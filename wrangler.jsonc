@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "webapp",
+  "compatibility_date": "2026-08-25",
+  "pages_build_output_dir": "./dist",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "vars": {
+    "LIVEKIT_URL": "wss://livekit.185.199.199.114.nip.io",
+    "LIVEKIT_HTTP_URL": "https://livekit.185.199.199.114.nip.io"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "webapp-production",
+      "database_id": "REPLACE_AFTER_D1_CREATE"
+    }
+  ]
+  // LIVEKIT_API_KEY / LIVEKIT_API_SECRET хранятся как Cloudflare secrets (wrangler secret put),
+  // а не в этом файле - они не должны попадать в git.
+}
