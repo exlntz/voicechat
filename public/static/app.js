@@ -14,7 +14,8 @@ const state = {
   maxParticipants: 5,
   previewStream: null,
   selectedCamId: null,
-  selectedMicId: null
+  selectedMicId: null,
+  selectedSpeakerId: null
 }
 
 const root = document.getElementById('app-root')
@@ -75,6 +76,33 @@ async function renderLobby(prefillRoomCode = '') {
   preview.appendChild(noCam)
   card.appendChild(preview)
 
+  // ---- Выбор устройств ввода/вывода ----
+  const deviceSettings = el('div', { class: 'device-settings' })
+
+  const camRow = el('div', { class: 'device-row' })
+  camRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-video' }), ' Камера']))
+  const camSelect = el('select', {})
+  camRow.appendChild(camSelect)
+  deviceSettings.appendChild(camRow)
+
+  const micRow = el('div', { class: 'device-row' })
+  micRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-microphone' }), ' Микрофон']))
+  const micSelect = el('select', {})
+  micRow.appendChild(micSelect)
+  const micMeter = el('div', { class: 'mic-meter' }, [el('div', { class: 'mic-meter-bar' })])
+  micRow.appendChild(micMeter)
+  deviceSettings.appendChild(micRow)
+
+  const spkRow = el('div', { class: 'device-row' })
+  spkRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-volume-up' }), ' Динамики']))
+  const spkSelect = el('select', {})
+  spkRow.appendChild(spkSelect)
+  const testBtn = el('button', { class: 'btn-secondary test-sound-btn', type: 'button', title: 'Проверить звук' }, 'Тест')
+  spkRow.appendChild(testBtn)
+  deviceSettings.appendChild(spkRow)
+
+  card.appendChild(deviceSettings)
+
   const nameInput = el('input', { type: 'text', placeholder: 'Ваше имя', value: savedName, maxlength: '30' })
   card.appendChild(nameInput)
 
@@ -94,7 +122,163 @@ async function renderLobby(prefillRoomCode = '') {
   screen.appendChild(card)
   root.appendChild(screen)
 
-  // start local camera preview (best effort)
+  // ---- Управление превью камеры ----
+  async function switchCamera(deviceId) {
+    if (state.previewStream) {
+      state.previewStream.getTracks().forEach((t) => t.stop())
+      state.previewStream = null
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: deviceId ? { deviceId: { exact: deviceId } } : true,
+        audio: false
+      })
+      state.previewStream = stream
+      previewVideo.srcObject = stream
+      noCam.style.display = 'none'
+    } catch (e) {
+      noCam.style.display = 'flex'
+    }
+  }
+
+  // ---- Индикатор уровня микрофона ----
+  let micStream = null
+  let audioCtx = null
+  let meterRAF = null
+
+  function stopMicMonitor() {
+    if (meterRAF) cancelAnimationFrame(meterRAF)
+    meterRAF = null
+    if (audioCtx) { try { audioCtx.close() } catch {} audioCtx = null }
+    if (micStream) { micStream.getTracks().forEach((t) => t.stop()); micStream = null }
+  }
+
+  async function startMicMonitor(deviceId) {
+    stopMicMonitor()
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio: deviceId ? { deviceId: { exact: deviceId } } : true
+      })
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+      const source = audioCtx.createMediaStreamSource(micStream)
+      const analyser = audioCtx.createAnalyser()
+      analyser.fftSize = 256
+      source.connect(analyser)
+      const data = new Uint8Array(analyser.frequencyBinCount)
+      const bar = micMeter.querySelector('.mic-meter-bar')
+      const loop = () => {
+        analyser.getByteFrequencyData(data)
+        const avg = data.reduce((a, b) => a + b, 0) / data.length
+        bar.style.width = Math.min(100, (avg / 100) * 100) + '%'
+        meterRAF = requestAnimationFrame(loop)
+      }
+      loop()
+    } catch (e) {
+      // нет доступа к микрофону - индикатор просто не покажется
+    }
+  }
+
+  // ---- Тест динамиков ----
+  async function playTestSound(deviceId) {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      const osc = ctx.createOscillator()
+      osc.frequency.value = 880
+      const gain = ctx.createGain()
+      gain.gain.value = 0.18
+      const dest = ctx.createMediaStreamDestination()
+      osc.connect(gain).connect(dest)
+      const audioEl = document.createElement('audio')
+      audioEl.srcObject = dest.stream
+      audioEl.autoplay = true
+      if (deviceId && typeof audioEl.setSinkId === 'function') {
+        await audioEl.setSinkId(deviceId).catch(() => {})
+      }
+      document.body.appendChild(audioEl)
+      osc.start()
+      setTimeout(() => {
+        try { osc.stop() } catch {}
+        try { ctx.close() } catch {}
+        audioEl.remove()
+      }, 600)
+    } catch (e) {
+      showToast('Не удалось воспроизвести тестовый звук', 'error')
+    }
+  }
+
+  // ---- Заполнение списков устройств ----
+  const speakerSupported = typeof HTMLMediaElement !== 'undefined' && typeof HTMLMediaElement.prototype.setSinkId === 'function'
+  if (!speakerSupported) spkRow.style.display = 'none'
+
+  async function populateDeviceLists() {
+    let devices = []
+    try {
+      devices = await navigator.mediaDevices.enumerateDevices()
+    } catch (e) {
+      return
+    }
+    const cams = devices.filter((d) => d.kind === 'videoinput')
+    const mics = devices.filter((d) => d.kind === 'audioinput')
+    const speakers = devices.filter((d) => d.kind === 'audiooutput')
+
+    const savedCam = localStorage.getItem('camDeviceId')
+    const savedMic = localStorage.getItem('micDeviceId')
+    const savedSpk = localStorage.getItem('speakerDeviceId')
+
+    camSelect.innerHTML = ''
+    if (cams.length === 0) {
+      camSelect.appendChild(el('option', { value: '' }, 'Камеры не найдены'))
+    } else {
+      cams.forEach((d, i) => camSelect.appendChild(el('option', { value: d.deviceId }, d.label || `Камера ${i + 1}`)))
+      if (savedCam && cams.some((d) => d.deviceId === savedCam)) camSelect.value = savedCam
+    }
+
+    micSelect.innerHTML = ''
+    if (mics.length === 0) {
+      micSelect.appendChild(el('option', { value: '' }, 'Микрофоны не найдены'))
+    } else {
+      mics.forEach((d, i) => micSelect.appendChild(el('option', { value: d.deviceId }, d.label || `Микрофон ${i + 1}`)))
+      if (savedMic && mics.some((d) => d.deviceId === savedMic)) micSelect.value = savedMic
+    }
+
+    if (speakerSupported) {
+      spkSelect.innerHTML = ''
+      if (speakers.length === 0) {
+        spkSelect.appendChild(el('option', { value: '' }, 'Не найдено'))
+      } else {
+        speakers.forEach((d, i) => spkSelect.appendChild(el('option', { value: d.deviceId }, d.label || `Динамики ${i + 1}`)))
+        if (savedSpk && speakers.some((d) => d.deviceId === savedSpk)) spkSelect.value = savedSpk
+      }
+    }
+
+    state.selectedCamId = camSelect.value || null
+    state.selectedMicId = micSelect.value || null
+    state.selectedSpeakerId = speakerSupported ? (spkSelect.value || null) : null
+  }
+
+  camSelect.addEventListener('change', async () => {
+    state.selectedCamId = camSelect.value || null
+    if (state.selectedCamId) localStorage.setItem('camDeviceId', state.selectedCamId)
+    await switchCamera(state.selectedCamId)
+  })
+
+  micSelect.addEventListener('change', async () => {
+    state.selectedMicId = micSelect.value || null
+    if (state.selectedMicId) localStorage.setItem('micDeviceId', state.selectedMicId)
+    await startMicMonitor(state.selectedMicId)
+  })
+
+  spkSelect.addEventListener('change', () => {
+    state.selectedSpeakerId = spkSelect.value || null
+    if (state.selectedSpeakerId) localStorage.setItem('speakerDeviceId', state.selectedSpeakerId)
+  })
+
+  testBtn.addEventListener('click', () => playTestSound(state.selectedSpeakerId))
+
+  const onDeviceChange = () => populateDeviceLists()
+  navigator.mediaDevices.addEventListener('devicechange', onDeviceChange)
+
+  // start local camera preview (best effort), затем получить лейблы устройств и запустить индикатор микрофона
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     state.previewStream = stream
@@ -104,11 +288,17 @@ async function renderLobby(prefillRoomCode = '') {
     noCam.style.display = 'flex'
   }
 
+  await populateDeviceLists()
+  await startMicMonitor(state.selectedMicId)
+  await populateDeviceLists() // обновить лейблы аудиоустройств после получения разрешения на микрофон
+
   function stopPreview() {
     if (state.previewStream) {
       state.previewStream.getTracks().forEach((t) => t.stop())
       state.previewStream = null
     }
+    stopMicMonitor()
+    navigator.mediaDevices.removeEventListener('devicechange', onDeviceChange)
   }
 
   async function doJoin() {
@@ -220,8 +410,13 @@ async function enterRoom(joinData) {
     adaptiveStream: true,
     dynacast: true,
     videoCaptureDefaults: {
-      resolution: LK.VideoPresets.h720.resolution
+      resolution: LK.VideoPresets.h720.resolution,
+      ...(state.selectedCamId ? { deviceId: state.selectedCamId } : {})
     },
+    audioCaptureDefaults: {
+      ...(state.selectedMicId ? { deviceId: state.selectedMicId } : {})
+    },
+    ...(state.selectedSpeakerId ? { audioOutput: { deviceId: state.selectedSpeakerId } } : {}),
     publishDefaults: {
       simulcast: true,
       videoSimulcastLayers: [LK.VideoPresets.h180, LK.VideoPresets.h360]
@@ -307,7 +502,11 @@ async function enterRoom(joinData) {
       track.attach(t.video)
       t.placeholder.style.display = 'none'
     } else if (track.source === LK.Track.Source.Microphone) {
-      track.attach(document.body.appendChild(el('audio', { autoplay: true, style: 'display:none' })))
+      const audioEl = document.body.appendChild(el('audio', { autoplay: true, style: 'display:none' }))
+      track.attach(audioEl)
+      if (state.selectedSpeakerId && typeof audioEl.setSinkId === 'function') {
+        audioEl.setSinkId(state.selectedSpeakerId).catch(() => {})
+      }
     } else if (track.source === LK.Track.Source.ScreenShare) {
       const t = makeScreenTile(participant.identity, name, publication.trackSid)
       track.attach(t.video)
@@ -316,7 +515,11 @@ async function enterRoom(joinData) {
       relayout()
       showToast(`${name} начал демонстрацию экрана`)
     } else if (track.source === LK.Track.Source.ScreenShareAudio) {
-      track.attach(document.body.appendChild(el('audio', { autoplay: true, style: 'display:none' })))
+      const audioEl = document.body.appendChild(el('audio', { autoplay: true, style: 'display:none' }))
+      track.attach(audioEl)
+      if (state.selectedSpeakerId && typeof audioEl.setSinkId === 'function') {
+        audioEl.setSinkId(state.selectedSpeakerId).catch(() => {})
+      }
     }
   })
 
