@@ -13,7 +13,7 @@
 ## URL
 - **Production backend (self-hosted на VPS пользователя)**: https://app.185.199.199.114.nip.io
 - **LiveKit медиа-сервер (тот же VPS, Нидерланды)**: wss://livekit.185.199.199.114.nip.io
-- **Скачать .exe (Windows)**: собирается из `/home/user/electron-app` (см. раздел "Сборка .exe")
+- **Скачать .exe (Windows)**: собирается из папки `electron-app/` (см. раздел "Сборка .exe")
 - **[Устаревшее] Cloudflare Worker деплой**: https://d64f63e0-da2a-4f9a-a681-de51ac697dac.vip.gensparksite.com — оставлен как резерв/референс, production больше НЕ через него (по явному запросу — деплой должен быть полностью на своём сервере, без Genspark/Cloudflare)
 
 ## Архитектура
@@ -32,7 +32,7 @@
 
 - **Control-plane** — самостоятельный Node.js-сервер (`/opt/zvonki-backend` на VPS, копия исходников в `/home/user/webapp/vps-backend-deployed-copy/` этого репозитория) на Hono + `@hono/node-server`: создаёт комнаты, генерирует JWT-токены доступа к LiveKit, следит за лимитами участников (5) и демонстраций экрана (2). Запущен под PM2, автозапуск после перезагрузки сервера через systemd (`pm2 startup systemd` + `pm2 save`).
 - **Медиа-сервер** — LiveKit (self-hosted, Docker) на том же VPS в Нидерландах (185.199.199.114). Обрабатывает весь видео/аудио трафик через SFU (Selective Forwarding Unit), с TURN/TLS для обхода блокировок.
-- **Клиент** — общий HTML/CSS/JS (`public/static/app.js`), который открывается либо в браузере, либо внутри Electron-обёртки (`/home/user/electron-app`, отдельная папка).
+- **Клиент** — общий HTML/CSS/JS (`public/static/app.js`), который открывается либо в браузере, либо внутри Electron-обёртки (`electron-app/`).
 - **SSL** — отдельный сертификат Let's Encrypt для `app.185.199.199.114.nip.io` (certbot, автопродление), по тому же принципу, что и для `livekit.*.nip.io`.
 - **Исходники Cloudflare Worker версии** (`src/index.tsx`, `wrangler.jsonc`) оставлены в репозитории как альтернативный/резервный вариант деплоя, но НЕ являются текущим production.
 
@@ -68,9 +68,9 @@
 - Сервисы настроены на автозапуск (`docker --restart unless-stopped`, `systemctl enable nginx`, `pm2 startup systemd` + `pm2 save`, `ufw` persistent) — переживают перезагрузку сервера
 
 ## Сборка .exe (Electron)
-Электрон-проект лежит отдельно в `/home/user/electron-app` (не деплоится на Cloudflare, не входит в этот репозиторий).
+Исходники desktop-клиента лежат в папке `electron-app/` этого репозитория (сама папка `release/` со скомпилированным .exe и `node_modules/` не хранятся в git — слишком большие файлы, GitHub их не примет).
 ```bash
-cd /home/user/electron-app
+cd electron-app
 npm install
 npx electron-builder --win portable --x64
 # Результат: release/Zvonki-Setup.exe

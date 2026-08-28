@@ -1,0 +1,38 @@
+{
+  "name": "zvonki-desktop",
+  "productName": "Звонки",
+  "version": "1.0.0",
+  "description": "Десктопное приложение для видеозвонков без ВПН",
+  "main": "src/main.js",
+  "author": "Zvonki",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win --x64",
+    "dist:win:portable": "electron-builder --win portable --x64"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.zvonki.desktop",
+    "productName": "Звонки",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "portable": {
+      "artifactName": "Zvonki-Setup.exe"
+    }
+  }
+}
