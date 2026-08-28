@@ -209,6 +209,15 @@ html, body {
   -webkit-app-region: no-drag;
 }
 
+.room-topbar .host-indicator {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #f5c518;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .room-topbar .status-dot {
   width: 8px; height: 8px; border-radius: 50%; background: var(--success);
   display: inline-block;
@@ -258,7 +267,9 @@ html, body {
   gap: 6px;
 }
 
-.tile .tile-label .fa-microphone-slash { color: var(--danger); }
+.tile .tile-label .fa-microphone-slash,
+.tile .tile-label .fa-video-slash { color: var(--danger); }
+.tile .tile-label .host-crown { color: #f5c518; margin-left: 2px; }
 
 .tile-fullscreen-btn {
   position: absolute;
@@ -281,7 +292,32 @@ html, body {
 }
 .tile-fullscreen-btn:hover { background: rgba(0,0,0,.8); }
 .tile.screen-tile:hover .tile-fullscreen-btn,
-.tile.screen-tile.is-fullscreen .tile-fullscreen-btn { opacity: 1; }
+.tile.screen-tile.is-fullscreen .tile-fullscreen-btn,
+.tile.camera-tile:hover .tile-fullscreen-btn { opacity: 1; }
+
+/* Кнопка "выгнать участника" - видна только создателю комнаты, при наведении на чужой тайл камеры.
+   Смещена левее кнопки fullscreen, чтобы не перекрываться с ней. */
+.tile-kick-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 48px;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(239, 68, 68, .75);
+  color: white;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity .15s, background .15s;
+  z-index: 6;
+}
+.tile-kick-btn:hover { background: var(--danger); }
+.tile.camera-tile:hover .tile-kick-btn { opacity: 1; }
 
 /* Регулятор громкости на тайле (голос собеседника / звук демонстрации) */
 .volume-control {
@@ -322,14 +358,18 @@ html, body {
 .tile.screen-tile { cursor: pointer; }
 
 .tile.screen-tile:fullscreen,
-.tile.screen-tile.is-fullscreen {
+.tile.screen-tile.is-fullscreen,
+.tile.camera-tile:fullscreen,
+.tile.camera-tile.is-fullscreen {
   background: #000;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .tile.screen-tile:fullscreen video,
-.tile.screen-tile.is-fullscreen video {
+.tile.screen-tile.is-fullscreen video,
+.tile.camera-tile:fullscreen video,
+.tile.camera-tile.is-fullscreen video {
   width: 100%;
   height: 100%;
   object-fit: contain;

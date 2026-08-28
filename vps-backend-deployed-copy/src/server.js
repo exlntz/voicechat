@@ -28,6 +28,9 @@ if (!LIVEKIT_URL || !LIVEKIT_HTTP_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET
 // ---------- SQLite (встроенный в Node.js, без нативных зависимостей) ----------
 const db = new DatabaseSync(DB_PATH)
 db.exec('CREATE TABLE IF NOT EXISTS rooms (code TEXT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, last_active DATETIME DEFAULT CURRENT_TIMESTAMP)')
+// Миграция: добавляем колонки создателя комнаты (может уже существовать в старой БД - игнорируем ошибку)
+try { db.exec('ALTER TABLE rooms ADD COLUMN creator_identity TEXT') } catch {}
+try { db.exec('ALTER TABLE rooms ADD COLUMN host_secret TEXT') } catch {}
 
 const app = new Hono()
 
@@ -63,10 +66,14 @@ app.post('/api/rooms', (c) => {
 })
 
 // ---------- API: войти в комнату (создаёт если не существует), возвращает LiveKit токен ----------
+// Создатель комнаты (первый, кто вошёл с этим кодом) получает роль хоста и секрет hostSecret,
+// которым может управлять участниками (выгонять). Секрет хранится в БД и возвращается только хосту;
+// при повторном входе с тем же hostSecret (например, после обновления страницы) права хоста подтверждаются.
 app.post('/api/join', async (c) => {
   const body = await c.req.json().catch(() => ({}))
   let roomCode = (body.roomCode || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')
   const displayName = sanitizeName(body.displayName || '', 'Гость')
+  const providedHostSecret = typeof body.hostSecret === 'string' && body.hostSecret ? body.hostSecret : null
 
   if (!roomCode) roomCode = randomId(6)
 
@@ -82,16 +89,32 @@ app.post('/api/join', async (c) => {
     return c.json({ error: 'room_full', message: `В комнате уже максимум участников (${MAX_PARTICIPANTS})` }, 403)
   }
 
-  db.prepare(
-    'INSERT INTO rooms (code) VALUES (?) ON CONFLICT(code) DO UPDATE SET last_active = CURRENT_TIMESTAMP'
-  ).run(roomCode)
-
   const identity = randomId(6)
+  const existingRoom = db.prepare('SELECT creator_identity, host_secret FROM rooms WHERE code = ?').get(roomCode)
+
+  let isHost = false
+  let hostSecret = null
+
+  if (!existingRoom) {
+    // Комнаты с таким кодом ещё не было - создающий её становится хостом
+    hostSecret = randomId(20)
+    isHost = true
+    db.prepare('INSERT INTO rooms (code, creator_identity, host_secret) VALUES (?, ?, ?)').run(roomCode, identity, hostSecret)
+  } else {
+    db.prepare('UPDATE rooms SET last_active = CURRENT_TIMESTAMP WHERE code = ?').run(roomCode)
+    if (providedHostSecret && existingRoom.host_secret && providedHostSecret === existingRoom.host_secret) {
+      // Создатель переподключается (например, обновил страницу/переподключение) - подтверждаем права хоста
+      isHost = true
+      hostSecret = existingRoom.host_secret
+      db.prepare('UPDATE rooms SET creator_identity = ? WHERE code = ?').run(identity, roomCode)
+    }
+  }
 
   const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
     identity,
     name: displayName,
-    ttl: '12h'
+    ttl: '12h',
+    metadata: JSON.stringify({ isHost })
   })
 
   at.addGrant({
@@ -117,8 +140,34 @@ app.post('/api/join', async (c) => {
     identity,
     displayName,
     maxParticipants: MAX_PARTICIPANTS,
-    maxScreenShares: MAX_SCREEN_SHARES
+    maxScreenShares: MAX_SCREEN_SHARES,
+    isHost,
+    hostSecret: isHost ? hostSecret : null
   })
+})
+
+// ---------- API: выгнать участника из комнаты (только для хоста-создателя) ----------
+app.post('/api/rooms/:code/kick', async (c) => {
+  const code = c.req.param('code')
+  const body = await c.req.json().catch(() => ({}))
+  const targetIdentity = (body.targetIdentity || '').trim()
+  const hostSecret = typeof body.hostSecret === 'string' ? body.hostSecret : ''
+
+  if (!targetIdentity || !hostSecret) {
+    return c.json({ error: 'bad_request', message: 'targetIdentity и hostSecret обязательны' }, 400)
+  }
+
+  const room = db.prepare('SELECT host_secret FROM rooms WHERE code = ?').get(code)
+  if (!room || !room.host_secret || room.host_secret !== hostSecret) {
+    return c.json({ error: 'forbidden', message: 'Недостаточно прав для удаления участника' }, 403)
+  }
+
+  try {
+    await svc.removeParticipant(code, targetIdentity)
+    return c.json({ success: true })
+  } catch (e) {
+    return c.json({ error: 'remove_failed', message: 'Не удалось удалить участника' }, 500)
+  }
 })
 
 // ---------- API: текущее число демонстраций экрана в комнате ----------

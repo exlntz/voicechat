@@ -7,7 +7,7 @@ const state = {
   room: null,
   roomCode: null,
   displayName: '',
-  cameraEnabled: true,
+  cameraEnabled: false, // по умолчанию входим в звонок с выключенной камерой
   micEnabled: true,
   screenShares: new Map(), // trackSid -> { participantIdentity, participantName }
   maxScreenShares: 2,
@@ -15,7 +15,9 @@ const state = {
   previewStream: null,
   selectedCamId: null,
   selectedMicId: null,
-  selectedSpeakerId: null
+  selectedSpeakerId: null,
+  isHost: false, // является ли текущий пользователь создателем комнаты
+  hostSecret: null // секрет для управления комнатой (выгон участников), известен только создателю
 }
 
 const root = document.getElementById('app-root')
@@ -358,6 +360,9 @@ async function renderLobby(prefillRoomCode = '') {
     const name = nameInput.value.trim() || `Гость-${Math.floor(Math.random() * 1000)}`
     localStorage.setItem('displayName', name)
     const roomCode = roomInput.value.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+    // Если ранее этот же браузер создал комнату с таким кодом - подтягиваем сохранённый секрет создателя,
+    // чтобы при повторном входе (например, обновление страницы) права хоста восстановились
+    const savedHostSecret = roomCode ? localStorage.getItem(`hostSecret:${roomCode}`) : null
 
     joinBtn.disabled = true
     joinBtn.textContent = 'Подключение...'
@@ -367,12 +372,16 @@ async function renderLobby(prefillRoomCode = '') {
       const res = await fetch('/api/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomCode, displayName: name })
+        body: JSON.stringify({ roomCode, displayName: name, hostSecret: savedHostSecret })
       })
       const data = await res.json()
 
       if (!res.ok) {
         throw new Error(data.message || 'Не удалось подключиться')
+      }
+
+      if (data.isHost && data.hostSecret) {
+        localStorage.setItem(`hostSecret:${data.roomCode}`, data.hostSecret)
       }
 
       stopPreview()
@@ -395,11 +404,13 @@ async function renderLobby(prefillRoomCode = '') {
 // ===================== КОМНАТА (звонок) =====================
 
 async function enterRoom(joinData) {
-  const { token, url, roomCode, displayName, maxParticipants, maxScreenShares } = joinData
+  const { token, url, roomCode, displayName, maxParticipants, maxScreenShares, isHost, hostSecret } = joinData
   state.roomCode = roomCode
   state.displayName = displayName
   state.maxParticipants = maxParticipants || 5
   state.maxScreenShares = maxScreenShares || 2
+  state.isHost = !!isHost
+  state.hostSecret = hostSecret || null
 
   root.innerHTML = ''
 
@@ -416,6 +427,11 @@ async function enterRoom(joinData) {
     navigator.clipboard.writeText(roomCode).then(() => showToast('Код комнаты скопирован'))
   })
   roomInfo.appendChild(codeBadge)
+  if (state.isHost) {
+    roomInfo.appendChild(el('span', { class: 'host-indicator', title: 'Вы создатель этой комнаты - можете выгонять участников' }, [
+      el('i', { class: 'fas fa-crown' }), ' Вы создатель'
+    ]))
+  }
   topbar.appendChild(roomInfo)
 
   const topRight = el('div', {})
@@ -527,17 +543,33 @@ async function enterRoom(joinData) {
     return wrap
   }
 
-  function makeCameraTile(identity, name, isLocal) {
+  function makeCameraTile(identity, name, isLocal, hostBadge) {
     const tile = el('div', { class: 'tile camera-tile', id: `tile-cam-${identity}` })
     const video = el('video', { autoplay: true, playsinline: true, ...(isLocal ? { muted: true } : {}) })
     if (isLocal) video.style.transform = 'scaleX(-1)'
     const placeholder = el('div', { class: 'no-video-placeholder' }, [el('div', { class: 'avatar-circle' }, initials(name))])
     const micIcon = el('i', { class: 'fas fa-microphone-slash', style: 'display:none' })
-    const label = el('div', { class: 'tile-label' }, [micIcon, el('span', {}, name + (isLocal ? ' (Вы)' : ''))])
+    // По умолчанию считаем камеру выключенной (большинство участников входят с выключенной камерой),
+    // индикатор скрывается явно как только подтверждается активная камера-трек
+    const camIcon = el('i', { class: 'fas fa-video-slash', style: isLocal ? 'display:none' : 'display:inline' })
+    const labelChildren = [camIcon, micIcon, el('span', {}, name + (isLocal ? ' (Вы)' : ''))]
+    if (hostBadge) labelChildren.push(el('i', { class: 'fas fa-crown host-crown', title: 'Создатель комнаты' }))
+    const label = el('div', { class: 'tile-label' }, labelChildren)
     tile.appendChild(video)
     tile.appendChild(placeholder)
     tile.appendChild(label)
+
+    // Полноэкранный режим для тайла камеры (выбрать конкретного участника "на весь экран")
+    const fsBtn = el('button', { class: 'tile-fullscreen-btn', title: 'На весь экран' }, [el('i', { class: 'fas fa-expand' })])
+    fsBtn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      toggleTileFullscreen(tile)
+    })
+    tile.appendChild(fsBtn)
+    tile.addEventListener('dblclick', () => toggleTileFullscreen(tile))
+
     let volumeCtl = null
+    let kickBtn = null
     if (!isLocal) {
       // Громкость голоса конкретного собеседника (не влияет на других)
       volumeCtl = makeVolumeControl((v) => {
@@ -545,14 +577,47 @@ async function enterRoom(joinData) {
         if (p) p.setVolume(v, LK.Track.Source.Microphone)
       })
       tile.appendChild(volumeCtl)
+      // Кнопка "выгнать участника" - видна только создателю комнаты (слева, чтобы не конфликтовать с fullscreen справа)
+      if (state.isHost) {
+        kickBtn = el('button', { class: 'tile-kick-btn', title: 'Выгнать из звонка' }, [el('i', { class: 'fas fa-user-slash' })])
+        kickBtn.addEventListener('click', (e) => {
+          e.stopPropagation()
+          kickParticipant(identity, name)
+        })
+        tile.appendChild(kickBtn)
+      }
     }
-    return { tile, video, placeholder, label, micIcon, volumeCtl }
+    return { tile, video, placeholder, label, micIcon, camIcon, volumeCtl, kickBtn, fsBtn }
   }
 
   // Обновить видимость иконки "микрофон выключен" на тайле участника по его identity
   function updateMicIndicator(identity, muted) {
     const t = cameraTilesMap.get(identity)
     if (t && t.micIcon) t.micIcon.style.display = muted ? 'inline' : 'none'
+  }
+
+  // Обновить видимость иконки "камера выключена" на тайле участника по его identity
+  function updateCamIndicator(identity, off) {
+    const t = cameraTilesMap.get(identity)
+    if (t && t.camIcon) t.camIcon.style.display = off ? 'inline' : 'none'
+  }
+
+  // ---- Выгнать участника из комнаты (доступно только создателю) ----
+  async function kickParticipant(identity, name) {
+    if (!state.isHost || !state.hostSecret) return
+    if (!confirm(`Выгнать «${name}» из звонка?`)) return
+    try {
+      const res = await fetch(`/api/rooms/${state.roomCode}/kick`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetIdentity: identity, hostSecret: state.hostSecret })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.message || 'Не удалось удалить участника')
+      showToast(`${name} выгнан из звонка`)
+    } catch (e) {
+      showToast(e.message || 'Не удалось выгнать участника', 'error')
+    }
   }
 
   // ---- Полноэкранный режим для тайла (демонстрация экрана) ----
@@ -590,7 +655,7 @@ async function enterRoom(joinData) {
   }
 
   document.addEventListener('fullscreenchange', () => {
-    document.querySelectorAll('.screen-tile').forEach((t) => {
+    document.querySelectorAll('.screen-tile, .camera-tile').forEach((t) => {
       const icon = t.querySelector('.tile-fullscreen-btn i')
       if (!icon) return
       icon.className = document.fullscreenElement === t ? 'fas fa-compress' : 'fas fa-expand'
@@ -600,9 +665,18 @@ async function enterRoom(joinData) {
 
   const cameraTilesMap = new Map() // identity -> {tile, video, placeholder, label}
 
-  function ensureCameraTile(identity, name, isLocal) {
+  // Определить, является ли участник создателем комнаты, по его metadata ({"isHost":true}, задаётся в JWT на сервере)
+  function isParticipantHost(participant) {
+    try {
+      return !!(participant.metadata && JSON.parse(participant.metadata).isHost)
+    } catch {
+      return false
+    }
+  }
+
+  function ensureCameraTile(identity, name, isLocal, hostBadge = false) {
     if (cameraTilesMap.has(identity)) return cameraTilesMap.get(identity)
-    const t = makeCameraTile(identity, name, isLocal)
+    const t = makeCameraTile(identity, name, isLocal, hostBadge)
     cameraTilesMap.set(identity, t)
     document.body.appendChild(t.tile) // temp, relayout moves it
     relayout()
@@ -619,16 +693,17 @@ async function enterRoom(joinData) {
   room.on(LK.RoomEvent.TrackSubscribed, (track, publication, participant) => {
     const name = participant.name || participant.identity
     if (track.source === LK.Track.Source.Camera) {
-      const t = ensureCameraTile(participant.identity, name, false)
+      const t = ensureCameraTile(participant.identity, name, false, isParticipantHost(participant))
       track.attach(t.video)
       t.placeholder.style.display = 'none'
+      updateCamIndicator(participant.identity, false)
     } else if (track.source === LK.Track.Source.Microphone) {
       const audioEl = document.body.appendChild(el('audio', { autoplay: true, style: 'display:none' }))
       track.attach(audioEl)
       if (state.selectedSpeakerId && typeof audioEl.setSinkId === 'function') {
         audioEl.setSinkId(state.selectedSpeakerId).catch(() => {})
       }
-      ensureCameraTile(participant.identity, name, false)
+      ensureCameraTile(participant.identity, name, false, isParticipantHost(participant))
       updateMicIndicator(participant.identity, publication.isMuted)
     } else if (track.source === LK.Track.Source.ScreenShare) {
       const t = makeScreenTile(participant.identity, name, publication.trackSid)
@@ -650,6 +725,7 @@ async function enterRoom(joinData) {
     if (track.source === LK.Track.Source.Camera) {
       const t = cameraTilesMap.get(participant.identity)
       if (t) t.placeholder.style.display = 'flex'
+      updateCamIndicator(participant.identity, true)
     } else if (track.source === LK.Track.Source.ScreenShare) {
       const tile = document.getElementById(`tile-screen-${publication.trackSid}`)
       if (tile) tile.remove()
@@ -663,6 +739,7 @@ async function enterRoom(joinData) {
     if (publication.source === LK.Track.Source.Camera) {
       const t = cameraTilesMap.get(participant.identity)
       if (t) t.placeholder.style.display = 'flex'
+      updateCamIndicator(participant.identity, true)
     } else if (publication.source === LK.Track.Source.Microphone) {
       updateMicIndicator(participant.identity, true)
     }
@@ -671,6 +748,7 @@ async function enterRoom(joinData) {
     if (publication.source === LK.Track.Source.Camera) {
       const t = cameraTilesMap.get(participant.identity)
       if (t) t.placeholder.style.display = 'none'
+      updateCamIndicator(participant.identity, false)
     } else if (publication.source === LK.Track.Source.Microphone) {
       updateMicIndicator(participant.identity, false)
     }
@@ -678,7 +756,7 @@ async function enterRoom(joinData) {
 
   room.on(LK.RoomEvent.ParticipantConnected, (participant) => {
     showToast(`${participant.name || participant.identity} присоединился`)
-    ensureCameraTile(participant.identity, participant.name || participant.identity, false)
+    ensureCameraTile(participant.identity, participant.name || participant.identity, false, isParticipantHost(participant))
   })
 
   room.on(LK.RoomEvent.ParticipantDisconnected, (participant) => {
@@ -704,7 +782,11 @@ async function enterRoom(joinData) {
 
   room.on(LK.RoomEvent.Disconnected, (reason) => {
     setStatus('Отключено', 'disconnected')
-    showToast('Вы отключены от звонка', reason ? 'error' : 'info')
+    if (reason === LK.DisconnectReason.PARTICIPANT_REMOVED) {
+      showToast('Вас выгнал из звонка создатель комнаты', 'error')
+    } else {
+      showToast('Вы отключены от звонка', reason ? 'error' : 'info')
+    }
     cleanupAndGoLobby()
   })
 
@@ -720,10 +802,11 @@ async function enterRoom(joinData) {
     await room.localParticipant.setCameraEnabled(state.cameraEnabled)
     await room.localParticipant.setMicrophoneEnabled(state.micEnabled)
 
-    const localTile = ensureCameraTile(room.localParticipant.identity, state.displayName, true)
+    const localTile = ensureCameraTile(room.localParticipant.identity, state.displayName, true, state.isHost)
     const camPub = room.localParticipant.getTrackPublication(LK.Track.Source.Camera)
     if (camPub && camPub.track) camPub.track.attach(localTile.video)
     localTile.placeholder.style.display = state.cameraEnabled ? 'none' : 'flex'
+    localTile.camIcon.style.display = state.cameraEnabled ? 'none' : 'inline'
 
     // Синхронизируем кнопки управления с фактическим стартовым состоянием
     micBtn.classList.toggle('active', state.micEnabled)
@@ -735,10 +818,13 @@ async function enterRoom(joinData) {
 
     // Render existing remote participants
     room.remoteParticipants.forEach((participant) => {
-      ensureCameraTile(participant.identity, participant.name || participant.identity, false)
+      ensureCameraTile(participant.identity, participant.name || participant.identity, false, isParticipantHost(participant))
       participant.trackPublications.forEach((pub) => {
         if (pub.source === LK.Track.Source.Microphone) {
           updateMicIndicator(participant.identity, pub.isMuted)
+        }
+        if (pub.source === LK.Track.Source.Camera) {
+          updateCamIndicator(participant.identity, !pub.track || pub.isMuted)
         }
         if (pub.track) {
           if (pub.source === LK.Track.Source.Camera) {
@@ -773,12 +859,20 @@ async function enterRoom(joinData) {
 
   camBtn.addEventListener('click', async () => {
     state.cameraEnabled = !state.cameraEnabled
-    await room.localParticipant.setCameraEnabled(state.cameraEnabled)
+    const pub = await room.localParticipant.setCameraEnabled(state.cameraEnabled)
     camBtn.classList.toggle('active', state.cameraEnabled)
     camBtn.classList.toggle('off', !state.cameraEnabled)
     camBtn.querySelector('i').className = state.cameraEnabled ? 'fas fa-video' : 'fas fa-video-slash'
     const t = cameraTilesMap.get(room.localParticipant.identity)
-    if (t) t.placeholder.style.display = state.cameraEnabled ? 'none' : 'flex'
+    if (t) {
+      // Если камера включается впервые за это подключение (входили с выключенной), трек создаётся только сейчас -
+      // его нужно прикрепить к <video>; при повторном вкл/выкл трек уже прикреплён и просто мьютится/анмьютится
+      if (state.cameraEnabled && pub && pub.track && !t.video.srcObject) {
+        pub.track.attach(t.video)
+      }
+      t.placeholder.style.display = state.cameraEnabled ? 'none' : 'flex'
+      t.camIcon.style.display = state.cameraEnabled ? 'none' : 'inline'
+    }
   })
 
   let isScreenSharing = false
