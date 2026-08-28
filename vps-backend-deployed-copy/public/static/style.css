@@ -140,6 +140,39 @@ html, body {
   color: var(--text-dim); font-size: 13px;
 }
 
+/* ---- Переключатели камеры/микрофона в лобби (с чем входить в звонок) ---- */
+.join-toggles {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.join-toggle-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.join-toggle-btn.on {
+  border-color: var(--accent);
+  background: rgba(91, 110, 245, .12);
+  color: var(--text);
+}
+.join-toggle-btn.off {
+  color: var(--text-dim);
+}
+.join-toggle-btn.off i { color: var(--danger); }
+.join-toggle-btn:hover { background: var(--bg-card); }
+
 /* ---------- Room screen ---------- */
 .room-screen {
   height: 100%;

@@ -76,6 +76,52 @@ async function renderLobby(prefillRoomCode = '') {
   preview.appendChild(noCam)
   card.appendChild(preview)
 
+  // ---- Переключатели: с чем входить в звонок (камера/микрофон вкл/выкл) ----
+  const joinToggles = el('div', { class: 'join-toggles' })
+  function makeJoinToggle(iconOnClass, iconOffClass, labelText, initialOn) {
+    const btn = el('button', { type: 'button', class: `join-toggle-btn ${initialOn ? 'on' : 'off'}` }, [
+      el('i', { class: initialOn ? iconOnClass : iconOffClass }),
+      el('span', {}, labelText)
+    ])
+    return btn
+  }
+  const camToggleBtn = makeJoinToggle('fas fa-video', 'fas fa-video-slash', 'Камера', state.cameraEnabled)
+  const micToggleBtn = makeJoinToggle('fas fa-microphone', 'fas fa-microphone-slash', 'Микрофон', state.micEnabled)
+  joinToggles.appendChild(camToggleBtn)
+  joinToggles.appendChild(micToggleBtn)
+  card.appendChild(joinToggles)
+
+  function setJoinToggle(btn, on, iconOnClass, iconOffClass) {
+    btn.classList.toggle('on', on)
+    btn.classList.toggle('off', !on)
+    btn.querySelector('i').className = on ? iconOnClass : iconOffClass
+  }
+
+  camToggleBtn.addEventListener('click', async () => {
+    state.cameraEnabled = !state.cameraEnabled
+    setJoinToggle(camToggleBtn, state.cameraEnabled, 'fas fa-video', 'fas fa-video-slash')
+    if (state.cameraEnabled) {
+      await switchCamera(state.selectedCamId)
+    } else {
+      if (state.previewStream) {
+        state.previewStream.getTracks().forEach((t) => t.stop())
+        state.previewStream = null
+      }
+      previewVideo.srcObject = null
+      noCam.style.display = 'flex'
+    }
+  })
+
+  micToggleBtn.addEventListener('click', async () => {
+    state.micEnabled = !state.micEnabled
+    setJoinToggle(micToggleBtn, state.micEnabled, 'fas fa-microphone', 'fas fa-microphone-slash')
+    if (state.micEnabled) {
+      await startMicMonitor(state.selectedMicId)
+    } else {
+      stopMicMonitor()
+    }
+  })
+
   // ---- Выбор устройств ввода/вывода ----
   const deviceSettings = el('div', { class: 'device-settings' })
 
@@ -259,13 +305,13 @@ async function renderLobby(prefillRoomCode = '') {
   camSelect.addEventListener('change', async () => {
     state.selectedCamId = camSelect.value || null
     if (state.selectedCamId) localStorage.setItem('camDeviceId', state.selectedCamId)
-    await switchCamera(state.selectedCamId)
+    if (state.cameraEnabled) await switchCamera(state.selectedCamId)
   })
 
   micSelect.addEventListener('change', async () => {
     state.selectedMicId = micSelect.value || null
     if (state.selectedMicId) localStorage.setItem('micDeviceId', state.selectedMicId)
-    await startMicMonitor(state.selectedMicId)
+    if (state.micEnabled) await startMicMonitor(state.selectedMicId)
   })
 
   spkSelect.addEventListener('change', () => {
@@ -279,18 +325,25 @@ async function renderLobby(prefillRoomCode = '') {
   navigator.mediaDevices.addEventListener('devicechange', onDeviceChange)
 
   // start local camera preview (best effort), затем получить лейблы устройств и запустить индикатор микрофона
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-    state.previewStream = stream
-    previewVideo.srcObject = stream
-    noCam.style.display = 'none'
-  } catch (e) {
+  // (только если соответствующее устройство включено переключателем "с чем входить")
+  if (state.cameraEnabled) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+      state.previewStream = stream
+      previewVideo.srcObject = stream
+      noCam.style.display = 'none'
+    } catch (e) {
+      noCam.style.display = 'flex'
+    }
+  } else {
     noCam.style.display = 'flex'
   }
 
   await populateDeviceLists()
-  await startMicMonitor(state.selectedMicId)
-  await populateDeviceLists() // обновить лейблы аудиоустройств после получения разрешения на микрофон
+  if (state.micEnabled) {
+    await startMicMonitor(state.selectedMicId)
+    await populateDeviceLists() // обновить лейблы аудиоустройств после получения разрешения на микрофон
+  }
 
   function stopPreview() {
     if (state.previewStream) {
@@ -479,7 +532,8 @@ async function enterRoom(joinData) {
     const video = el('video', { autoplay: true, playsinline: true, ...(isLocal ? { muted: true } : {}) })
     if (isLocal) video.style.transform = 'scaleX(-1)'
     const placeholder = el('div', { class: 'no-video-placeholder' }, [el('div', { class: 'avatar-circle' }, initials(name))])
-    const label = el('div', { class: 'tile-label' }, [el('i', { class: 'fas fa-microphone-slash', style: 'display:none' }), el('span', {}, name + (isLocal ? ' (Вы)' : ''))])
+    const micIcon = el('i', { class: 'fas fa-microphone-slash', style: 'display:none' })
+    const label = el('div', { class: 'tile-label' }, [micIcon, el('span', {}, name + (isLocal ? ' (Вы)' : ''))])
     tile.appendChild(video)
     tile.appendChild(placeholder)
     tile.appendChild(label)
@@ -492,7 +546,13 @@ async function enterRoom(joinData) {
       })
       tile.appendChild(volumeCtl)
     }
-    return { tile, video, placeholder, label, volumeCtl }
+    return { tile, video, placeholder, label, micIcon, volumeCtl }
+  }
+
+  // Обновить видимость иконки "микрофон выключен" на тайле участника по его identity
+  function updateMicIndicator(identity, muted) {
+    const t = cameraTilesMap.get(identity)
+    if (t && t.micIcon) t.micIcon.style.display = muted ? 'inline' : 'none'
   }
 
   // ---- Полноэкранный режим для тайла (демонстрация экрана) ----
@@ -568,6 +628,8 @@ async function enterRoom(joinData) {
       if (state.selectedSpeakerId && typeof audioEl.setSinkId === 'function') {
         audioEl.setSinkId(state.selectedSpeakerId).catch(() => {})
       }
+      ensureCameraTile(participant.identity, name, false)
+      updateMicIndicator(participant.identity, publication.isMuted)
     } else if (track.source === LK.Track.Source.ScreenShare) {
       const t = makeScreenTile(participant.identity, name, publication.trackSid)
       track.attach(t.video)
@@ -601,12 +663,16 @@ async function enterRoom(joinData) {
     if (publication.source === LK.Track.Source.Camera) {
       const t = cameraTilesMap.get(participant.identity)
       if (t) t.placeholder.style.display = 'flex'
+    } else if (publication.source === LK.Track.Source.Microphone) {
+      updateMicIndicator(participant.identity, true)
     }
   })
   room.on(LK.RoomEvent.TrackUnmuted, (publication, participant) => {
     if (publication.source === LK.Track.Source.Camera) {
       const t = cameraTilesMap.get(participant.identity)
       if (t) t.placeholder.style.display = 'none'
+    } else if (publication.source === LK.Track.Source.Microphone) {
+      updateMicIndicator(participant.identity, false)
     }
   })
 
@@ -650,18 +716,30 @@ async function enterRoom(joinData) {
     await room.connect(url, token)
     setStatus('Подключено', '')
 
-    // Publish local camera + mic
-    await room.localParticipant.setCameraEnabled(true)
-    await room.localParticipant.setMicrophoneEnabled(true)
+    // Публикуем камеру/микрофон согласно выбору пользователя в лобби (можно войти с выключенными)
+    await room.localParticipant.setCameraEnabled(state.cameraEnabled)
+    await room.localParticipant.setMicrophoneEnabled(state.micEnabled)
 
     const localTile = ensureCameraTile(room.localParticipant.identity, state.displayName, true)
     const camPub = room.localParticipant.getTrackPublication(LK.Track.Source.Camera)
     if (camPub && camPub.track) camPub.track.attach(localTile.video)
+    localTile.placeholder.style.display = state.cameraEnabled ? 'none' : 'flex'
+
+    // Синхронизируем кнопки управления с фактическим стартовым состоянием
+    micBtn.classList.toggle('active', state.micEnabled)
+    micBtn.classList.toggle('off', !state.micEnabled)
+    micBtn.querySelector('i').className = state.micEnabled ? 'fas fa-microphone' : 'fas fa-microphone-slash'
+    camBtn.classList.toggle('active', state.cameraEnabled)
+    camBtn.classList.toggle('off', !state.cameraEnabled)
+    camBtn.querySelector('i').className = state.cameraEnabled ? 'fas fa-video' : 'fas fa-video-slash'
 
     // Render existing remote participants
     room.remoteParticipants.forEach((participant) => {
       ensureCameraTile(participant.identity, participant.name || participant.identity, false)
       participant.trackPublications.forEach((pub) => {
+        if (pub.source === LK.Track.Source.Microphone) {
+          updateMicIndicator(participant.identity, pub.isMuted)
+        }
         if (pub.track) {
           if (pub.source === LK.Track.Source.Camera) {
             const t = cameraTilesMap.get(participant.identity)
