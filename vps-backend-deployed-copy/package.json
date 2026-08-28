@@ -1,0 +1,13 @@
+{
+  "name": "zvonki-backend",
+  "type": "module",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "hono": "^4.13.5",
+    "@hono/node-server": "^1.13.7",
+    "livekit-server-sdk": "^2.18.0"
+  }
+}

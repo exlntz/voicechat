@@ -11,30 +11,36 @@
   - WebRTC поверх собственного TURN/TLS — устойчиво к DPI-блокировкам
 
 ## URL
-- **Production backend (Cloudflare Worker)**: https://d64f63e0-da2a-4f9a-a681-de51ac697dac.vip.gensparksite.com
-- **LiveKit медиа-сервер (VPS, Нидерланды)**: wss://livekit.185.199.199.114.nip.io
+- **Production backend (self-hosted на VPS пользователя)**: https://app.185.199.199.114.nip.io
+- **LiveKit медиа-сервер (тот же VPS, Нидерланды)**: wss://livekit.185.199.199.114.nip.io
 - **Скачать .exe (Windows)**: собирается из `/home/user/electron-app` (см. раздел "Сборка .exe")
+- **[Устаревшее] Cloudflare Worker деплой**: https://d64f63e0-da2a-4f9a-a681-de51ac697dac.vip.gensparksite.com — оставлен как резерв/референс, production больше НЕ через него (по явному запросу — деплой должен быть полностью на своём сервере, без Genspark/Cloudflare)
 
 ## Архитектура
+**Всё, включая control-plane, теперь работает на собственном VPS пользователя — без Cloudflare Workers и без Genspark-хостинга.**
 ```
 [Electron .exe / Браузер]
-        │  HTTPS (получение JWT-токена)
+        │  HTTPS app.185.199.199.114.nip.io (получение JWT-токена)
         ▼
-[Cloudflare Worker — Hono]  ← control-plane: комнаты, лимиты, токены (этот репозиторий)
-        │  хранит комнаты в D1
+[nginx (SSL termination, Let's Encrypt)]
         ▼
-[LiveKit SFU на VPS 185.199.199.114] ← медиа-сервер: WebRTC SFU + TURN
+[Node.js + Hono, PM2, порт 3001 (127.0.0.1)]  ← control-plane: комнаты, лимиты, токены
+        │  хранит комнаты в node:sqlite (файл на диске VPS)
+        ▼
+[LiveKit SFU, тот же VPS, wss://livekit.185.199.199.114.nip.io] ← медиа-сервер: WebRTC SFU + TURN
 ```
 
-- **Control-plane** (этот проект, `/home/user/webapp`) — Cloudflare Worker на Hono: создаёт комнаты, генерирует JWT-токены доступа к LiveKit, следит за лимитами участников (5) и демонстраций экрана (2).
-- **Медиа-сервер** — LiveKit (self-hosted, Docker) на VPS в Нидерландах (185.199.199.114). Обрабатывает весь видео/аудио трафик через SFU (Selective Forwarding Unit), с TURN/TLS для обхода блокировок.
-- **Клиент** — общий HTML/CSS/JS (`public/static/app.js`), который открывается либо в браузере, либо внутри Electron-обёртки (`/home/user/electron-app`, отдельная папка, не деплоится на Cloudflare).
+- **Control-plane** — самостоятельный Node.js-сервер (`/opt/zvonki-backend` на VPS, копия исходников в `/home/user/webapp/vps-backend-deployed-copy/` этого репозитория) на Hono + `@hono/node-server`: создаёт комнаты, генерирует JWT-токены доступа к LiveKit, следит за лимитами участников (5) и демонстраций экрана (2). Запущен под PM2, автозапуск после перезагрузки сервера через systemd (`pm2 startup systemd` + `pm2 save`).
+- **Медиа-сервер** — LiveKit (self-hosted, Docker) на том же VPS в Нидерландах (185.199.199.114). Обрабатывает весь видео/аудио трафик через SFU (Selective Forwarding Unit), с TURN/TLS для обхода блокировок.
+- **Клиент** — общий HTML/CSS/JS (`public/static/app.js`), который открывается либо в браузере, либо внутри Electron-обёртки (`/home/user/electron-app`, отдельная папка).
+- **SSL** — отдельный сертификат Let's Encrypt для `app.185.199.199.114.nip.io` (certbot, автопродление), по тому же принципу, что и для `livekit.*.nip.io`.
+- **Исходники Cloudflare Worker версии** (`src/index.tsx`, `wrangler.jsonc`) оставлены в репозитории как альтернативный/резервный вариант деплоя, но НЕ являются текущим production.
 
 ## Данные и хранилище
-- **Cloudflare D1** (`DB` binding) — таблица `rooms(code, created_at, last_active)`, история комнат
-- **LiveKit RoomService** — источник правды по текущим участникам/трекам (не хранится в D1)
-- **Секреты**: `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` — установлены как Cloudflare secrets (не в коде/git)
-- **Переменные окружения** (`wrangler.jsonc` → `vars`): `LIVEKIT_URL`, `LIVEKIT_HTTP_URL`
+- **node:sqlite** (встроенный экспериментальный модуль Node.js 22, `DatabaseSync`) — таблица `rooms(code, created_at, last_active)`, файл БД на диске VPS (`/opt/zvonki-backend/data/`)
+- **LiveKit RoomService** — источник правды по текущим участникам/трекам (не хранится в БД)
+- **Секреты**: `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` — в файле `/opt/zvonki-backend/.env` на VPS (chmod 600, не в git)
+- *(Резерв, Cloudflare-версия): Cloudflare D1 + secrets — используются только если деплоить `src/index.tsx` на Cloudflare Workers вместо VPS*
 
 ## API эндпоинты (control-plane)
 - `POST /api/rooms` — создать новую комнату, возвращает `{roomCode}`
@@ -53,9 +59,13 @@
 ## Инфраструктура (VPS, не в этом репозитории)
 - **VPS**: 185.199.199.114 (Нидерланды, 4 vCPU/8GB/175GB SSD, Ubuntu 22.04)
 - **LiveKit**: Docker-контейнер (`--network host`), конфиг в `/opt/livekit/livekit.yaml`, порты 7880 (WSS через nginx на 443), RTC UDP 50000-60000, TURN 3478/UDP + 5349/TLS
-- **nginx**: реверс-прокси для WSS-сигналинга (443 → 7880), SSL через Let's Encrypt/certbot (домен `livekit.185.199.199.114.nip.io`, автопродление)
-- **UFW**: открыты только нужные порты (22, 80, 443, 50000-60000/udp, 7881/tcp, 3478/udp, 5349/tcp)
-- Сервисы настроены на автозапуск (`docker --restart unless-stopped`, `systemctl enable nginx`, `ufw` persistent) — переживают перезагрузку сервера
+- **Backend (control-plane)**: Node.js 22 + PM2, `/opt/zvonki-backend`, слушает `127.0.0.1:3001`, наружу не торчит (доступ только через nginx)
+- **nginx**: два виртуальных хоста —
+  - `livekit.185.199.199.114.nip.io` — реверс-прокси для WSS-сигналинга LiveKit (443 → 7880)
+  - `app.185.199.199.114.nip.io` — реверс-прокси для backend'а (443 → 127.0.0.1:3001), HTTP→HTTPS редирект
+  - SSL для обоих — Let's Encrypt/certbot, автопродление (сертификат `app.*` действителен до 2026-11-26)
+- **UFW**: открыты только нужные порты (22, 80, 443, 50000-60000/udp, 7881/tcp, 3478/udp, 5349/tcp); порт 3001 НЕ в списке разрешённых — backend недоступен снаружи напрямую, только через nginx
+- Сервисы настроены на автозапуск (`docker --restart unless-stopped`, `systemctl enable nginx`, `pm2 startup systemd` + `pm2 save`, `ufw` persistent) — переживают перезагрузку сервера
 
 ## Сборка .exe (Electron)
 Электрон-проект лежит отдельно в `/home/user/electron-app` (не деплоится на Cloudflare, не входит в этот репозиторий).
@@ -65,14 +75,16 @@ npm install
 npx electron-builder --win portable --x64
 # Результат: release/Zvonki-Setup.exe
 ```
-URL backend'а задаётся в `electron-app/src/main.js` (переменная `SERVER_URL`), по умолчанию указывает на production Cloudflare Worker.
+URL backend'а задаётся в `electron-app/src/main.js` (переменная `SERVER_URL`), по умолчанию указывает на production self-hosted backend `https://app.185.199.199.114.nip.io`.
 
 ## Реализовано
 - ✅ LiveKit SFU медиа-сервер развёрнут и работает (проверено сквозное тестирование: JWT-токен → `/rtc/validate` → success)
-- ✅ Cloudflare Worker control-plane (комнаты, токены, лимиты) — задеплоен на production
+- ✅ Backend полностью на собственном VPS пользователя — Node.js + PM2 + nginx + Let's Encrypt, без Cloudflare/Genspark
+- ✅ Собственный SSL-сертификат для `app.185.199.199.114.nip.io` (Let's Encrypt, автопродление)
+- ✅ Автозапуск backend'а после перезагрузки VPS (PM2 + systemd)
 - ✅ Веб-фронтенд (лобби, комната звонка, управление камерой/микрофоном/демонстрацией экрана)
 - ✅ Electron-обёртка с нативным выбором экрана (desktopCapturer + собственный UI пикера)
-- ✅ Собран рабочий .exe (Windows portable, 70 МБ)
+- ✅ Собран рабочий .exe (Windows portable, 70 МБ), указывает на self-hosted backend
 - ✅ Лимиты соблюдаются на уровне сервера: 5 участников, 2 демонстрации экрана
 
 ## Не реализовано / следующие шаги
@@ -83,7 +95,9 @@ URL backend'а задаётся в `electron-app/src/main.js` (переменн�
 - ⏳ Тест реального звонка с 5 живыми участниками и 2 демонстрациями экрана одновременно на сети из России
 
 ## Деплой
-- **Platform**: Cloudflare Workers (через управляемый хостинг Genspark, Workers for Platform)
-- **Статус**: ✅ Активен
-- **Стек**: Hono + TypeScript + Cloudflare D1 + LiveKit (self-hosted SFU)
+- **Platform**: собственный VPS пользователя (185.199.199.114, Нидерланды) — НЕ через Cloudflare/Genspark
+- **Статус**: ✅ Активен, проверен сквозным тестом (HTTPS → API → LiveKit)
+- **Стек**: Node.js 22 + Hono + `@hono/node-server` + `node:sqlite` + PM2 + nginx + Let's Encrypt + LiveKit (self-hosted SFU)
+- **Исходники backend'а**: `/home/user/vps-backend/` (рабочая копия) и `/home/user/webapp/vps-backend-deployed-copy/` (снапшот в этом репозитории)
+- **Резервный вариант**: Cloudflare Worker (`src/index.tsx` в этом же репозитории) — оставлен на будущее, сейчас не используется как production
 - **Обновлено**: 2026-08-28
