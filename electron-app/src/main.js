@@ -40,8 +40,11 @@ function createMainWindow() {
   mainWindow.on('closed', () => { mainWindow = null })
 }
 
-// ---- Обработчик системного выбора источника экрана/окна для getUserMedia(desktop) ----
-// Electron сам не показывает системный диалог выбора экрана как в браузере — рисуем свой.
+// ---- Обработчик системного выбора источника экрана/окна ----
+// Electron сам не показывает системный диалог выбора экрана как в браузере — рисуем свой,
+// и отдаём выбранный источник через setDisplayMediaRequestHandler (см. ниже), благодаря
+// чему звук с устройства (системный звук) захватывается автоматически через 'loopback'.
+// Возвращает выбранный DesktopCapturerSource целиком (или null при отмене).
 function openPickerWindow() {
   return new Promise((resolve) => {
     desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 300, height: 200 } })
@@ -78,7 +81,8 @@ function openPickerWindow() {
 
         const onChosen = (_e, sourceId) => {
           cleanup()
-          resolve(sourceId || null)
+          const source = sources.find((s) => s.id === sourceId) || null
+          resolve(source)
         }
         const onCancel = () => {
           cleanup()
@@ -107,12 +111,37 @@ function openPickerWindow() {
   })
 }
 
+// Оставляем IPC-метод для обратной совместимости (не используется в новом flow,
+// но пусть будет, если где-то ещё вызывается) - возвращает только id источника.
 ipcMain.handle('choose-screen-source', async () => {
-  return await openPickerWindow()
+  const source = await openPickerWindow()
+  return source ? source.id : null
 })
 
 app.whenReady().then(() => {
   createMainWindow()
+
+  // ---- Захват экрана + системного звука для getDisplayMedia() из рендерера ----
+  // Рендерер вызывает navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }) -
+  // Electron не показывает системный пикер (на Windows/Linux), поэтому мы сами открываем
+  // свой pickerWindow, а затем отдаём выбранный источник + 'loopback' для звука всего компьютера.
+  // 'loopback' поддерживается на Windows (наша целевая платформа) - официально из документации Electron.
+  session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
+    try {
+      const source = await openPickerWindow()
+      if (!source) {
+        // Пользователь отменил выбор - отдаём пустой результат, getDisplayMedia отклонится с NotAllowedError
+        callback({})
+        return
+      }
+      callback({
+        video: source,
+        audio: request.audioRequested ? 'loopback' : undefined
+      })
+    } catch (e) {
+      callback({})
+    }
+  }, { useSystemPicker: false })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow()

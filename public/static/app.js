@@ -456,6 +456,24 @@ async function enterRoom(joinData) {
     screenCountBadge.textContent = String(state.screenShares.size)
   }
 
+  // ---- Регулятор громкости (слайдер + иконка), общий для камеры и демонстрации ----
+  function makeVolumeControl(onChange, initial = 1) {
+    const wrap = el('div', { class: 'volume-control' })
+    const icon = el('i', { class: 'fas fa-volume-up' })
+    const slider = el('input', { type: 'range', min: '0', max: '150', value: String(Math.round(initial * 100)) })
+    wrap.appendChild(icon)
+    wrap.appendChild(slider)
+    slider.addEventListener('input', (e) => {
+      e.stopPropagation()
+      const v = Number(slider.value) / 100
+      icon.className = v === 0 ? 'fas fa-volume-mute' : v < 0.5 ? 'fas fa-volume-down' : 'fas fa-volume-up'
+      onChange(v)
+    })
+    wrap.addEventListener('click', (e) => e.stopPropagation())
+    wrap.addEventListener('dblclick', (e) => e.stopPropagation())
+    return wrap
+  }
+
   function makeCameraTile(identity, name, isLocal) {
     const tile = el('div', { class: 'tile camera-tile', id: `tile-cam-${identity}` })
     const video = el('video', { autoplay: true, playsinline: true, ...(isLocal ? { muted: true } : {}) })
@@ -465,7 +483,16 @@ async function enterRoom(joinData) {
     tile.appendChild(video)
     tile.appendChild(placeholder)
     tile.appendChild(label)
-    return { tile, video, placeholder, label }
+    let volumeCtl = null
+    if (!isLocal) {
+      // Громкость голоса конкретного собеседника (не влияет на других)
+      volumeCtl = makeVolumeControl((v) => {
+        const p = room.getParticipantByIdentity(identity)
+        if (p) p.setVolume(v, LK.Track.Source.Microphone)
+      })
+      tile.appendChild(volumeCtl)
+    }
+    return { tile, video, placeholder, label, volumeCtl }
   }
 
   // ---- Полноэкранный режим для тайла (демонстрация экрана) ----
@@ -477,7 +504,7 @@ async function enterRoom(joinData) {
     }
   }
 
-  function makeScreenTile(identity, name, sid) {
+  function makeScreenTile(identity, name, sid, isLocal) {
     const tile = el('div', { class: 'tile screen-tile', id: `tile-screen-${sid}` })
     const video = el('video', { autoplay: true, playsinline: true, muted: true })
     const label = el('div', { class: 'tile-label' }, [el('i', { class: 'fas fa-desktop' }), el('span', {}, `Демонстрация — ${name}`)])
@@ -489,8 +516,17 @@ async function enterRoom(joinData) {
     tile.appendChild(video)
     tile.appendChild(label)
     tile.appendChild(fsBtn)
+    let volumeCtl = null
+    if (!isLocal) {
+      // Громкость звука демонстрации (звук с устройства демонстрирующего)
+      volumeCtl = makeVolumeControl((v) => {
+        const p = room.getParticipantByIdentity(identity)
+        if (p) p.setVolume(v, LK.Track.Source.ScreenShareAudio)
+      })
+      tile.appendChild(volumeCtl)
+    }
     tile.addEventListener('dblclick', () => toggleTileFullscreen(tile))
-    return { tile, video, label, fsBtn }
+    return { tile, video, label, fsBtn, volumeCtl }
   }
 
   document.addEventListener('fullscreenchange', () => {
@@ -700,48 +736,29 @@ async function enterRoom(joinData) {
     }
 
     try {
-      let pub
-      if (IS_ELECTRON) {
-        // В Electron используем нативный desktopCapturer через preload API
-        const sourceId = await window.electronAPI.chooseScreenSource()
-        if (!sourceId) return // отмена пользователем
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: {
-            mandatory: {
-              chromeMediaSource: 'desktop',
-              chromeMediaSourceId: sourceId,
-              maxFrameRate: 60,
-              maxWidth: 1920,
-              maxHeight: 1080
-            }
-          }
-        })
-        const track = stream.getVideoTracks()[0]
-        track.contentHint = 'motion'
-        pub = await room.localParticipant.publishTrack(track, {
-          source: LK.Track.Source.ScreenShare,
-          simulcast: false,
-          videoEncoding: { maxBitrate: 8_000_000, maxFramerate: 60 }
-        })
-      } else {
-        pub = await room.localParticipant.setScreenShareEnabled(true, {
-          video: { displaySurface: 'monitor' },
-          audio: false,
-          resolution: LK.ScreenSharePresets.h1080fps30.resolution,
-          contentHint: 'motion'
-        }, {
-          videoEncoding: { maxBitrate: 8_000_000, maxFramerate: 60 },
-          simulcast: false
-        })
-      }
+      // Единый путь для веба и Electron: LiveKit вызывает navigator.mediaDevices.getDisplayMedia().
+      // В браузере это открывает системный диалог "Поделиться экраном" с чекбоксом "Поделиться аудио".
+      // В Electron этот вызов перехватывается session.setDisplayMediaRequestHandler (main.js) -
+      // там открывается наше окно выбора источника (picker.html) и звук всего компьютера
+      // захватывается автоматически через audio: 'loopback' (поддерживается на Windows).
+      // Если поток содержит аудио-трек, LiveKit сам публикует его как Track.Source.ScreenShareAudio.
+      const pub = await room.localParticipant.setScreenShareEnabled(true, {
+        video: { displaySurface: 'monitor' },
+        audio: true, // запрашиваем звук с устройства - и браузер, и наш Electron-обработчик его предоставят
+        systemAudio: 'include',
+        resolution: LK.ScreenSharePresets.h1080fps30.resolution,
+        contentHint: 'motion'
+      }, {
+        videoEncoding: { maxBitrate: 8_000_000, maxFramerate: 60 },
+        simulcast: false
+      })
 
       if (!pub) return // пользователь отменил выбор источника
       isScreenSharing = true
       currentScreenTrackSid = pub.trackSid
       screenBtn.classList.add('active')
 
-      const t = makeScreenTile(room.localParticipant.identity, state.displayName + ' (Вы)', pub.trackSid)
+      const t = makeScreenTile(room.localParticipant.identity, state.displayName + ' (Вы)', pub.trackSid, true)
       pub.track.attach(t.video)
       document.body.appendChild(t.tile)
       state.screenShares.set(pub.trackSid, { identity: room.localParticipant.identity, name: state.displayName })

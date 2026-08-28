@@ -250,6 +250,42 @@ html, body {
 .tile.screen-tile:hover .tile-fullscreen-btn,
 .tile.screen-tile.is-fullscreen .tile-fullscreen-btn { opacity: 1; }
 
+/* Регулятор громкости на тайле (голос собеседника / звук демонстрации) */
+.volume-control {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0,0,0,.55);
+  padding: 5px 10px;
+  border-radius: 16px;
+  opacity: 0;
+  transition: opacity .15s, background .15s;
+  z-index: 5;
+  cursor: default;
+}
+.volume-control:hover { background: rgba(0,0,0,.8); }
+.tile:hover .volume-control,
+.tile.screen-tile.is-fullscreen .volume-control { opacity: 1; }
+
+.volume-control i {
+  font-size: 12px;
+  color: var(--text);
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.volume-control input[type="range"] {
+  width: 70px;
+  height: 4px;
+  cursor: pointer;
+  accent-color: var(--accent);
+  background: transparent;
+}
+
 .tile.screen-tile { cursor: pointer; }
 
 .tile.screen-tile:fullscreen,
