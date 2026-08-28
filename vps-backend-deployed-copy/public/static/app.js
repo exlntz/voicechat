@@ -468,14 +468,39 @@ async function enterRoom(joinData) {
     return { tile, video, placeholder, label }
   }
 
+  // ---- Полноэкранный режим для тайла (демонстрация экрана) ----
+  function toggleTileFullscreen(tile) {
+    if (document.fullscreenElement === tile) {
+      document.exitFullscreen().catch(() => {})
+    } else {
+      tile.requestFullscreen().catch(() => showToast('Не удалось открыть полноэкранный режим', 'error'))
+    }
+  }
+
   function makeScreenTile(identity, name, sid) {
     const tile = el('div', { class: 'tile screen-tile', id: `tile-screen-${sid}` })
     const video = el('video', { autoplay: true, playsinline: true, muted: true })
     const label = el('div', { class: 'tile-label' }, [el('i', { class: 'fas fa-desktop' }), el('span', {}, `Демонстрация — ${name}`)])
+    const fsBtn = el('button', { class: 'tile-fullscreen-btn', title: 'На весь экран' }, [el('i', { class: 'fas fa-expand' })])
+    fsBtn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      toggleTileFullscreen(tile)
+    })
     tile.appendChild(video)
     tile.appendChild(label)
-    return { tile, video, label }
+    tile.appendChild(fsBtn)
+    tile.addEventListener('dblclick', () => toggleTileFullscreen(tile))
+    return { tile, video, label, fsBtn }
   }
+
+  document.addEventListener('fullscreenchange', () => {
+    document.querySelectorAll('.screen-tile').forEach((t) => {
+      const icon = t.querySelector('.tile-fullscreen-btn i')
+      if (!icon) return
+      icon.className = document.fullscreenElement === t ? 'fas fa-compress' : 'fas fa-expand'
+      t.classList.toggle('is-fullscreen', document.fullscreenElement === t)
+    })
+  })
 
   const cameraTilesMap = new Map() // identity -> {tile, video, placeholder, label}
 
