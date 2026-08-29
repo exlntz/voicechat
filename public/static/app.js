@@ -49,7 +49,7 @@ function showToast(message, type = 'info') {
     container = el('div', { class: 'toast-container' })
     document.body.appendChild(container)
   }
-  const toast = el('div', { class: `toast ${type === 'error' ? 'error' : ''}` }, message)
+  const toast = el('div', { class: `toast ${type === 'error' ? 'error' : type === 'success' ? 'success' : ''}` }, message)
   container.appendChild(toast)
   setTimeout(() => toast.remove(), 4500)
 }
@@ -179,7 +179,9 @@ function renderAuthScreen(afterLoginRoomCode = '') {
     container.dataset.mode = mode
     container.classList.toggle('right-panel-active', mode === 'register')
     loginErrorSlot.style.display = 'none'
+    loginErrorSlot.classList.remove('success')
     registerErrorSlot.style.display = 'none'
+    registerErrorSlot.classList.remove('success')
   }
 
   toRegisterBtn.addEventListener('click', () => setMode('register'))
@@ -187,9 +189,11 @@ function renderAuthScreen(afterLoginRoomCode = '') {
   mobileToRegister.addEventListener('click', () => setMode('register'))
   mobileToLogin.addEventListener('click', () => setMode('login'))
 
-  function showError(slot, message) {
+  // type: 'error' (красный, по умолчанию) | 'success' (зелёный, для сообщения после регистрации)
+  function showMessage(slot, message, type = 'error') {
     slot.style.display = 'block'
     slot.textContent = message
+    slot.classList.toggle('success', type === 'success')
   }
 
   async function submit(kind, usernameInput, passwordInput, errorSlot, submitBtn, defaultLabel, loadingLabel, displayNameInput) {
@@ -198,6 +202,7 @@ function renderAuthScreen(afterLoginRoomCode = '') {
     const displayName = displayNameInput ? displayNameInput.value.trim() : undefined
 
     errorSlot.style.display = 'none'
+    errorSlot.classList.remove('success')
     submitBtn.disabled = true
     submitBtn.textContent = loadingLabel
 
@@ -214,10 +219,32 @@ function renderAuthScreen(afterLoginRoomCode = '') {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.message || 'Ошибка авторизации')
 
+      submitBtn.disabled = false
+      submitBtn.textContent = defaultLabel
+
+      if (kind === 'register') {
+        // По просьбе пользователя после регистрации не бросаем сразу в звонок - вместо этого
+        // красиво (той же анимацией слайдера, что и обычное переключение форм) переводим на
+        // форму входа и подставляем туда только что введённые юзернейм/пароль, чтобы пользователю
+        // достаточно было просто нажать "Войти". Эндпоинт /api/auth/register сам создаёт сессию
+        // (см. server.js) - разлогиниваем, чтобы вход происходил осознанно через форму логина.
+        try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }) } catch {}
+        registerDisplayName.value = ''
+        registerUsername.value = ''
+        registerPassword.value = ''
+        setMode('login')
+        loginUsername.value = username
+        loginPassword.value = password
+        showMessage(loginErrorSlot, 'Аккаунт создан! Проверьте данные и нажмите «Войти»', 'success')
+        showToast('Регистрация завершена', 'success')
+        loginSubmit.focus()
+        return
+      }
+
       state.currentUser = data.user
       renderLobby(afterLoginRoomCode)
     } catch (e) {
-      showError(errorSlot, e.message || 'Ошибка авторизации')
+      showMessage(errorSlot, e.message || 'Ошибка авторизации', 'error')
       submitBtn.disabled = false
       submitBtn.textContent = defaultLabel
     }
