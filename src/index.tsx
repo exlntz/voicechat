@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import { AccessToken, RoomServiceClient, TrackSource } from 'livekit-server-sdk'
 import { renderer } from './renderer'
 
@@ -11,7 +12,7 @@ type Bindings = {
   DB: D1Database
 }
 
-const app = new Hono<{ Bindings: Bindings }>()
+const app = new Hono<{ Bindings: Bindings; Variables: { user: { id: number; username: string } } }>()
 
 app.use('/api/*', cors())
 app.use(renderer)
@@ -40,7 +41,176 @@ function sanitizeName(input: string, fallbackPrefix: string) {
 async function ensureSchema(db: D1Database) {
   // db.exec() в D1 разбивает запрос по символу новой строки, поэтому весь statement должен быть в одну строку
   await db.exec('CREATE TABLE IF NOT EXISTS rooms (code TEXT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, last_active DATETIME DEFAULT CURRENT_TIMESTAMP)')
+  await db.exec('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, username_lower TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, password_salt TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)')
+  await db.exec('CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id INTEGER NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, expires_at TEXT NOT NULL)')
 }
+
+// ---------- Система пользователей (регистрация/вход) - см. подробное объяснение в
+// vps-backend-deployed-copy/src/server.js. Здесь то же самое, но на D1 (вместо node:sqlite) и
+// Web Crypto (PBKDF2, доступен нативно в Cloudflare Workers runtime, в отличие от node:crypto scrypt). ----------
+const SESSION_COOKIE = 'zvonki_session'
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 дней
+const USERNAME_RE = /^[\p{L}\p{N}_-]{3,24}$/u
+const PBKDF2_ITERATIONS = 100_000
+
+function bufToHex(buf: ArrayBuffer) {
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function hexToBuf(hex: string) {
+  const bytes = new Uint8Array(hex.length / 2)
+  for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.substr(i * 2, 2), 16)
+  return bytes
+}
+
+async function hashPassword(password: string) {
+  const saltBytes = crypto.getRandomValues(new Uint8Array(16))
+  const salt = bufToHex(saltBytes.buffer)
+  const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits'])
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: saltBytes, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' }, keyMaterial, 256)
+  return { hash: bufToHex(bits), salt }
+}
+
+async function verifyPassword(password: string, hash: string, salt: string) {
+  const saltBytes = hexToBuf(salt)
+  const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits'])
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: saltBytes, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' }, keyMaterial, 256)
+  const testHex = bufToHex(bits)
+  // Сравнение строк одинаковой длины через === в JS не является строго constant-time, но для
+  // hex-представления криптографического хэша (не пароля напрямую) риск timing-атаки признан
+  // практически незначимым в большинстве угроз-моделей; здесь это осознанный трейд-офф ради
+  // простоты в среде Workers, где node:crypto.timingSafeEqual недоступен.
+  return testHex === hash
+}
+
+async function createSession(db: D1Database, userId: number) {
+  const token = bufToHex(crypto.getRandomValues(new Uint8Array(32)).buffer)
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString()
+  await db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)').bind(token, userId, expiresAt).run()
+  return token
+}
+
+async function getUserByToken(db: D1Database, token: string | undefined) {
+  if (!token) return null
+  const row = await db.prepare(
+    'SELECT u.id as id, u.username as username, s.expires_at as expiresAt FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?'
+  ).bind(token).first<{ id: number; username: string; expiresAt: string }>()
+  if (!row) return null
+  if (new Date(row.expiresAt).getTime() < Date.now()) {
+    await db.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run()
+    return null
+  }
+  return { id: row.id, username: row.username }
+}
+
+function setSessionCookie(c: any, token: string) {
+  setCookie(c, SESSION_COOKIE, token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: Math.floor(SESSION_TTL_MS / 1000)
+  })
+}
+
+// Требуем авторизацию на всех /api/* маршрутах, КРОМЕ /api/auth/*
+app.use('/api/*', async (c, next) => {
+  if (c.req.path.startsWith('/api/auth/')) return next()
+  await ensureSchema(c.env.DB)
+  const token = getCookie(c, SESSION_COOKIE)
+  const user = await getUserByToken(c.env.DB, token)
+  if (!user) return c.json({ error: 'unauthenticated', message: 'Требуется авторизация' }, 401)
+  c.set('user', user)
+  await next()
+})
+
+// ---------- API: регистрация ----------
+app.post('/api/auth/register', async (c) => {
+  const { env } = c
+  await ensureSchema(env.DB)
+  const body = await c.req.json<{ username?: string; password?: string }>().catch(() => ({}))
+  const username = (body.username || '').trim()
+  const password = typeof body.password === 'string' ? body.password : ''
+
+  if (!USERNAME_RE.test(username)) {
+    return c.json({ error: 'invalid_username', message: 'Логин: 3-24 символа, буквы/цифры/_/-' }, 400)
+  }
+  if (password.length < 6 || password.length > 100) {
+    return c.json({ error: 'invalid_password', message: 'Пароль должен быть от 6 до 100 символов' }, 400)
+  }
+
+  const usernameLower = username.toLowerCase()
+  const existing = await env.DB.prepare('SELECT id FROM users WHERE username_lower = ?').bind(usernameLower).first()
+  if (existing) {
+    return c.json({ error: 'username_taken', message: 'Этот логин уже занят' }, 409)
+  }
+
+  const { hash, salt } = await hashPassword(password)
+  let userId: number
+  try {
+    const info = await env.DB.prepare(
+      'INSERT INTO users (username, username_lower, password_hash, password_salt) VALUES (?, ?, ?, ?)'
+    ).bind(username, usernameLower, hash, salt).run()
+    userId = info.meta.last_row_id as number
+  } catch {
+    return c.json({ error: 'username_taken', message: 'Этот логин уже занят' }, 409)
+  }
+
+  const token = await createSession(env.DB, userId)
+  setSessionCookie(c, token)
+  return c.json({ user: { id: userId, username } })
+})
+
+// ---------- API: вход ----------
+app.post('/api/auth/login', async (c) => {
+  const { env } = c
+  await ensureSchema(env.DB)
+  const body = await c.req.json<{ username?: string; password?: string }>().catch(() => ({}))
+  const username = (body.username || '').trim()
+  const password = typeof body.password === 'string' ? body.password : ''
+
+  if (!username || !password) {
+    return c.json({ error: 'invalid_credentials', message: 'Введите логин и пароль' }, 400)
+  }
+
+  const usernameLower = username.toLowerCase()
+  const row = await env.DB.prepare('SELECT id, username, password_hash, password_salt FROM users WHERE username_lower = ?')
+    .bind(usernameLower).first<{ id: number; username: string; password_hash: string; password_salt: string }>()
+  if (!row) {
+    return c.json({ error: 'invalid_credentials', message: 'Неверный логин или пароль' }, 401)
+  }
+
+  const ok = await verifyPassword(password, row.password_hash, row.password_salt)
+  if (!ok) {
+    return c.json({ error: 'invalid_credentials', message: 'Неверный логин или пароль' }, 401)
+  }
+
+  const token = await createSession(env.DB, row.id)
+  setSessionCookie(c, token)
+  return c.json({ user: { id: row.id, username: row.username } })
+})
+
+// ---------- API: выход ----------
+app.post('/api/auth/logout', async (c) => {
+  const { env } = c
+  await ensureSchema(env.DB)
+  const token = getCookie(c, SESSION_COOKIE)
+  if (token) {
+    try { await env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run() } catch {}
+  }
+  deleteCookie(c, SESSION_COOKIE, { path: '/' })
+  return c.json({ success: true })
+})
+
+// ---------- API: текущий пользователь ----------
+app.get('/api/auth/me', async (c) => {
+  const { env } = c
+  await ensureSchema(env.DB)
+  const token = getCookie(c, SESSION_COOKIE)
+  const user = await getUserByToken(env.DB, token)
+  if (!user) return c.json({ error: 'unauthenticated' }, 401)
+  return c.json({ user })
+})
 
 // ---------- API: create a new room ----------
 app.post('/api/rooms', async (c) => {
@@ -58,9 +228,11 @@ app.post('/api/join', async (c) => {
   const { env } = c
   await ensureSchema(env.DB)
 
-  const body = await c.req.json<{ roomCode?: string; displayName?: string }>().catch(() => ({}))
+  const body = await c.req.json<{ roomCode?: string }>().catch(() => ({}))
   let roomCode = (body.roomCode || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')
-  const displayName = sanitizeName(body.displayName || '', 'Гость')
+  // Имя участника берём из авторизованной сессии (см. middleware выше), а не из тела запроса
+  const authUser = c.get('user')
+  const displayName = sanitizeName(authUser?.username || '', 'Гость')
 
   if (!roomCode) {
     roomCode = randomId(6)

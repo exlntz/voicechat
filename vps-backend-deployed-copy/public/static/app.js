@@ -4,6 +4,7 @@ const LK = window.LivekitClient
 const IS_ELECTRON = !!window.electronAPI
 
 const state = {
+  currentUser: null, // { id, username } - авторизованный пользователь (см. renderAuthScreen/fetchMe)
   room: null,
   roomCode: null,
   displayName: '',
@@ -57,20 +58,137 @@ function initials(name) {
   return (name || '?').trim().slice(0, 2).toUpperCase()
 }
 
+// ===================== АВТОРИЗАЦИЯ (регистрация / вход) =====================
+// Требование: пользователь должен быть залогинен, чтобы попасть в приложение (звонок).
+// Сессия хранится в httpOnly-cookie (см. server.js) - на фронтенде просто дёргаем /api/auth/me
+// при загрузке и, если не авторизован, показываем экран логина/регистрации вместо лобби.
+
+async function fetchMe() {
+  try {
+    const res = await fetch('/api/auth/me', { credentials: 'same-origin' })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.user || null
+  } catch {
+    return null
+  }
+}
+
+function renderAuthScreen(afterLoginRoomCode = '') {
+  root.innerHTML = ''
+
+  const screen = el('div', { class: 'lobby-screen' })
+  const card = el('div', { class: 'lobby-card' })
+
+  card.appendChild(el('h1', {}, 'Звонки'))
+  card.appendChild(el('div', { class: 'subtitle' }, 'Войдите или зарегистрируйтесь, чтобы продолжить'))
+
+  const errorSlot = el('div', { style: 'display:none' })
+  card.appendChild(errorSlot)
+
+  let mode = 'login' // 'login' | 'register'
+
+  const tabs = el('div', { class: 'auth-tabs' })
+  const loginTab = el('button', { type: 'button', class: 'auth-tab active' }, 'Вход')
+  const registerTab = el('button', { type: 'button', class: 'auth-tab' }, 'Регистрация')
+  tabs.appendChild(loginTab)
+  tabs.appendChild(registerTab)
+  card.appendChild(tabs)
+
+  const usernameInput = el('input', { type: 'text', placeholder: 'Логин', maxlength: '24', autocomplete: 'username' })
+  card.appendChild(usernameInput)
+
+  const passwordInput = el('input', { type: 'password', placeholder: 'Пароль', maxlength: '100', autocomplete: 'current-password' })
+  card.appendChild(passwordInput)
+
+  const submitBtn = el('button', {}, 'Войти')
+  card.appendChild(submitBtn)
+
+  const hint = el('div', { class: 'hint-text' }, 'Логин: 3-24 символа (буквы/цифры/_/-). Пароль: минимум 6 символов.')
+  card.appendChild(hint)
+
+  screen.appendChild(card)
+  root.appendChild(screen)
+
+  function setMode(next) {
+    mode = next
+    loginTab.classList.toggle('active', mode === 'login')
+    registerTab.classList.toggle('active', mode === 'register')
+    submitBtn.textContent = mode === 'login' ? 'Войти' : 'Зарегистрироваться'
+    passwordInput.autocomplete = mode === 'login' ? 'current-password' : 'new-password'
+    errorSlot.style.display = 'none'
+  }
+
+  loginTab.addEventListener('click', () => setMode('login'))
+  registerTab.addEventListener('click', () => setMode('register'))
+
+  async function submit() {
+    const username = usernameInput.value.trim()
+    const password = passwordInput.value
+
+    errorSlot.style.display = 'none'
+    submitBtn.disabled = true
+    submitBtn.textContent = mode === 'login' ? 'Вход...' : 'Регистрация...'
+
+    try {
+      const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register'
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ username, password })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.message || 'Ошибка авторизации')
+
+      state.currentUser = data.user
+      renderLobby(afterLoginRoomCode)
+    } catch (e) {
+      errorSlot.style.display = 'block'
+      errorSlot.className = 'error-box'
+      errorSlot.textContent = e.message || 'Ошибка авторизации'
+      submitBtn.disabled = false
+      submitBtn.textContent = mode === 'login' ? 'Войти' : 'Зарегистрироваться'
+    }
+  }
+
+  submitBtn.addEventListener('click', submit)
+  passwordInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit() })
+  usernameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit() })
+}
+
 // ===================== ЛОББИ (экран входа) =====================
 
 async function renderLobby(prefillRoomCode = '') {
+  // Требуем авторизацию перед лобби - если нет активной сессии, показываем экран входа/регистрации.
+  if (!state.currentUser) {
+    state.currentUser = await fetchMe()
+  }
+  if (!state.currentUser) {
+    renderAuthScreen(prefillRoomCode)
+    return
+  }
+
   root.innerHTML = ''
   const params = new URLSearchParams(location.search)
   const urlRoom = prefillRoomCode || (location.pathname.startsWith('/room/') ? location.pathname.split('/room/')[1] : '') || params.get('room') || ''
-
-  const savedName = localStorage.getItem('displayName') || ''
 
   const screen = el('div', { class: 'lobby-screen' })
   const card = el('div', { class: 'lobby-card' })
 
   card.appendChild(el('h1', {}, IS_ELECTRON ? 'Звонки' : 'Звонки (веб)'))
   card.appendChild(el('div', { class: 'subtitle' }, 'Качественная связь без ВПН · до 5 участников · 2 демонстрации экрана в 60 FPS'))
+
+  const userBar = el('div', { class: 'lobby-userbar' })
+  userBar.appendChild(el('span', {}, [el('i', { class: 'fas fa-user' }), ` ${state.currentUser.username}`]))
+  const logoutBtn = el('button', { type: 'button', class: 'lobby-logout-btn' }, 'Выйти')
+  logoutBtn.addEventListener('click', async () => {
+    try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }) } catch {}
+    state.currentUser = null
+    renderAuthScreen()
+  })
+  userBar.appendChild(logoutBtn)
+  card.appendChild(userBar)
 
   const errorSlot = el('div', { style: 'display:none' })
   card.appendChild(errorSlot)
@@ -155,9 +273,6 @@ async function renderLobby(prefillRoomCode = '') {
   deviceSettings.appendChild(spkRow)
 
   card.appendChild(deviceSettings)
-
-  const nameInput = el('input', { type: 'text', placeholder: 'Ваше имя', value: savedName, maxlength: '30' })
-  card.appendChild(nameInput)
 
   const roomInput = el('input', {
     type: 'text',
@@ -362,8 +477,6 @@ async function renderLobby(prefillRoomCode = '') {
   }
 
   async function doJoin() {
-    const name = nameInput.value.trim() || `Гость-${Math.floor(Math.random() * 1000)}`
-    localStorage.setItem('displayName', name)
     const roomCode = roomInput.value.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
     // Если ранее этот же браузер создал комнату с таким кодом - подтягиваем сохранённый секрет создателя,
     // чтобы при повторном входе (например, обновление страницы) права хоста восстановились
@@ -374,12 +487,20 @@ async function renderLobby(prefillRoomCode = '') {
     errorSlot.style.display = 'none'
 
     try {
+      // displayName больше не передаётся - сервер берёт имя из авторизованной сессии (куки-cookie)
       const res = await fetch('/api/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomCode, displayName: name, hostSecret: savedHostSecret })
+        credentials: 'same-origin',
+        body: JSON.stringify({ roomCode, hostSecret: savedHostSecret })
       })
       const data = await res.json()
+
+      if (res.status === 401) {
+        state.currentUser = null
+        renderAuthScreen(roomCode)
+        return
+      }
 
       if (!res.ok) {
         throw new Error(data.message || 'Не удалось подключиться')
@@ -402,7 +523,6 @@ async function renderLobby(prefillRoomCode = '') {
   }
 
   joinBtn.addEventListener('click', doJoin)
-  nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doJoin() })
   roomInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doJoin() })
 }
 

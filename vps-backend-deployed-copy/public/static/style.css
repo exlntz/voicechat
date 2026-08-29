@@ -142,6 +142,68 @@ html, body {
   text-align: left;
 }
 
+/* ---------- Auth screen (login / register tabs) ---------- */
+.auth-tabs {
+  display: flex;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 20px;
+  gap: 4px;
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+
+.auth-tab.active {
+  background: var(--accent);
+  color: white;
+}
+
+/* ---------- Lobby user bar (logged-in username + logout) ---------- */
+.lobby-userbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.lobby-logout-btn {
+  width: auto;
+  padding: 6px 12px;
+  margin-top: 0;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+
+.lobby-logout-btn:hover {
+  background: var(--bg-card);
+  color: var(--text);
+}
+
 /* device preview on lobby */
 .device-preview {
   background: #000;

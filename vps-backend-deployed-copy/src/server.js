@@ -4,11 +4,15 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serveStatic } from '@hono/node-server/serve-static'
+import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import { AccessToken, RoomServiceClient, TrackSource } from 'livekit-server-sdk'
 import { DatabaseSync } from 'node:sqlite'
-import { randomBytes } from 'node:crypto'
+import { randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto'
+import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+
+const scrypt = promisify(scryptCb)
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -32,9 +36,90 @@ db.exec('CREATE TABLE IF NOT EXISTS rooms (code TEXT PRIMARY KEY, created_at DAT
 try { db.exec('ALTER TABLE rooms ADD COLUMN creator_identity TEXT') } catch {}
 try { db.exec('ALTER TABLE rooms ADD COLUMN host_secret TEXT') } catch {}
 
+// ---------- Система пользователей (регистрация/вход) ----------
+// Простая собственная реализация без внешних зависимостей: пароли хешируются scrypt'ом (встроен в
+// node:crypto) со случайной солью на каждого пользователя, сессии - случайный токен в httpOnly-cookie,
+// сама сессия хранится в SQLite (а не JWT), чтобы можно было мгновенно "убить" сессию через logout.
+db.exec(`CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL,
+  username_lower TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  password_salt TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)`)
+db.exec(`CREATE TABLE IF NOT EXISTS sessions (
+  token TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  expires_at TEXT NOT NULL
+)`)
+
+const SESSION_COOKIE = 'zvonki_session'
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 дней
+// Разрешённые символы логина: буквы (в т.ч. кириллица через \p{L}), цифры, _ и -
+const USERNAME_RE = /^[\p{L}\p{N}_-]{3,24}$/u
+
+async function hashPassword(password) {
+  const salt = randomBytes(16).toString('hex')
+  const hash = (await scrypt(password, salt, 64)).toString('hex')
+  return { hash, salt }
+}
+
+async function verifyPassword(password, hash, salt) {
+  const hashBuf = Buffer.from(hash, 'hex')
+  const testBuf = await scrypt(password, salt, 64)
+  if (hashBuf.length !== testBuf.length) return false
+  return timingSafeEqual(hashBuf, testBuf)
+}
+
+function createSession(userId) {
+  const token = randomBytes(32).toString('hex')
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString()
+  db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)').run(token, userId, expiresAt)
+  return token
+}
+
+function getUserByToken(token) {
+  if (!token) return null
+  const row = db.prepare(
+    'SELECT u.id as id, u.username as username, s.expires_at as expiresAt FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?'
+  ).get(token)
+  if (!row) return null
+  if (new Date(row.expiresAt).getTime() < Date.now()) {
+    db.prepare('DELETE FROM sessions WHERE token = ?').run(token)
+    return null
+  }
+  return { id: row.id, username: row.username }
+}
+
+function setSessionCookie(c, token) {
+  setCookie(c, SESSION_COOKIE, token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: Math.floor(SESSION_TTL_MS / 1000)
+  })
+}
+
+// Требует авторизации - навешивается на все /api/* маршруты, кроме /api/auth/*
+async function requireAuth(c, next) {
+  const token = getCookie(c, SESSION_COOKIE)
+  const user = getUserByToken(token)
+  if (!user) return c.json({ error: 'unauthenticated', message: 'Требуется авторизация' }, 401)
+  c.set('user', user)
+  await next()
+}
+
 const app = new Hono()
 
 app.use('/api/*', cors())
+// Все /api/* маршруты требуют авторизации, КРОМЕ /api/auth/* (иначе войти было бы невозможно)
+app.use('/api/*', (c, next) => {
+  if (c.req.path.startsWith('/api/auth/')) return next()
+  return requireAuth(c, next)
+})
 // Статика фронтенда (HTML отдаём вручную ниже, а /static/* — файлы напрямую)
 app.use('/static/*', serveStatic({ root: join(__dirname, '..', 'public') }))
 
@@ -62,6 +147,85 @@ function sanitizeName(input, fallbackPrefix) {
 
 const svc = new RoomServiceClient(LIVEKIT_HTTP_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
 
+// ---------- API: регистрация ----------
+app.post('/api/auth/register', async (c) => {
+  const body = await c.req.json().catch(() => ({}))
+  const username = (body.username || '').trim()
+  const password = typeof body.password === 'string' ? body.password : ''
+
+  if (!USERNAME_RE.test(username)) {
+    return c.json({ error: 'invalid_username', message: 'Логин: 3-24 символа, буквы/цифры/_/-' }, 400)
+  }
+  if (password.length < 6 || password.length > 100) {
+    return c.json({ error: 'invalid_password', message: 'Пароль должен быть от 6 до 100 символов' }, 400)
+  }
+
+  const usernameLower = username.toLowerCase()
+  const existing = db.prepare('SELECT id FROM users WHERE username_lower = ?').get(usernameLower)
+  if (existing) {
+    return c.json({ error: 'username_taken', message: 'Этот логин уже занят' }, 409)
+  }
+
+  const { hash, salt } = await hashPassword(password)
+  let userId
+  try {
+    const info = db.prepare(
+      'INSERT INTO users (username, username_lower, password_hash, password_salt) VALUES (?, ?, ?, ?)'
+    ).run(username, usernameLower, hash, salt)
+    userId = info.lastInsertRowid
+  } catch {
+    return c.json({ error: 'username_taken', message: 'Этот логин уже занят' }, 409)
+  }
+
+  const token = createSession(userId)
+  setSessionCookie(c, token)
+  return c.json({ user: { id: userId, username } })
+})
+
+// ---------- API: вход ----------
+app.post('/api/auth/login', async (c) => {
+  const body = await c.req.json().catch(() => ({}))
+  const username = (body.username || '').trim()
+  const password = typeof body.password === 'string' ? body.password : ''
+
+  if (!username || !password) {
+    return c.json({ error: 'invalid_credentials', message: 'Введите логин и пароль' }, 400)
+  }
+
+  const usernameLower = username.toLowerCase()
+  const row = db.prepare('SELECT id, username, password_hash, password_salt FROM users WHERE username_lower = ?').get(usernameLower)
+  if (!row) {
+    return c.json({ error: 'invalid_credentials', message: 'Неверный логин или пароль' }, 401)
+  }
+
+  const ok = await verifyPassword(password, row.password_hash, row.password_salt)
+  if (!ok) {
+    return c.json({ error: 'invalid_credentials', message: 'Неверный логин или пароль' }, 401)
+  }
+
+  const token = createSession(row.id)
+  setSessionCookie(c, token)
+  return c.json({ user: { id: row.id, username: row.username } })
+})
+
+// ---------- API: выход ----------
+app.post('/api/auth/logout', (c) => {
+  const token = getCookie(c, SESSION_COOKIE)
+  if (token) {
+    try { db.prepare('DELETE FROM sessions WHERE token = ?').run(token) } catch {}
+  }
+  deleteCookie(c, SESSION_COOKIE, { path: '/' })
+  return c.json({ success: true })
+})
+
+// ---------- API: текущий пользователь (проверка авторизации на фронте) ----------
+app.get('/api/auth/me', (c) => {
+  const token = getCookie(c, SESSION_COOKIE)
+  const user = getUserByToken(token)
+  if (!user) return c.json({ error: 'unauthenticated' }, 401)
+  return c.json({ user })
+})
+
 // ---------- API: создать новую комнату ----------
 app.post('/api/rooms', (c) => {
   const code = randomId(6)
@@ -76,7 +240,11 @@ app.post('/api/rooms', (c) => {
 app.post('/api/join', async (c) => {
   const body = await c.req.json().catch(() => ({}))
   let roomCode = (body.roomCode || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')
-  const displayName = sanitizeName(body.displayName || '', 'Гость')
+  // Имя участника берём из аккаунта авторизованного пользователя (requireAuth уже отработал
+  // для всех /api/* кроме /api/auth/*), а не из тела запроса - раньше можно было представиться
+  // произвольным именем, теперь имя жёстко привязано к логину.
+  const authUser = c.get('user')
+  const displayName = sanitizeName(authUser?.username || '', 'Гость')
   const providedHostSecret = typeof body.hostSecret === 'string' && body.hostSecret ? body.hostSecret : null
 
   if (!roomCode) roomCode = randomId(6)
