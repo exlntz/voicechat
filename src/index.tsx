@@ -41,7 +41,9 @@ function sanitizeName(input: string, fallbackPrefix: string) {
 async function ensureSchema(db: D1Database) {
   // db.exec() в D1 разбивает запрос по символу новой строки, поэтому весь statement должен быть в одну строку
   await db.exec('CREATE TABLE IF NOT EXISTS rooms (code TEXT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, last_active DATETIME DEFAULT CURRENT_TIMESTAMP)')
-  await db.exec('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, username_lower TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, password_salt TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)')
+  await db.exec('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, username_lower TEXT NOT NULL UNIQUE, display_name TEXT, password_hash TEXT NOT NULL, password_salt TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)')
+  // Миграция для баз созданных до появления display_name - D1 не поддерживает "ADD COLUMN IF NOT EXISTS", поэтому просто глушим ошибку "duplicate column", если колонка уже есть
+  try { await db.exec('ALTER TABLE users ADD COLUMN display_name TEXT') } catch {}
   await db.exec('CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id INTEGER NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, expires_at TEXT NOT NULL)')
 }
 
@@ -50,7 +52,10 @@ async function ensureSchema(db: D1Database) {
 // Web Crypto (PBKDF2, доступен нативно в Cloudflare Workers runtime, в отличие от node:crypto scrypt). ----------
 const SESSION_COOKIE = 'zvonki_session'
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 дней
-const USERNAME_RE = /^[\p{L}\p{N}_-]{3,24}$/u
+// См. подробное объяснение в vps-backend-deployed-copy/src/server.js: username - только ASCII (для входа/будущего
+// добавления в друзья), display_name - любой язык (показывается везде в интерфейсе).
+const USERNAME_RE = /^[A-Za-z0-9_-]{3,24}$/
+const DISPLAY_NAME_RE = /^[\p{L}\p{N}_\- ]{1,40}$/u
 const PBKDF2_ITERATIONS = 100_000
 
 function bufToHex(buf: ArrayBuffer) {
@@ -93,14 +98,14 @@ async function createSession(db: D1Database, userId: number) {
 async function getUserByToken(db: D1Database, token: string | undefined) {
   if (!token) return null
   const row = await db.prepare(
-    'SELECT u.id as id, u.username as username, s.expires_at as expiresAt FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?'
-  ).bind(token).first<{ id: number; username: string; expiresAt: string }>()
+    'SELECT u.id as id, u.username as username, u.display_name as displayName, s.expires_at as expiresAt FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?'
+  ).bind(token).first<{ id: number; username: string; displayName: string | null; expiresAt: string }>()
   if (!row) return null
   if (new Date(row.expiresAt).getTime() < Date.now()) {
     await db.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run()
     return null
   }
-  return { id: row.id, username: row.username }
+  return { id: row.id, username: row.username, displayName: row.displayName || row.username }
 }
 
 function setSessionCookie(c: any, token: string) {
@@ -128,12 +133,16 @@ app.use('/api/*', async (c, next) => {
 app.post('/api/auth/register', async (c) => {
   const { env } = c
   await ensureSchema(env.DB)
-  const body = await c.req.json<{ username?: string; password?: string }>().catch(() => ({}))
+  const body = await c.req.json<{ username?: string; displayName?: string; password?: string }>().catch(() => ({}))
   const username = (body.username || '').trim()
+  const displayName = (body.displayName || '').trim() || username
   const password = typeof body.password === 'string' ? body.password : ''
 
   if (!USERNAME_RE.test(username)) {
-    return c.json({ error: 'invalid_username', message: 'Логин: 3-24 символа, буквы/цифры/_/-' }, 400)
+    return c.json({ error: 'invalid_username', message: 'Жюзернейм: 3-24 символа, только англ. буквы/цифры/_/-' }, 400)
+  }
+  if (!DISPLAY_NAME_RE.test(displayName)) {
+    return c.json({ error: 'invalid_display_name', message: 'Имя: 1-40 символов (буквы любого языка, цифры, пробел, _/-)' }, 400)
   }
   if (password.length < 6 || password.length > 100) {
     return c.json({ error: 'invalid_password', message: 'Пароль должен быть от 6 до 100 символов' }, 400)
@@ -142,23 +151,23 @@ app.post('/api/auth/register', async (c) => {
   const usernameLower = username.toLowerCase()
   const existing = await env.DB.prepare('SELECT id FROM users WHERE username_lower = ?').bind(usernameLower).first()
   if (existing) {
-    return c.json({ error: 'username_taken', message: 'Этот логин уже занят' }, 409)
+    return c.json({ error: 'username_taken', message: 'Этот юзернейм уже занят' }, 409)
   }
 
   const { hash, salt } = await hashPassword(password)
   let userId: number
   try {
     const info = await env.DB.prepare(
-      'INSERT INTO users (username, username_lower, password_hash, password_salt) VALUES (?, ?, ?, ?)'
-    ).bind(username, usernameLower, hash, salt).run()
+      'INSERT INTO users (username, username_lower, display_name, password_hash, password_salt) VALUES (?, ?, ?, ?, ?)'
+    ).bind(username, usernameLower, displayName, hash, salt).run()
     userId = info.meta.last_row_id as number
   } catch {
-    return c.json({ error: 'username_taken', message: 'Этот логин уже занят' }, 409)
+    return c.json({ error: 'username_taken', message: 'Этот юзернейм уже занят' }, 409)
   }
 
   const token = await createSession(env.DB, userId)
   setSessionCookie(c, token)
-  return c.json({ user: { id: userId, username } })
+  return c.json({ user: { id: userId, username, displayName } })
 })
 
 // ---------- API: вход ----------
@@ -174,8 +183,8 @@ app.post('/api/auth/login', async (c) => {
   }
 
   const usernameLower = username.toLowerCase()
-  const row = await env.DB.prepare('SELECT id, username, password_hash, password_salt FROM users WHERE username_lower = ?')
-    .bind(usernameLower).first<{ id: number; username: string; password_hash: string; password_salt: string }>()
+  const row = await env.DB.prepare('SELECT id, username, display_name, password_hash, password_salt FROM users WHERE username_lower = ?')
+    .bind(usernameLower).first<{ id: number; username: string; display_name: string | null; password_hash: string; password_salt: string }>()
   if (!row) {
     return c.json({ error: 'invalid_credentials', message: 'Неверный логин или пароль' }, 401)
   }
@@ -187,7 +196,7 @@ app.post('/api/auth/login', async (c) => {
 
   const token = await createSession(env.DB, row.id)
   setSessionCookie(c, token)
-  return c.json({ user: { id: row.id, username: row.username } })
+  return c.json({ user: { id: row.id, username: row.username, displayName: row.display_name || row.username } })
 })
 
 // ---------- API: выход ----------
@@ -230,9 +239,10 @@ app.post('/api/join', async (c) => {
 
   const body = await c.req.json<{ roomCode?: string }>().catch(() => ({}))
   let roomCode = (body.roomCode || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')
-  // Имя участника берём из авторизованной сессии (см. middleware выше), а не из тела запроса
+  // Имя участника берём из авторизованной сессии (см. middleware выше), а не из тела запроса.
+  // Показываем displayName (может быть на любом языке), а не технический username.
   const authUser = c.get('user')
-  const displayName = sanitizeName(authUser?.username || '', 'Гость')
+  const displayName = sanitizeName((authUser as any)?.displayName || authUser?.username || '', 'Гость')
 
   if (!roomCode) {
     roomCode = randomId(6)

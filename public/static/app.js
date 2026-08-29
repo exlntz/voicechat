@@ -4,7 +4,7 @@ const LK = window.LivekitClient
 const IS_ELECTRON = !!window.electronAPI
 
 const state = {
-  currentUser: null, // { id, username } - авторизованный пользователь (см. renderAuthScreen/fetchMe)
+  currentUser: null, // { id, username, displayName } - авторизованный пользователь (см. renderAuthScreen/fetchMe)
   room: null,
   roomCode: null,
   displayName: '',
@@ -58,6 +58,23 @@ function initials(name) {
   return (name || '?').trim().slice(0, 2).toUpperCase()
 }
 
+// Поле пароля с кнопкой-глазиком, переключающей видимость введённого текста (type: password <-> text).
+// Возвращает { wrapper, input } - wrapper вставляется в форму, input используется как обычное поле
+// (value, addEventListener и т.д.), логика клика по глазику инкапсулирована здесь.
+function makePasswordField(placeholder, maxlength, autocomplete) {
+  const input = el('input', { type: 'password', placeholder, maxlength, autocomplete })
+  const eyeIcon = el('i', { class: 'fas fa-eye' })
+  const toggleBtn = el('button', { type: 'button', class: 'password-toggle-btn', tabindex: '-1', 'aria-label': 'Показать пароль' }, [eyeIcon])
+  toggleBtn.addEventListener('click', () => {
+    const shown = input.type === 'text'
+    input.type = shown ? 'password' : 'text'
+    eyeIcon.className = shown ? 'fas fa-eye' : 'fas fa-eye-slash'
+    toggleBtn.setAttribute('aria-label', shown ? 'Показать пароль' : 'Скрыть пароль')
+  })
+  const wrapper = el('div', { class: 'password-field' }, [input, toggleBtn])
+  return { wrapper, input }
+}
+
 // ===================== АВТОРИЗАЦИЯ (регистрация / вход) =====================
 // Требование: пользователь должен быть залогинен, чтобы попасть в приложение (звонок).
 // Сессия хранится в httpOnly-cookie (см. server.js) - на фронтенде просто дёргаем /api/auth/me
@@ -89,8 +106,8 @@ function renderAuthScreen(afterLoginRoomCode = '') {
 
   // ---- Форма входа ----
   const loginErrorSlot = el('div', { class: 'auth-error', style: 'display:none' })
-  const loginUsername = el('input', { type: 'text', placeholder: 'Логин', maxlength: '24', autocomplete: 'username' })
-  const loginPassword = el('input', { type: 'password', placeholder: 'Пароль', maxlength: '100', autocomplete: 'current-password' })
+  const loginUsername = el('input', { type: 'text', placeholder: 'Юзернейм', maxlength: '24', autocomplete: 'username' })
+  const { wrapper: loginPasswordField, input: loginPassword } = makePasswordField('Пароль', '100', 'current-password')
   const loginSubmit = el('button', { type: 'button', class: 'auth-submit-btn' }, 'Войти')
 
   // Текстовая ссылка-переключатель под формой - видна только на узких экранах (телефон),
@@ -100,18 +117,22 @@ function renderAuthScreen(afterLoginRoomCode = '') {
 
   const loginPanel = el('div', { class: 'auth-form-panel auth-signin' }, [
     el('h1', {}, 'Вход'),
-    el('div', { class: 'auth-form-hint' }, 'Используйте логин и пароль от аккаунта'),
+    el('div', { class: 'auth-form-hint' }, 'Используйте юзернейм и пароль от аккаунта'),
     loginErrorSlot,
     loginUsername,
-    loginPassword,
+    loginPasswordField,
     loginSubmit,
     mobileSwitchToRegister
   ])
 
   // ---- Форма регистрации ----
+  // "Отображаемое имя" (может быть на любом языке, включая кириллицу) - то, что видят другие
+  // участники звонка. "Юзернейм" - технический идентификатор для входа в аккаунт (и в будущем -
+  // для добавления в друзья), поэтому строго ограничен латиницей/цифрами/_/- .
   const registerErrorSlot = el('div', { class: 'auth-error', style: 'display:none' })
-  const registerUsername = el('input', { type: 'text', placeholder: 'Логин', maxlength: '24', autocomplete: 'username' })
-  const registerPassword = el('input', { type: 'password', placeholder: 'Пароль (мин. 6 символов)', maxlength: '100', autocomplete: 'new-password' })
+  const registerDisplayName = el('input', { type: 'text', placeholder: 'Отображаемое имя', maxlength: '40', autocomplete: 'name' })
+  const registerUsername = el('input', { type: 'text', placeholder: 'Юзернейм (для входа)', maxlength: '24', autocomplete: 'username' })
+  const { wrapper: registerPasswordField, input: registerPassword } = makePasswordField('Пароль (мин. 6 символов)', '100', 'new-password')
   const registerSubmit = el('button', { type: 'button', class: 'auth-submit-btn' }, 'Зарегистрироваться')
 
   const mobileToLogin = el('button', { type: 'button', class: 'auth-switch-link' }, 'Войти')
@@ -119,10 +140,11 @@ function renderAuthScreen(afterLoginRoomCode = '') {
 
   const registerPanel = el('div', { class: 'auth-form-panel auth-signup' }, [
     el('h1', {}, 'Регистрация'),
-    el('div', { class: 'auth-form-hint' }, 'Логин: 3-24 символа (буквы/цифры/_/-)'),
+    el('div', { class: 'auth-form-hint' }, 'Имя - любой язык · Юзернейм - латиница/цифры/_/-, 3-24 символа'),
     registerErrorSlot,
+    registerDisplayName,
     registerUsername,
-    registerPassword,
+    registerPasswordField,
     registerSubmit,
     mobileSwitchToLogin
   ])
@@ -170,9 +192,10 @@ function renderAuthScreen(afterLoginRoomCode = '') {
     slot.textContent = message
   }
 
-  async function submit(kind, usernameInput, passwordInput, errorSlot, submitBtn, defaultLabel, loadingLabel) {
+  async function submit(kind, usernameInput, passwordInput, errorSlot, submitBtn, defaultLabel, loadingLabel, displayNameInput) {
     const username = usernameInput.value.trim()
     const password = passwordInput.value
+    const displayName = displayNameInput ? displayNameInput.value.trim() : undefined
 
     errorSlot.style.display = 'none'
     submitBtn.disabled = true
@@ -180,11 +203,13 @@ function renderAuthScreen(afterLoginRoomCode = '') {
 
     try {
       const endpoint = kind === 'login' ? '/api/auth/login' : '/api/auth/register'
+      const payload = { username, password }
+      if (displayNameInput) payload.displayName = displayName
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify(payload)
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.message || 'Ошибка авторизации')
@@ -199,12 +224,13 @@ function renderAuthScreen(afterLoginRoomCode = '') {
   }
 
   loginSubmit.addEventListener('click', () => submit('login', loginUsername, loginPassword, loginErrorSlot, loginSubmit, 'Войти', 'Вход...'))
-  registerSubmit.addEventListener('click', () => submit('register', registerUsername, registerPassword, registerErrorSlot, registerSubmit, 'Зарегистрироваться', 'Регистрация...'))
+  registerSubmit.addEventListener('click', () => submit('register', registerUsername, registerPassword, registerErrorSlot, registerSubmit, 'Зарегистрироваться', 'Регистрация...', registerDisplayName))
 
   loginPassword.addEventListener('keydown', (e) => { if (e.key === 'Enter') loginSubmit.click() })
   loginUsername.addEventListener('keydown', (e) => { if (e.key === 'Enter') loginSubmit.click() })
   registerPassword.addEventListener('keydown', (e) => { if (e.key === 'Enter') registerSubmit.click() })
   registerUsername.addEventListener('keydown', (e) => { if (e.key === 'Enter') registerSubmit.click() })
+  registerDisplayName.addEventListener('keydown', (e) => { if (e.key === 'Enter') registerSubmit.click() })
 }
 
 // ===================== ЛОББИ (экран входа) =====================
@@ -230,7 +256,7 @@ async function renderLobby(prefillRoomCode = '') {
   card.appendChild(el('div', { class: 'subtitle' }, 'Качественная связь без ВПН · до 5 участников · 2 демонстрации экрана в 60 FPS'))
 
   const userBar = el('div', { class: 'lobby-userbar' })
-  userBar.appendChild(el('span', {}, [el('i', { class: 'fas fa-user' }), ` ${state.currentUser.username}`]))
+  userBar.appendChild(el('span', {}, [el('i', { class: 'fas fa-user' }), ` ${state.currentUser.displayName || state.currentUser.username}`]))
   const logoutBtn = el('button', { type: 'button', class: 'lobby-logout-btn' }, 'Выйти')
   logoutBtn.addEventListener('click', async () => {
     try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }) } catch {}

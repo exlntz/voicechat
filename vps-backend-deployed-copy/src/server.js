@@ -48,6 +48,11 @@ db.exec(`CREATE TABLE IF NOT EXISTS users (
   password_salt TEXT NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 )`)
+// Миграция: отображаемое имя (может быть на любом языке, включая кириллицу) отдельно от
+// юзернейма (который используется для входа/будущего добавления в друзья и должен быть
+// только латиница+цифры+_/-). У пользователей, зарегистрированных до этого поля, display_name
+// будет NULL - в таком случае на бэкенде подставляем username как фолбэк (см. ниже).
+try { db.exec('ALTER TABLE users ADD COLUMN display_name TEXT') } catch {}
 db.exec(`CREATE TABLE IF NOT EXISTS sessions (
   token TEXT PRIMARY KEY,
   user_id INTEGER NOT NULL,
@@ -57,8 +62,12 @@ db.exec(`CREATE TABLE IF NOT EXISTS sessions (
 
 const SESSION_COOKIE = 'zvonki_session'
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 дней
-// Разрешённые символы логина: буквы (в т.ч. кириллица через \p{L}), цифры, _ и -
-const USERNAME_RE = /^[\p{L}\p{N}_-]{3,24}$/u
+// Юзернейм - технический идентификатор для входа (и в будущем - добавления в друзья), поэтому
+// строго ASCII: латинские буквы, цифры, _ и -. Отображаемое имя (display_name) - отдельное поле,
+// его пользователь видит везде в интерфейсе (тайлы участников, юзербар), и оно может быть на
+// любом языке, включая кириллицу (та же логика разрешённых символов, что раньше была у логина).
+const USERNAME_RE = /^[A-Za-z0-9_-]{3,24}$/
+const DISPLAY_NAME_RE = /^[\p{L}\p{N}_\- ]{1,40}$/u
 
 async function hashPassword(password) {
   const salt = randomBytes(16).toString('hex')
@@ -83,14 +92,15 @@ function createSession(userId) {
 function getUserByToken(token) {
   if (!token) return null
   const row = db.prepare(
-    'SELECT u.id as id, u.username as username, s.expires_at as expiresAt FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?'
+    'SELECT u.id as id, u.username as username, u.display_name as displayName, s.expires_at as expiresAt FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?'
   ).get(token)
   if (!row) return null
   if (new Date(row.expiresAt).getTime() < Date.now()) {
     db.prepare('DELETE FROM sessions WHERE token = ?').run(token)
     return null
   }
-  return { id: row.id, username: row.username }
+  // У пользователей, зарегистрированных до появления display_name, поле будет NULL - подставляем username
+  return { id: row.id, username: row.username, displayName: row.displayName || row.username }
 }
 
 function setSessionCookie(c, token) {
@@ -151,10 +161,15 @@ const svc = new RoomServiceClient(LIVEKIT_HTTP_URL, LIVEKIT_API_KEY, LIVEKIT_API
 app.post('/api/auth/register', async (c) => {
   const body = await c.req.json().catch(() => ({}))
   const username = (body.username || '').trim()
+  // displayName необязателен - если не передан (или пуст), используем username как отображаемое имя
+  const displayName = (body.displayName || '').trim() || username
   const password = typeof body.password === 'string' ? body.password : ''
 
   if (!USERNAME_RE.test(username)) {
-    return c.json({ error: 'invalid_username', message: 'Логин: 3-24 символа, буквы/цифры/_/-' }, 400)
+    return c.json({ error: 'invalid_username', message: 'Юзернейм: 3-24 символа, только англ. буквы/цифры/_/-' }, 400)
+  }
+  if (!DISPLAY_NAME_RE.test(displayName)) {
+    return c.json({ error: 'invalid_display_name', message: 'Имя: 1-40 символов (буквы любого языка, цифры, пробел, _/-)' }, 400)
   }
   if (password.length < 6 || password.length > 100) {
     return c.json({ error: 'invalid_password', message: 'Пароль должен быть от 6 до 100 символов' }, 400)
@@ -163,23 +178,23 @@ app.post('/api/auth/register', async (c) => {
   const usernameLower = username.toLowerCase()
   const existing = db.prepare('SELECT id FROM users WHERE username_lower = ?').get(usernameLower)
   if (existing) {
-    return c.json({ error: 'username_taken', message: 'Этот логин уже занят' }, 409)
+    return c.json({ error: 'username_taken', message: 'Этот юзернейм уже занят' }, 409)
   }
 
   const { hash, salt } = await hashPassword(password)
   let userId
   try {
     const info = db.prepare(
-      'INSERT INTO users (username, username_lower, password_hash, password_salt) VALUES (?, ?, ?, ?)'
-    ).run(username, usernameLower, hash, salt)
+      'INSERT INTO users (username, username_lower, display_name, password_hash, password_salt) VALUES (?, ?, ?, ?, ?)'
+    ).run(username, usernameLower, displayName, hash, salt)
     userId = info.lastInsertRowid
   } catch {
-    return c.json({ error: 'username_taken', message: 'Этот логин уже занят' }, 409)
+    return c.json({ error: 'username_taken', message: 'Этот юзернейм уже занят' }, 409)
   }
 
   const token = createSession(userId)
   setSessionCookie(c, token)
-  return c.json({ user: { id: userId, username } })
+  return c.json({ user: { id: userId, username, displayName } })
 })
 
 // ---------- API: вход ----------
@@ -193,7 +208,7 @@ app.post('/api/auth/login', async (c) => {
   }
 
   const usernameLower = username.toLowerCase()
-  const row = db.prepare('SELECT id, username, password_hash, password_salt FROM users WHERE username_lower = ?').get(usernameLower)
+  const row = db.prepare('SELECT id, username, display_name as displayName, password_hash, password_salt FROM users WHERE username_lower = ?').get(usernameLower)
   if (!row) {
     return c.json({ error: 'invalid_credentials', message: 'Неверный логин или пароль' }, 401)
   }
@@ -205,7 +220,7 @@ app.post('/api/auth/login', async (c) => {
 
   const token = createSession(row.id)
   setSessionCookie(c, token)
-  return c.json({ user: { id: row.id, username: row.username } })
+  return c.json({ user: { id: row.id, username: row.username, displayName: row.displayName || row.username } })
 })
 
 // ---------- API: выход ----------
@@ -242,9 +257,10 @@ app.post('/api/join', async (c) => {
   let roomCode = (body.roomCode || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')
   // Имя участника берём из аккаунта авторизованного пользователя (requireAuth уже отработал
   // для всех /api/* кроме /api/auth/*), а не из тела запроса - раньше можно было представиться
-  // произвольным именем, теперь имя жёстко привязано к логину.
+  // произвольным именем, теперь имя жёстко привязано к аккаунту. Показываем displayName
+  // (может быть на любом языке), а не технический username.
   const authUser = c.get('user')
-  const displayName = sanitizeName(authUser?.username || '', 'Гость')
+  const displayName = sanitizeName(authUser?.displayName || authUser?.username || '', 'Гость')
   const providedHostSecret = typeof body.hostSecret === 'string' && body.hostSecret ? body.hostSecret : null
 
   if (!roomCode) roomCode = randomId(6)

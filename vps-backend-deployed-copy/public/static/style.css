@@ -272,6 +272,37 @@ html, body {
   color: var(--text);
 }
 
+/* Поле пароля с кнопкой-глазиком (показать/скрыть введённый пароль). Обёртка - просто
+   позиционирующий контейнер: сам input стилизуется как обычно через ".auth-form-panel input",
+   глазик абсолютно позиционирован над правым краем поля. */
+.password-field {
+  position: relative;
+}
+
+.password-field input {
+  padding-right: 44px;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 15px;
+  cursor: pointer;
+  transition: color 140ms ease;
+}
+
+.password-toggle-btn:hover { color: var(--text-dim); }
+.password-toggle-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-sm); }
+
 .auth-submit-btn {
   width: 100%;
   padding: 12px 14px;
