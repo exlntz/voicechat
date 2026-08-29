@@ -14,15 +14,30 @@
 }
 
 * { box-sizing: border-box; }
+*, *::before, *::after { -webkit-tap-highlight-color: transparent; }
 
 html, body {
   margin: 0;
   padding: 0;
+  /* 100dvh вместо 100% - на мобильных браузерах (особенно Safari/Chrome Android) адресная строка
+     то появляется, то скрывается при скролле, из-за чего 100vh/100% "прыгает" и обрезает интерфейс.
+     dvh (dynamic viewport height) актуализируется вместе с реальной видимой областью. Через @supports
+     оставляем 100% как надёжный фолбэк для старых браузеров без поддержки dvh. */
   height: 100%;
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   overflow: hidden;
+  /* Отступы под системные вырезы/скругления (iPhone notch, "остров") на весь документ */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation; /* убирает 300мс задержку на тап и мешающие двойные зум-тапы */
+}
+@supports (height: 100dvh) {
+  html, body { height: 100dvh; }
 }
 
 #app-root { height: 100%; width: 100%; }
@@ -34,6 +49,7 @@ html, body {
   align-items: center;
   justify-content: center;
   padding: 24px;
+  overflow-y: auto; /* на маленьких экранах контент карточки может не влезать по высоте - даём скролл */
 }
 
 .lobby-card {
@@ -44,6 +60,7 @@ html, body {
   width: 100%;
   max-width: 420px;
   text-align: center;
+  margin: auto; /* центрирование по вертикали даже при скролле контейнера */
 }
 
 .lobby-card h1 {
@@ -64,7 +81,9 @@ html, body {
   border: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--text);
-  font-size: 15px;
+  /* 16px, а не 15px - на iOS Safari фокус на поле ввода с font-size < 16px вызывает
+     автоматический зум страницы, после чего интерфейс "разъезжается" до ручного возврата масштаба */
+  font-size: 16px;
   margin-bottom: 12px;
   outline: none;
   transition: border-color .15s;
@@ -295,6 +314,16 @@ html, body {
 .tile.screen-tile.is-fullscreen .tile-fullscreen-btn,
 .tile.camera-tile:hover .tile-fullscreen-btn { opacity: 1; }
 
+/* На тач-устройствах :hover не срабатывает физически (нет курсора) - кнопки, которые появляются
+   только при наведении (fullscreen/kick/volume), были бы недоступны на телефоне вообще, только через
+   долгое угадывание. (hover: none) надёжно определяет тач-устройства без курсора и делает эти
+   элементы управления постоянно видимыми (слегка прозрачными, чтобы не загромождать картинку). */
+@media (hover: none) {
+  .tile-fullscreen-btn,
+  .tile-kick-btn,
+  .volume-control { opacity: .85; }
+}
+
 /* Кнопка "выгнать участника" - видна только создателю комнаты, при наведении на чужой тайл камеры.
    Смещена левее кнопки fullscreen, чтобы не перекрываться с ней. */
 .tile-kick-btn {
@@ -448,6 +477,55 @@ html, body {
   width: 1px; height: 28px; background: var(--border); margin: 0 6px;
 }
 
+/* ---- Выбор FPS демонстрации экрана (кнопка "Демонстрация" + шеврон с текущим FPS) ---- */
+.screen-fps-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  position: relative;
+}
+
+.fps-toggle-btn {
+  width: auto !important;
+  min-width: 40px;
+  padding: 0 8px !important;
+  border-radius: 20px !important;
+  gap: 4px;
+  font-size: 11px !important;
+  font-weight: 700;
+}
+.fps-toggle-btn .fps-toggle-label { font-size: 11px; }
+.fps-toggle-btn .fps-toggle-caret { font-size: 9px; opacity: .8; }
+
+.fps-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.5);
+  z-index: 20;
+  min-width: 90px;
+}
+
+.fps-menu-item {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+}
+.fps-menu-item:hover { background: var(--bg-elevated); }
+.fps-menu-item.selected { background: var(--accent); color: white; font-weight: 600; }
+
 .leave-btn {
   padding: 0 20px;
   border-radius: 24px;
@@ -546,6 +624,8 @@ html, body {
   font-size: 13px;
   outline: none;
   cursor: pointer;
+  /* Высота тач-таргета не менее 40px - минимальный рекомендуемый размер для пальца на телефоне */
+  min-height: 40px;
 }
 .device-row select:focus { border-color: var(--accent); }
 
@@ -573,6 +653,222 @@ html, body {
   margin-top: 0 !important;
 }
 
-@media (max-width: 700px) {
-  .sidebar-participants { display: none; }
+/* ---------- Мобильная адаптация ---------- */
+
+/* До 860px (телефоны и узкие планшеты, включая портретную ориентацию): демонстрация экрана
+   занимает всю ширину сверху, а тайлы камер участников уходят в горизонтальную "плёнку"
+   под ней вместо вертикальной колонки справа - справа для них просто нет места. */
+@media (max-width: 860px) {
+  .room-main { flex-direction: column; }
+  .sidebar-participants {
+    width: 100%;
+    height: 108px;
+    max-height: 108px;
+    flex-direction: row;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    padding: 8px;
+  }
+  .sidebar-participants .tile {
+    width: 150px;
+    height: 100%;
+    flex-shrink: 0;
+  }
+}
+
+/* Позволяем содержимому сцены скроллиться, а не сжиматься до нуля, если тайлов много
+   (например, много участников камер в одной колонке на телефоне) */
+.stage { overflow: auto; }
+
+@media (max-width: 480px) {
+  /* Верхняя панель: разрешаем перенос строки, чтобы код комнаты/статус/значок "создатель"
+     не наезжали друг на друга и не обрезались на узких экранах */
+  .room-topbar {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 12px;
+  }
+  .room-topbar .room-info {
+    font-size: 12px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Панель управления звонком: чуть компактнее кнопки и отступы, чтобы 4-5 круглых кнопок
+     помещались на ширине маленького телефона (320-375px) без перекрытия */
+  .controls-bar {
+    gap: 6px;
+    padding: 10px 6px;
+    flex-wrap: nowrap;
+    overflow-x: auto; /* страховка: если совсем не влезает - лучше горизонтальный скролл, чем обрезка */
+  }
+  .ctrl-btn { width: 42px; height: 42px; font-size: 15px; flex-shrink: 0; }
+  .leave-btn { padding: 0 14px; height: 42px; font-size: 13px; flex-shrink: 0; }
+  .ctrl-divider { margin: 0 2px; height: 22px; flex-shrink: 0; }
+
+  .tile .tile-label { font-size: 11px; padding: 2px 8px; }
+  .avatar-circle { width: 48px; height: 48px; font-size: 18px; }
+}
+
+/* Меню выбора FPS не должно вылезать за пределы экрана на узких телефонах */
+.fps-menu { max-width: 90vw; }
+
+@media (max-width: 380px) {
+  .panel { width: 85vw; }
+}
+
+/* ---------- Кастомное контекстное меню (ПКМ) на тайле демонстрации экрана, в стиле Discord ---------- */
+.screen-ctx-menu {
+  position: fixed;
+  z-index: 2000;
+  min-width: 216px;
+  background: #111214;
+  border: 1px solid #26272b;
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  font-size: 14px;
+  color: #dbdee1;
+  user-select: none;
+}
+
+.screen-ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+  white-space: nowrap;
+}
+.screen-ctx-item:hover,
+.screen-ctx-item.open { background: #4752c4; color: #fff; }
+.screen-ctx-item.destructive { color: #f23f42; }
+.screen-ctx-item.destructive:hover { background: #f23f42; color: #fff; }
+
+.screen-ctx-item .ctx-icon {
+  width: 16px;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 13px;
+  opacity: .9;
+}
+
+.screen-ctx-item .ctx-label { flex: 1; }
+
+.screen-ctx-item .ctx-chevron {
+  font-size: 11px;
+  opacity: .7;
+  flex-shrink: 0;
+}
+
+/* Чекбокс (напр. "Поделиться звуком стрима") */
+.screen-ctx-item .ctx-checkbox {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 2px solid #6c6f75;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  transition: background .1s, border-color .1s;
+}
+.screen-ctx-item.checked .ctx-checkbox {
+  background: #23a559;
+  border-color: #23a559;
+  color: #fff;
+}
+.screen-ctx-item:hover .ctx-checkbox { border-color: #fff; }
+
+.screen-ctx-divider {
+  height: 1px;
+  background: #26272b;
+  margin: 4px 2px;
+}
+
+.screen-ctx-submenu {
+  position: fixed;
+  z-index: 2001;
+  min-width: 170px;
+  background: #111214;
+  border: 1px solid #26272b;
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  font-size: 14px;
+  color: #dbdee1;
+}
+.screen-ctx-submenu .screen-ctx-item.selected { color: #23a559; }
+.screen-ctx-submenu .screen-ctx-item.selected .ctx-icon { color: #23a559; }
+
+/* ---------- Discord-style центрированная раскладка сцены звонка ---------- */
+.stage.stage-centered {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  align-content: center;
+  gap: 12px;
+}
+.stage.stage-centered .tile {
+  flex: 0 1 auto;
+}
+.stage.stage-centered .tile.camera-tile {
+  width: min(320px, 100%);
+  aspect-ratio: 16/10;
+}
+.stage.stage-centered .tile.screen-tile {
+  width: 100%;
+  max-width: 100%;
+  flex: 1 1 100%;
+  aspect-ratio: 16/9;
+  max-height: 100%;
+}
+.stage.stage-centered.screen-count-2 .tile.screen-tile {
+  flex: 1 1 calc(50% - 12px);
+  max-width: calc(50% - 12px);
+}
+
+/* LIVE + FPS бейджи на тайле демонстрации (как в Discord) */
+.tile .live-badge-group {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 4;
+}
+.tile .live-badge {
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tile .live-badge .live-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: #fff;
+  animation: live-blink 1.6s infinite;
+}
+@keyframes live-blink { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+.tile .fps-badge {
+  background: rgba(0,0,0,.6);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* Аватар-круг для участника с выключенной камерой, центрированный (Discord-style) */
+.stage.stage-centered .no-video-placeholder .avatar-circle {
+  width: 88px; height: 88px; font-size: 30px;
 }
