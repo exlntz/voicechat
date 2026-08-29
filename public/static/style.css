@@ -14,10 +14,10 @@
   --border: #23242e;
   --border-strong: #33343f;
 
-  --accent: #3b82f6;
-  --accent-hover: #5c9bfa;
+  --accent: #064cbd;
+  --accent-hover: #3d73cc;
   --accent-contrast: #ffffff;
-  --accent-wash: rgba(59, 130, 246, 0.14);
+  --accent-wash: rgba(6, 76, 189, 0.18);
 
   --danger: #f0475a;
   --danger-hover: #ff5c6e;
@@ -272,6 +272,47 @@ html, body {
   color: var(--text);
 }
 
+/* Поле пароля с кнопкой-глазиком (показать/скрыть введённый пароль). Обёртка - просто
+   позиционирующий контейнер: сам input стилизуется как обычно через ".auth-form-panel input",
+   глазик абсолютно позиционирован над правым краем поля.
+   Важно: .password-field - flex-item внутри .auth-form-panel (display:flex; column), поэтому
+   margin-bottom инпута (12px) уходит в высоту самого wrapper'а, а не "торчит" наружу как у
+   обычных input. Из-за этого высота wrapper'а (56px) больше высоты видимого поля (44px) - если
+   кнопку растянуть на 100% высоты wrapper'а, она визуально съезжает вниз на половину этой
+   разницы. Поэтому кнопка позиционируется не через height:100%, а строго по высоте самого input
+   (top:0/bottom:0 внутри границ инпута), и центрируется относительно НЕГО, а не wrapper'а. */
+.password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-field input {
+  padding-right: 44px;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  top: 0;
+  bottom: 12px; /* совпадает с margin-bottom инпута - кнопка выравнивается точно по высоте поля */
+  right: 4px;
+  width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  font-size: 16px;
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease;
+}
+
+.password-toggle-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+.password-toggle-btn:active { transform: scale(0.92); }
+.password-toggle-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
 .auth-submit-btn {
   width: 100%;
   padding: 12px 14px;
@@ -299,6 +340,14 @@ html, body {
   font-size: 13px;
   margin-bottom: 14px;
   text-align: left;
+}
+
+/* Сообщение об успехе (например "Аккаунт создан!" после перехода с регистрации на логин) -
+   тот же .auth-error слот, просто зелёная тема вместо красной. */
+.auth-error.success {
+  background: var(--success-wash);
+  border-color: rgba(47, 208, 138, .35);
+  color: var(--success);
 }
 
 /* Форма входа изначально слева, форма регистрации - справа за пределами видимой области */
@@ -417,23 +466,39 @@ html, body {
   .auth-mobile-switch { display: block; }
 }
 
-/* ---------- Lobby user bar (logged-in username + logout) ---------- */
+/* ---------- Lobby user bar (logged-in username + logout) ----------
+   Имя пользователя показывается отдельной строкой над кнопкой выхода -
+   раньше они стояли в один ряд впритык (иконка+ник слева, широкая синяя
+   кнопка справа), из-за чего смотрелось тесно и разнородно по ширине. */
 .lobby-userbar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 10px 14px;
+  padding: 12px 14px;
   margin-bottom: 16px;
   font-size: 13.5px;
   color: var(--text);
 }
 
-.lobby-logout-btn {
-  width: auto;
-  padding: 6px 12px;
+.lobby-userbar > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-dim);
+}
+
+.lobby-userbar > span i {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.lobby-card .lobby-logout-btn {
+  width: 100%;
+  padding: 8px 12px;
   margin-top: 0;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
@@ -445,10 +510,11 @@ html, body {
   transition: background .15s, color .15s, border-color .15s;
 }
 
-.lobby-logout-btn:hover {
+.lobby-card .lobby-logout-btn:hover {
   background: var(--accent-wash);
   border-color: var(--accent);
   color: var(--text);
+  filter: none;
 }
 
 /* device preview on lobby */
@@ -874,6 +940,7 @@ html, body {
   max-width: 320px;
 }
 .toast.error { border-color: var(--danger); color: #ff9aa5; }
+.toast.success { border-color: var(--success); color: var(--success); }
 @keyframes toast-in {
   from { opacity: 0; transform: translateX(20px); }
   to { opacity: 1; transform: translateX(0); }
