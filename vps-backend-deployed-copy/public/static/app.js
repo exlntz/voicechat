@@ -74,64 +74,112 @@ async function fetchMe() {
   }
 }
 
+// Экран входа/регистрации в виде анимированной "раздвижной панели" (форма слева/справа,
+// сплошная акцентная панель с призывом к действию сдвигается между ними). На десктопе -
+// полноценная анимация сдвига (как в референсном видео, но сплошные цвета без градиентов).
+// На узких экранах (телефон) 2-колоночная механика физически не влезает - там просто
+// показываем текущую форму + текстовую подсказку-переключатель под ней (без анимации сдвига).
 function renderAuthScreen(afterLoginRoomCode = '') {
   root.innerHTML = ''
 
-  const screen = el('div', { class: 'lobby-screen' })
-  const card = el('div', { class: 'lobby-card' })
-
-  card.appendChild(el('h1', {}, 'Звонки'))
-  card.appendChild(el('div', { class: 'subtitle' }, 'Войдите или зарегистрируйтесь, чтобы продолжить'))
-
-  const errorSlot = el('div', { style: 'display:none' })
-  card.appendChild(errorSlot)
-
   let mode = 'login' // 'login' | 'register'
 
-  const tabs = el('div', { class: 'auth-tabs' })
-  const loginTab = el('button', { type: 'button', class: 'auth-tab active' }, 'Вход')
-  const registerTab = el('button', { type: 'button', class: 'auth-tab' }, 'Регистрация')
-  tabs.appendChild(loginTab)
-  tabs.appendChild(registerTab)
-  card.appendChild(tabs)
+  const screen = el('div', { class: 'auth-screen' })
+  const container = el('div', { class: 'auth-container', 'data-mode': 'login' })
 
-  const usernameInput = el('input', { type: 'text', placeholder: 'Логин', maxlength: '24', autocomplete: 'username' })
-  card.appendChild(usernameInput)
+  // ---- Форма входа ----
+  const loginErrorSlot = el('div', { class: 'auth-error', style: 'display:none' })
+  const loginUsername = el('input', { type: 'text', placeholder: 'Логин', maxlength: '24', autocomplete: 'username' })
+  const loginPassword = el('input', { type: 'password', placeholder: 'Пароль', maxlength: '100', autocomplete: 'current-password' })
+  const loginSubmit = el('button', { type: 'button', class: 'auth-submit-btn' }, 'Войти')
 
-  const passwordInput = el('input', { type: 'password', placeholder: 'Пароль', maxlength: '100', autocomplete: 'current-password' })
-  card.appendChild(passwordInput)
+  // Текстовая ссылка-переключатель под формой - видна только на узких экранах (телефон),
+  // где двухпанельный слайдер физически не влезает (см. media query в style.css)
+  const mobileToRegister = el('button', { type: 'button', class: 'auth-switch-link' }, 'Зарегистрироваться')
+  const mobileSwitchToRegister = el('div', { class: 'auth-mobile-switch' }, ['Нет аккаунта? ', mobileToRegister])
 
-  const submitBtn = el('button', {}, 'Войти')
-  card.appendChild(submitBtn)
+  const loginPanel = el('div', { class: 'auth-form-panel auth-signin' }, [
+    el('h1', {}, 'Вход'),
+    el('div', { class: 'auth-form-hint' }, 'Используйте логин и пароль от аккаунта'),
+    loginErrorSlot,
+    loginUsername,
+    loginPassword,
+    loginSubmit,
+    mobileSwitchToRegister
+  ])
 
-  const hint = el('div', { class: 'hint-text' }, 'Логин: 3-24 символа (буквы/цифры/_/-). Пароль: минимум 6 символов.')
-  card.appendChild(hint)
+  // ---- Форма регистрации ----
+  const registerErrorSlot = el('div', { class: 'auth-error', style: 'display:none' })
+  const registerUsername = el('input', { type: 'text', placeholder: 'Логин', maxlength: '24', autocomplete: 'username' })
+  const registerPassword = el('input', { type: 'password', placeholder: 'Пароль (мин. 6 символов)', maxlength: '100', autocomplete: 'new-password' })
+  const registerSubmit = el('button', { type: 'button', class: 'auth-submit-btn' }, 'Зарегистрироваться')
 
-  screen.appendChild(card)
+  const mobileToLogin = el('button', { type: 'button', class: 'auth-switch-link' }, 'Войти')
+  const mobileSwitchToLogin = el('div', { class: 'auth-mobile-switch' }, ['Уже есть аккаунт? ', mobileToLogin])
+
+  const registerPanel = el('div', { class: 'auth-form-panel auth-signup' }, [
+    el('h1', {}, 'Регистрация'),
+    el('div', { class: 'auth-form-hint' }, 'Логин: 3-24 символа (буквы/цифры/_/-)'),
+    registerErrorSlot,
+    registerUsername,
+    registerPassword,
+    registerSubmit,
+    mobileSwitchToLogin
+  ])
+
+  // ---- Акцентная сдвигающаяся панель с призывом к действию (правая CTA = "войти в звонки",
+  // левая CTA = "уже есть аккаунт") ----
+  const toRegisterBtn = el('button', { type: 'button', class: 'auth-ghost-btn' }, 'Регистрация')
+  const overlayRight = el('div', { class: 'auth-overlay-panel auth-overlay-right' }, [
+    el('h1', {}, 'Привет!'),
+    el('p', {}, 'Введите логин и пароль, чтобы начать пользоваться сервисом'),
+    toRegisterBtn
+  ])
+
+  const toLoginBtn = el('button', { type: 'button', class: 'auth-ghost-btn' }, 'Войти')
+  const overlayLeft = el('div', { class: 'auth-overlay-panel auth-overlay-left' }, [
+    el('h1', {}, 'С возвращением!'),
+    el('p', {}, 'Чтобы продолжить, войдите с вашим логином и паролем'),
+    toLoginBtn
+  ])
+
+  const overlay = el('div', { class: 'auth-overlay' }, [overlayLeft, overlayRight])
+  const overlayContainer = el('div', { class: 'auth-overlay-container' }, [overlay])
+
+  container.appendChild(loginPanel)
+  container.appendChild(registerPanel)
+  container.appendChild(overlayContainer)
+  screen.appendChild(container)
   root.appendChild(screen)
 
   function setMode(next) {
     mode = next
-    loginTab.classList.toggle('active', mode === 'login')
-    registerTab.classList.toggle('active', mode === 'register')
-    submitBtn.textContent = mode === 'login' ? 'Войти' : 'Зарегистрироваться'
-    passwordInput.autocomplete = mode === 'login' ? 'current-password' : 'new-password'
-    errorSlot.style.display = 'none'
+    container.dataset.mode = mode
+    container.classList.toggle('right-panel-active', mode === 'register')
+    loginErrorSlot.style.display = 'none'
+    registerErrorSlot.style.display = 'none'
   }
 
-  loginTab.addEventListener('click', () => setMode('login'))
-  registerTab.addEventListener('click', () => setMode('register'))
+  toRegisterBtn.addEventListener('click', () => setMode('register'))
+  toLoginBtn.addEventListener('click', () => setMode('login'))
+  mobileToRegister.addEventListener('click', () => setMode('register'))
+  mobileToLogin.addEventListener('click', () => setMode('login'))
 
-  async function submit() {
+  function showError(slot, message) {
+    slot.style.display = 'block'
+    slot.textContent = message
+  }
+
+  async function submit(kind, usernameInput, passwordInput, errorSlot, submitBtn, defaultLabel, loadingLabel) {
     const username = usernameInput.value.trim()
     const password = passwordInput.value
 
     errorSlot.style.display = 'none'
     submitBtn.disabled = true
-    submitBtn.textContent = mode === 'login' ? 'Вход...' : 'Регистрация...'
+    submitBtn.textContent = loadingLabel
 
     try {
-      const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register'
+      const endpoint = kind === 'login' ? '/api/auth/login' : '/api/auth/register'
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -144,17 +192,19 @@ function renderAuthScreen(afterLoginRoomCode = '') {
       state.currentUser = data.user
       renderLobby(afterLoginRoomCode)
     } catch (e) {
-      errorSlot.style.display = 'block'
-      errorSlot.className = 'error-box'
-      errorSlot.textContent = e.message || 'Ошибка авторизации'
+      showError(errorSlot, e.message || 'Ошибка авторизации')
       submitBtn.disabled = false
-      submitBtn.textContent = mode === 'login' ? 'Войти' : 'Зарегистрироваться'
+      submitBtn.textContent = defaultLabel
     }
   }
 
-  submitBtn.addEventListener('click', submit)
-  passwordInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit() })
-  usernameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit() })
+  loginSubmit.addEventListener('click', () => submit('login', loginUsername, loginPassword, loginErrorSlot, loginSubmit, 'Войти', 'Вход...'))
+  registerSubmit.addEventListener('click', () => submit('register', registerUsername, registerPassword, registerErrorSlot, registerSubmit, 'Зарегистрироваться', 'Регистрация...'))
+
+  loginPassword.addEventListener('keydown', (e) => { if (e.key === 'Enter') loginSubmit.click() })
+  loginUsername.addEventListener('keydown', (e) => { if (e.key === 'Enter') loginSubmit.click() })
+  registerPassword.addEventListener('keydown', (e) => { if (e.key === 'Enter') registerSubmit.click() })
+  registerUsername.addEventListener('keydown', (e) => { if (e.key === 'Enter') registerSubmit.click() })
 }
 
 // ===================== ЛОББИ (экран входа) =====================
