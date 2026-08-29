@@ -202,6 +202,27 @@ html, body {
 
 .auth-form-panel input:focus { border-color: var(--accent); }
 
+/* Отключаем стандартную светлую подсветку браузера при автозаполнении логина/пароля -
+   иначе Chrome красит поле в белый цвет мимо всех обычных стилей. Трюк с огромным
+   box-shadow "закрашивает" фон нужным тёмным цветом (обычный background тут бесполезен),
+   а -webkit-text-fill-color переопределяет цвет текста автозаполненного значения. */
+.auth-form-panel input:-webkit-autofill,
+.auth-form-panel input:-webkit-autofill:hover,
+.auth-form-panel input:-webkit-autofill:focus,
+.auth-form-panel input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-elevated) inset;
+  box-shadow: 0 0 0 1000px var(--bg-elevated) inset;
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Firefox использует свой механизм автозаполнения без -webkit-autofill */
+.auth-form-panel input:autofill {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
 .auth-submit-btn {
   width: 100%;
   padding: 12px 14px;
