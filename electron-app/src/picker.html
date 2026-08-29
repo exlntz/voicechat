@@ -19,13 +19,23 @@
     margin: 0 0 12px;
     color: #cfd2d8;
   }
+  h2.group-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #7c8598;
+    margin: 12px 0 6px;
+  }
   .grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
-    max-height: 320px;
-    overflow-y: auto;
     padding-right: 4px;
+  }
+  .grids-wrap {
+    max-height: 300px;
+    overflow-y: auto;
   }
   .item {
     border: 2px solid transparent;
@@ -53,6 +63,33 @@
     text-overflow: ellipsis;
     color: #b7bac1;
   }
+  .audio-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #1a1d24;
+  }
+  .audio-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin: 2px 0 0;
+    accent-color: #3b82f6;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .audio-row label {
+    font-size: 13px;
+    cursor: pointer;
+    display: block;
+  }
+  .audio-row .audio-hint {
+    font-size: 11px;
+    color: #7c8598;
+    margin-top: 3px;
+  }
   .actions {
     display: flex;
     justify-content: flex-end;
@@ -72,11 +109,26 @@
   .btn-share { background: #3b82f6; color: #fff; }
   .btn-share:disabled { background: #2a3550; color: #7c8598; cursor: not-allowed; }
   .btn-share:not(:disabled):hover { background: #2f6fdb; }
+  .empty-hint { font-size: 12px; color: #7c8598; padding: 8px 0; }
 </style>
 </head>
 <body>
   <h1>Выберите, что демонстрировать</h1>
-  <div class="grid" id="grid"></div>
+  <div class="grids-wrap">
+    <h2 class="group-title">Экраны</h2>
+    <div class="grid" id="gridScreens"></div>
+    <h2 class="group-title">Окна</h2>
+    <div class="grid" id="gridWindows"></div>
+  </div>
+
+  <div class="audio-row">
+    <input type="checkbox" id="audioCheckbox" checked />
+    <div>
+      <label for="audioCheckbox">Поделиться звуком стрима</label>
+      <div class="audio-hint" id="audioHint">Звук всегда захватывается вместе с демонстрацией — можно включать/выключать в любой момент прямо во время звонка.</div>
+    </div>
+  </div>
+
   <div class="actions">
     <button class="btn-cancel" id="cancelBtn">Отмена</button>
     <button class="btn-share" id="shareBtn" disabled>Демонстрировать</button>
@@ -84,31 +136,54 @@
 
   <script>
     let selectedId = null
-    const grid = document.getElementById('grid')
+    let selectedType = null
+    const gridScreens = document.getElementById('gridScreens')
+    const gridWindows = document.getElementById('gridWindows')
     const shareBtn = document.getElementById('shareBtn')
     const cancelBtn = document.getElementById('cancelBtn')
+    const audioCheckbox = document.getElementById('audioCheckbox')
+    const audioHint = document.getElementById('audioHint')
 
-    window.pickerAPI.onSources((sources) => {
-      grid.innerHTML = ''
+    function selectItem(item, s) {
+      document.querySelectorAll('.item').forEach((el) => el.classList.remove('selected'))
+      item.classList.add('selected')
+      selectedId = s.id
+      selectedType = s.type
+      shareBtn.disabled = false
+      // Захват системного звука на Windows не изолируется по конкретному окну - при выборе окна
+      // всё равно будет слышен звук всей системы, а не только этого приложения. Предупреждаем,
+      // но НЕ блокируем чекбокс - звук демонстрации должен быть доступен всегда, по требованию.
+      audioHint.textContent = s.type === 'window'
+        ? 'При демонстрации отдельного окна захватывается звук всей системы (ограничение Windows) - выбирайте "Экраны" выше, если нужен точечный захват звука приложения.'
+        : 'Звук всегда захватывается вместе с демонстрацией — можно включать/выключать в любой момент прямо во время звонка.'
+    }
+
+    function renderGroup(container, sources) {
+      container.innerHTML = ''
+      if (!sources.length) {
+        container.appendChild(Object.assign(document.createElement('div'), { className: 'empty-hint', textContent: 'Ничего не найдено' }))
+        return
+      }
       sources.forEach((s) => {
         const item = document.createElement('div')
         item.className = 'item'
         item.innerHTML = `<img src="${s.thumbnail}" /><div class="name">${s.name}</div>`
-        item.addEventListener('click', () => {
-          document.querySelectorAll('.item').forEach((el) => el.classList.remove('selected'))
-          item.classList.add('selected')
-          selectedId = s.id
-          shareBtn.disabled = false
-        })
+        item.addEventListener('click', () => selectItem(item, s))
         item.addEventListener('dblclick', () => {
-          window.pickerAPI.choose(s.id)
+          selectItem(item, s)
+          window.pickerAPI.choose(s.id, audioCheckbox.checked)
         })
-        grid.appendChild(item)
+        container.appendChild(item)
       })
+    }
+
+    window.pickerAPI.onSources((sources) => {
+      renderGroup(gridScreens, sources.filter((s) => s.type === 'screen'))
+      renderGroup(gridWindows, sources.filter((s) => s.type === 'window'))
     })
 
     shareBtn.addEventListener('click', () => {
-      if (selectedId) window.pickerAPI.choose(selectedId)
+      if (selectedId) window.pickerAPI.choose(selectedId, audioCheckbox.checked)
     })
     cancelBtn.addEventListener('click', () => window.pickerAPI.cancel())
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.pickerAPI.cancel() })

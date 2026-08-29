@@ -17,7 +17,12 @@ const state = {
   selectedMicId: null,
   selectedSpeakerId: null,
   isHost: false, // является ли текущий пользователь создателем комнаты
-  hostSecret: null // секрет для управления комнатой (выгон участников), известен только создателю
+  hostSecret: null, // секрет для управления комнатой (выгон участников), известен только создателю
+  screenShareFps: Number(localStorage.getItem('screenShareFps')) || 60, // выбранный FPS для демонстрации экрана (запоминается между звонками)
+  // "Поделиться звуком стрима" - по умолчанию ВКЛЮЧЕНО (звук демонстрации должен быть слышен всегда,
+  // если явно не выключен пользователем через кастомное контекстное меню на тайле демонстрации)
+  screenShareAudioShared: localStorage.getItem('screenShareAudioShared') !== '0',
+  screenShareContentHint: localStorage.getItem('screenShareContentHint') || 'motion' // 'motion' | 'detail'
 }
 
 const root = document.getElementById('app-root')
@@ -437,7 +442,8 @@ async function enterRoom(joinData) {
   const topRight = el('div', {})
   const participantsBtn = el('button', {
     class: 'ctrl-btn',
-    style: 'width:36px;height:36px;font-size:14px',
+    // 40px, а не 36px - минимальный рекомендуемый размер тач-таргета на телефоне
+    style: 'width:40px;height:40px;font-size:14px',
     title: 'Участники'
   }, [el('i', { class: 'fas fa-users' })])
   topRight.appendChild(participantsBtn)
@@ -462,12 +468,49 @@ async function enterRoom(joinData) {
   const screenCountBadge = el('span', { class: 'badge-count', style: 'display:none' }, '0')
   screenBtn.appendChild(screenCountBadge)
 
+  // Демонстрация экрана через getDisplayMedia() не поддерживается в большинстве мобильных
+  // браузеров (iOS Safari/Chrome, Android Chrome вне десктоп-режима) - без проверки пользователь
+  // на телефоне видел бы активную кнопку, а по нажатию получал бы непонятную ошибку/тишину.
+  // Скрываем кнопку и FPS-переключатель целиком, если API физически отсутствует.
+  const canScreenShare = !!(navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === 'function')
+
+  // ---- Выбор FPS для демонстрации экрана: кнопка-шеврон открывает мини-меню с вариантами ----
+  const FPS_OPTIONS = [15, 30, 60]
+  const fpsGroup = el('div', { class: 'screen-fps-group' })
+  const fpsBtn = el('button', { class: 'ctrl-btn fps-toggle-btn', title: 'Частота кадров демонстрации' }, [
+    el('span', { class: 'fps-toggle-label' }, `${state.screenShareFps}`),
+    el('i', { class: 'fas fa-chevron-up fps-toggle-caret' })
+  ])
+  const fpsMenu = el('div', { class: 'fps-menu', style: 'display:none' })
+  FPS_OPTIONS.forEach((fps) => {
+    const item = el('button', { type: 'button', class: `fps-menu-item${fps === state.screenShareFps ? ' selected' : ''}` }, `${fps} FPS`)
+    item.addEventListener('click', (e) => {
+      e.stopPropagation()
+      state.screenShareFps = fps
+      localStorage.setItem('screenShareFps', String(fps))
+      fpsMenu.querySelectorAll('.fps-menu-item').forEach((el2) => el2.classList.remove('selected'))
+      item.classList.add('selected')
+      fpsBtn.querySelector('.fps-toggle-label').textContent = String(fps)
+      fpsMenu.style.display = 'none'
+      applyScreenShareFps(fps) // если демка уже идёт - применяем новое значение "живьём"
+    })
+    fpsMenu.appendChild(item)
+  })
+  fpsBtn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    fpsMenu.style.display = fpsMenu.style.display === 'none' ? 'flex' : 'none'
+  })
+  document.addEventListener('click', () => { fpsMenu.style.display = 'none' })
+  fpsGroup.appendChild(screenBtn)
+  fpsGroup.appendChild(fpsBtn)
+  fpsGroup.appendChild(fpsMenu)
+
   const divider1 = el('div', { class: 'ctrl-divider' })
   const leaveBtn = el('button', { class: 'leave-btn' }, [el('i', { class: 'fas fa-phone-slash' }), ' Выйти'])
 
   controls.appendChild(micBtn)
   controls.appendChild(camBtn)
-  controls.appendChild(screenBtn)
+  if (canScreenShare) controls.appendChild(fpsGroup)
   controls.appendChild(divider1)
   controls.appendChild(leaveBtn)
   screen.appendChild(controls)
@@ -478,6 +521,12 @@ async function enterRoom(joinData) {
   const room = new LK.Room({
     adaptiveStream: true,
     dynacast: true,
+    // Маршрутизация удалённого аудио через Web Audio API (GainNode), а не напрямую через
+    // HTMLMediaElement.volume. Это нужно для корректной работы регулятора громкости >100%:
+    // родная громкость <audio>/<video> ограничена диапазоном [0,1] и браузер бросает исключение
+    // при попытке выставить больше 1 - из-за этого слайдер "залипал"/не реагировал на верхних значениях.
+    // GainNode такого ограничения не имеет и позволяет усиливать сигнал выше 100% без ошибок.
+    webAudioMix: true,
     videoCaptureDefaults: {
       resolution: LK.VideoPresets.h720.resolution,
       ...(state.selectedCamId ? { deviceId: state.selectedCamId } : {})
@@ -499,31 +548,53 @@ async function enterRoom(joinData) {
   }
 
   function relayout() {
-    // Камеры/аватары участников -> stage (grid). Демки экрана -> stage приоритетно, камеры уходят в сайдбар если есть демки
+    // Камеры/аватары участников -> stage (центрированный flex, как в Discord). Демки экрана ->
+    // stage приоритетно, камеры уходят в сайдбар если есть демки.
     const hasScreenShares = state.screenShares.size > 0
     const cameraTiles = Array.from(document.querySelectorAll('.camera-tile'))
     const screenTiles = Array.from(document.querySelectorAll('.screen-tile'))
+    // На узких экранах (телефон, особенно портретная ориентация) сетке физически негде
+    // расположить несколько колонок без сильного сжатия каждого тайла - принудительно
+    // уменьшаем число колонок, независимо от того, сколько тайлов реально помещалось бы
+    // на десктопе. Порог 860px совпадает с медиа-запросом в CSS, где сайдбар демок
+    // становится горизонтальной "плёнкой" под сценой вместо вертикальной колонки справа.
+    const isNarrow = window.innerWidth <= 860
 
     stage.innerHTML = ''
     sidebar.innerHTML = ''
+    stage.classList.add('stage-centered')
+    stage.classList.remove('screen-count-2')
 
     if (hasScreenShares) {
       screenTiles.forEach((t) => stage.appendChild(t))
       cameraTiles.forEach((t) => sidebar.appendChild(t))
       sidebar.style.display = cameraTiles.length ? 'flex' : 'none'
       const n = screenTiles.length
-      stage.style.gridTemplateColumns = n > 1 ? 'repeat(2, 1fr)' : '1fr'
+      // Две демки одновременно на телефоне лучше показывать друг под другом, чем сжимать
+      // пополам по ширине - иначе контент демонстрации становится нечитаемым
+      if (n > 1 && !isNarrow) stage.classList.add('screen-count-2')
+      stage.style.gridTemplateColumns = ''
     } else {
       sidebar.style.display = 'none'
       cameraTiles.forEach((t) => stage.appendChild(t))
-      const n = cameraTiles.length || 1
-      const cols = n <= 1 ? 1 : n <= 4 ? 2 : 3
-      stage.style.gridTemplateColumns = `repeat(${cols}, 1fr)`
+      stage.style.gridTemplateColumns = ''
     }
 
     screenCountBadge.style.display = state.screenShares.size > 0 ? 'block' : 'none'
     screenCountBadge.textContent = String(state.screenShares.size)
   }
+
+  // Пересчитать раскладку при повороте телефона / изменении размера окна (например, вызов
+  // виртуальной клавиатуры или переход портрет<->ландшафт) - без этого сетка "застревала"
+  // в раскладке, посчитанной на момент последнего relayout(), а не текущей ширины экрана
+  let relayoutRAF = null
+  window.addEventListener('resize', () => {
+    if (relayoutRAF) return
+    relayoutRAF = requestAnimationFrame(() => {
+      relayoutRAF = null
+      relayout()
+    })
+  })
 
   // ---- Регулятор громкости (слайдер + иконка), общий для камеры и демонстрации ----
   function makeVolumeControl(onChange, initial = 1) {
@@ -633,12 +704,18 @@ async function enterRoom(joinData) {
     const tile = el('div', { class: 'tile screen-tile', id: `tile-screen-${sid}` })
     const video = el('video', { autoplay: true, playsinline: true, muted: true })
     const label = el('div', { class: 'tile-label' }, [el('i', { class: 'fas fa-desktop' }), el('span', {}, `Демонстрация — ${name}`)])
+    // Бейджи LIVE + FPS в стиле Discord, в левом верхнем углу тайла демонстрации
+    const liveBadge = el('div', { class: 'live-badge-group' }, [
+      el('span', { class: 'live-badge' }, [el('span', { class: 'live-dot' }), 'LIVE']),
+      el('span', { class: 'fps-badge' }, `${state.screenShareFps} FPS`)
+    ])
     const fsBtn = el('button', { class: 'tile-fullscreen-btn', title: 'На весь экран' }, [el('i', { class: 'fas fa-expand' })])
     fsBtn.addEventListener('click', (e) => {
       e.stopPropagation()
       toggleTileFullscreen(tile)
     })
     tile.appendChild(video)
+    tile.appendChild(liveBadge)
     tile.appendChild(label)
     tile.appendChild(fsBtn)
     let volumeCtl = null
@@ -651,7 +728,171 @@ async function enterRoom(joinData) {
       tile.appendChild(volumeCtl)
     }
     tile.addEventListener('dblclick', () => toggleTileFullscreen(tile))
-    return { tile, video, label, fsBtn, volumeCtl }
+    // Кастомное контекстное меню (ПКМ) вместо стандартного браузерного - в стиле Discord.
+    // Для своей демонстрации - полный набор действий (стоп/смена источника/звук/PiP/качество).
+    // Для чужой демонстрации - только просмотровые опции (PiP + качество приёма).
+    tile.addEventListener('contextmenu', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      openScreenContextMenu(e.clientX, e.clientY, { tile, video, identity, sid, isLocal })
+    })
+    return { tile, video, label, fsBtn, volumeCtl, fpsBadge: liveBadge.querySelector('.fps-badge') }
+  }
+
+  // ---- Обновить FPS-бейдж на тайле демонстрации ----
+  function updateScreenFpsBadge(sid, fps) {
+    const t = screenTilesMap.get(sid)
+    if (t && t.fpsBadge) t.fpsBadge.textContent = `${fps} FPS`
+  }
+
+  // ===================== Кастомное контекстное меню тайла демонстрации (Discord-style) =====================
+  let activeCtxMenu = null
+  let activeCtxSubmenu = null
+
+  function closeScreenContextMenu() {
+    if (activeCtxSubmenu) { activeCtxSubmenu.remove(); activeCtxSubmenu = null }
+    if (activeCtxMenu) { activeCtxMenu.remove(); activeCtxMenu = null }
+  }
+  document.addEventListener('click', closeScreenContextMenu)
+  document.addEventListener('contextmenu', (e) => {
+    // Клик правой кнопкой где-то ещё (не на тайле демонстрации) - закрыть меню, если открыто
+    if (activeCtxMenu && !e.target.closest('.screen-tile')) closeScreenContextMenu()
+  })
+  window.addEventListener('resize', closeScreenContextMenu)
+  window.addEventListener('blur', closeScreenContextMenu)
+
+  function ctxItem({ icon, label, checked, chevron, destructive, onClick, selected }) {
+    const classes = ['screen-ctx-item']
+    if (checked) classes.push('checked')
+    if (destructive) classes.push('destructive')
+    if (selected) classes.push('selected')
+    const effectiveIcon = selected ? 'fas fa-check' : icon
+    const item = el('div', { class: classes.join(' ') }, [
+      checked !== undefined
+        ? el('span', { class: 'ctx-checkbox' })
+        : el('span', { class: 'ctx-icon' }, effectiveIcon ? [el('i', { class: effectiveIcon })] : []),
+      el('span', { class: 'ctx-label' }, label),
+      chevron ? el('i', { class: 'fas fa-chevron-right ctx-chevron' }) : null
+    ])
+    if (onClick) {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation()
+        onClick(e)
+      })
+    }
+    return item
+  }
+
+  function positionFloating(node, x, y) {
+    document.body.appendChild(node)
+    const vw = window.innerWidth, vh = window.innerHeight
+    const rect = node.getBoundingClientRect()
+    let left = x, top = y
+    if (left + rect.width > vw - 8) left = Math.max(8, vw - rect.width - 8)
+    if (top + rect.height > vh - 8) top = Math.max(8, vh - rect.height - 8)
+    node.style.left = left + 'px'
+    node.style.top = top + 'px'
+  }
+
+  function openSubmenu(anchorEl, buildItems) {
+    if (activeCtxSubmenu) { activeCtxSubmenu.remove(); activeCtxSubmenu = null }
+    const submenu = el('div', { class: 'screen-ctx-submenu' }, buildItems())
+    const rect = anchorEl.getBoundingClientRect()
+    positionFloating(submenu, rect.right + 4, rect.top)
+    submenu.addEventListener('click', (e) => e.stopPropagation())
+    submenu.addEventListener('contextmenu', (e) => e.preventDefault())
+    activeCtxSubmenu = submenu
+  }
+
+  function openScreenContextMenu(x, y, ctx) {
+    closeScreenContextMenu()
+    const { identity, sid, isLocal } = ctx
+    const items = []
+
+    if (isLocal) {
+      items.push(ctxItem({
+        icon: 'fas fa-stop-circle', label: 'Прекратить стрим', destructive: true,
+        onClick: () => { closeScreenContextMenu(); stopScreenShare() }
+      }))
+      items.push(el('div', { class: 'screen-ctx-divider' }))
+      items.push(ctxItem({
+        icon: 'fas fa-arrows-rotate', label: 'Изменить источник',
+        onClick: () => { closeScreenContextMenu(); changeScreenSource() }
+      }))
+      const qualityItem = ctxItem({
+        icon: 'fas fa-gauge-high', label: 'Качество передачи', chevron: true
+      })
+      qualityItem.addEventListener('mouseenter', () => {
+        openSubmenu(qualityItem, () => FPS_OPTIONS.map((fps) => ctxItem({
+          label: `${fps} FPS`,
+          selected: fps === state.screenShareFps,
+          onClick: () => {
+            state.screenShareFps = fps
+            localStorage.setItem('screenShareFps', String(fps))
+            fpsBtn.querySelector('.fps-toggle-label').textContent = String(fps)
+            fpsMenu.querySelectorAll('.fps-menu-item').forEach((el2) => el2.classList.toggle('selected', el2.textContent === `${fps} FPS`))
+            applyScreenShareFps(fps)
+            if (currentScreenTrackSid) updateScreenFpsBadge(currentScreenTrackSid, fps)
+            closeScreenContextMenu()
+          }
+        })))
+      })
+      items.push(qualityItem)
+      items.push(el('div', { class: 'screen-ctx-divider' }))
+      items.push(ctxItem({
+        label: 'Поделиться звуком стрима',
+        checked: state.screenShareAudioShared,
+        onClick: () => { toggleScreenShareAudio(); openScreenContextMenu(x, y, ctx) }
+      }))
+      items.push(ctxItem({
+        icon: 'fas fa-up-right-from-square', label: 'Стрим в отдельном окне',
+        onClick: () => { closeScreenContextMenu(); openScreenSharePiP(ctx.video) }
+      }))
+      items.push(el('div', { class: 'screen-ctx-divider' }))
+      const otherItem = ctxItem({ icon: 'fas fa-sliders', label: 'Другие настройки', chevron: true })
+      otherItem.addEventListener('mouseenter', () => {
+        openSubmenu(otherItem, () => [
+          ctxItem({
+            label: 'Оптимизировать: движение', selected: state.screenShareContentHint === 'motion',
+            onClick: () => { setScreenShareContentHint('motion'); closeScreenContextMenu() }
+          }),
+          ctxItem({
+            label: 'Оптимизировать: чёткость', selected: state.screenShareContentHint === 'detail',
+            onClick: () => { setScreenShareContentHint('detail'); closeScreenContextMenu() }
+          })
+        ])
+      })
+      items.push(otherItem)
+    } else {
+      // Чужая демонстрация - только просмотровые действия
+      items.push(ctxItem({
+        icon: 'fas fa-up-right-from-square', label: 'Стрим в отдельном окне',
+        onClick: () => { closeScreenContextMenu(); openScreenSharePiP(ctx.video) }
+      }))
+      items.push(el('div', { class: 'screen-ctx-divider' }))
+      const qualityItem = ctxItem({ icon: 'fas fa-gauge-high', label: 'Качество приёма', chevron: true })
+      qualityItem.addEventListener('mouseenter', () => {
+        openSubmenu(qualityItem, () => [
+          ctxItem({ label: 'Высокое', onClick: () => { setRemoteScreenQuality(identity, LK.VideoQuality.HIGH); closeScreenContextMenu() } }),
+          ctxItem({ label: 'Среднее', onClick: () => { setRemoteScreenQuality(identity, LK.VideoQuality.MEDIUM); closeScreenContextMenu() } }),
+          ctxItem({ label: 'Низкое', onClick: () => { setRemoteScreenQuality(identity, LK.VideoQuality.LOW); closeScreenContextMenu() } })
+        ])
+      })
+      items.push(qualityItem)
+    }
+
+    const menu = el('div', { class: 'screen-ctx-menu' }, items)
+    menu.addEventListener('click', (e) => e.stopPropagation())
+    menu.addEventListener('contextmenu', (e) => e.preventDefault())
+    positionFloating(menu, x, y)
+    activeCtxMenu = menu
+  }
+
+  function setRemoteScreenQuality(identity, quality) {
+    const p = room.getParticipantByIdentity(identity)
+    if (!p) return
+    const pub = p.getTrackPublication(LK.Track.Source.ScreenShare)
+    if (pub && typeof pub.setVideoQuality === 'function') pub.setVideoQuality(quality)
   }
 
   document.addEventListener('fullscreenchange', () => {
@@ -664,6 +905,7 @@ async function enterRoom(joinData) {
   })
 
   const cameraTilesMap = new Map() // identity -> {tile, video, placeholder, label}
+  const screenTilesMap = new Map() // trackSid -> {tile, video, label, fsBtn, volumeCtl}
 
   // Определить, является ли участник создателем комнаты, по его metadata ({"isHost":true}, задаётся в JWT на сервере)
   function isParticipantHost(participant) {
@@ -689,6 +931,31 @@ async function enterRoom(joinData) {
     relayout()
   }
 
+  // ---- Тайл демонстрации экрана: идемпотентное создание по trackSid ----
+  // Раньше makeScreenTile() вызывался напрямую из нескольких мест (TrackSubscribed, рендер уже
+  // подключённых участников при входе, старт своей демки) без проверки на существование тайла с
+  // таким же trackSid. Из-за гонки событий (например, TrackSubscribed срабатывал одновременно с
+  // ручным рендером существующих публикаций участника при подключении) один и тот же поток экрана
+  // мог получить два DOM-тайла одновременно - "демка раздваивалась". ensureScreenTile() гарантирует
+  // единственный тайл на trackSid и переиспользует существующий, если он уже есть.
+  function ensureScreenTile(identity, name, sid, isLocal = false) {
+    const existing = screenTilesMap.get(sid)
+    if (existing) return existing
+    const t = makeScreenTile(identity, name, sid, isLocal)
+    screenTilesMap.set(sid, t)
+    document.body.appendChild(t.tile) // temp, relayout moves it
+    state.screenShares.set(sid, { identity, name })
+    relayout()
+    return t
+  }
+
+  function removeScreenTile(sid) {
+    const t = screenTilesMap.get(sid)
+    if (t) { t.tile.remove(); screenTilesMap.delete(sid) }
+    state.screenShares.delete(sid)
+    relayout()
+  }
+
   // ---- Track handling ----
   room.on(LK.RoomEvent.TrackSubscribed, (track, publication, participant) => {
     const name = participant.name || participant.identity
@@ -706,12 +973,10 @@ async function enterRoom(joinData) {
       ensureCameraTile(participant.identity, name, false, isParticipantHost(participant))
       updateMicIndicator(participant.identity, publication.isMuted)
     } else if (track.source === LK.Track.Source.ScreenShare) {
-      const t = makeScreenTile(participant.identity, name, publication.trackSid)
+      const alreadyExisted = screenTilesMap.has(publication.trackSid)
+      const t = ensureScreenTile(participant.identity, name, publication.trackSid)
       track.attach(t.video)
-      document.body.appendChild(t.tile)
-      state.screenShares.set(publication.trackSid, { identity: participant.identity, name })
-      relayout()
-      showToast(`${name} начал демонстрацию экрана`)
+      if (!alreadyExisted) showToast(`${name} начал демонстрацию экрана`)
     } else if (track.source === LK.Track.Source.ScreenShareAudio) {
       const audioEl = document.body.appendChild(el('audio', { autoplay: true, style: 'display:none' }))
       track.attach(audioEl)
@@ -727,10 +992,7 @@ async function enterRoom(joinData) {
       if (t) t.placeholder.style.display = 'flex'
       updateCamIndicator(participant.identity, true)
     } else if (track.source === LK.Track.Source.ScreenShare) {
-      const tile = document.getElementById(`tile-screen-${publication.trackSid}`)
-      if (tile) tile.remove()
-      state.screenShares.delete(publication.trackSid)
-      relayout()
+      removeScreenTile(publication.trackSid)
     }
     track.detach()
   })
@@ -764,13 +1026,8 @@ async function enterRoom(joinData) {
     removeCameraTile(participant.identity)
     // Clean up any of their screen shares
     for (const [sid, info] of Array.from(state.screenShares.entries())) {
-      if (info.identity === participant.identity) {
-        const tile = document.getElementById(`tile-screen-${sid}`)
-        if (tile) tile.remove()
-        state.screenShares.delete(sid)
-      }
+      if (info.identity === participant.identity) removeScreenTile(sid)
     }
-    relayout()
   })
 
   room.on(LK.RoomEvent.ActiveSpeakersChanged, (speakers) => {
@@ -832,11 +1089,8 @@ async function enterRoom(joinData) {
             pub.track.attach(t.video)
             t.placeholder.style.display = 'none'
           } else if (pub.source === LK.Track.Source.ScreenShare) {
-            const t = makeScreenTile(participant.identity, participant.name || participant.identity, pub.trackSid)
+            const t = ensureScreenTile(participant.identity, participant.name || participant.identity, pub.trackSid)
             pub.track.attach(t.video)
-            document.body.appendChild(t.tile)
-            state.screenShares.set(pub.trackSid, { identity: participant.identity, name: participant.name })
-            relayout()
           }
         }
       })
@@ -876,24 +1130,60 @@ async function enterRoom(joinData) {
   })
 
   let isScreenSharing = false
+  let screenShareBusy = false // защита от повторного/двойного клика во время async старта - вторая причина "раздвоения" демки
   let currentScreenTrackSid = null
 
-  screenBtn.addEventListener('click', async () => {
-    if (isScreenSharing) {
-      // Stop own screen share
-      await room.localParticipant.setScreenShareEnabled(false)
-      isScreenSharing = false
-      screenBtn.classList.remove('active')
-      if (currentScreenTrackSid) {
-        const tile = document.getElementById(`tile-screen-${currentScreenTrackSid}`)
-        if (tile) tile.remove()
-        state.screenShares.delete(currentScreenTrackSid)
-        currentScreenTrackSid = null
-        relayout()
-      }
-      return
-    }
+  // Битрейт подбираем под выбранный FPS - чем выше частота кадров, тем больше данных нужно
+  // передавать в секунду для сохранения резкости; на 15 FPS высокий битрейт не нужен.
+  function bitrateForFps(fps) {
+    if (fps <= 15) return 4_000_000
+    if (fps <= 30) return 6_000_000
+    return 8_000_000
+  }
 
+  // ---- Применить выбранный FPS к уже идущей демонстрации "живьём", без пересоздания трека ----
+  // Меняем и реальные constraints захвата (applyConstraints), и предел кодировщика (RTCRtpSender
+  // encodings[].maxFramerate) - иначе повышение FPS не даст эффекта, если сендер уже был ограничен
+  // более низким значением на старте публикации.
+  function applyScreenShareFps(fps) {
+    if (!isScreenSharing) return
+    const pub = room.localParticipant.getTrackPublication(LK.Track.Source.ScreenShare)
+    const track = pub && pub.track
+    if (!track) return
+    const msTrack = track.mediaStreamTrack
+    if (msTrack && typeof msTrack.applyConstraints === 'function') {
+      msTrack.applyConstraints({ frameRate: { ideal: fps, min: Math.min(fps, 30) } }).catch(() => {})
+    }
+    const sender = track.sender
+    if (sender && typeof sender.getParameters === 'function') {
+      try {
+        const params = sender.getParameters()
+        if (params.encodings && params.encodings.length) {
+          params.encodings.forEach((enc) => { enc.maxFramerate = fps; enc.maxBitrate = bitrateForFps(fps) })
+          Promise.resolve(sender.setParameters(params)).catch(() => {})
+        }
+      } catch {}
+    }
+    showToast(`FPS демонстрации изменён на ${fps}`)
+  }
+
+  // ===================== Демонстрация экрана: start/stop/change-source отдельными функциями =====================
+  // Вынесено из единого screenBtn-обработчика, чтобы этими же действиями можно было управлять
+  // и из кастомного контекстного меню (ПКМ на тайле демонстрации): "Прекратить стрим", "Изменить источник".
+
+  // ---- Запустить демонстрацию экрана ----
+  // Единый путь для веба и Electron: LiveKit вызывает navigator.mediaDevices.getDisplayMedia().
+  // В браузере это открывает системный диалог "Поделиться экраном" с чекбоксом "Поделиться аудио".
+  // В Electron этот вызов перехватывается session.setDisplayMediaRequestHandler (main.js) - там
+  // открывается наш пикер (picker.html) со своим чекбоксом "Поделиться звуком стрима" (по умолчанию
+  // включён), и звук захватывается через audio: 'loopback' (поддерживается на Windows).
+  // ВАЖНО про звук: запрашиваем audio:true ВСЕГДА, независимо от текущего state.screenShareAudioShared -
+  // так гарантируется, что аудио-трек демонстрации ВСЕГДА захватывается и публикуется (по явному
+  // требованию "всегда должно быть слышно звук демки"); если пользователь выключил чекбокс "Поделиться
+  // звуком стрима" в контекстном меню, мы просто мьютим уже существующий трек (toggleScreenShareAudio),
+  // а не отказываемся от его захвата - так его можно включить обратно "живьём", без пересоздания демки.
+  async function startScreenShare() {
+    if (screenShareBusy || isScreenSharing) return
     // Check global limit before starting
     try {
       const res = await fetch(`/api/rooms/${state.roomCode}/screen-shares`)
@@ -907,34 +1197,62 @@ async function enterRoom(joinData) {
       // но по договоренности лимит соблюдается на уровне приложения
     }
 
+    screenShareBusy = true
     try {
-      // Единый путь для веба и Electron: LiveKit вызывает navigator.mediaDevices.getDisplayMedia().
-      // В браузере это открывает системный диалог "Поделиться экраном" с чекбоксом "Поделиться аудио".
-      // В Electron этот вызов перехватывается session.setDisplayMediaRequestHandler (main.js) -
-      // там открывается наше окно выбора источника (picker.html) и звук всего компьютера
-      // захватывается автоматически через audio: 'loopback' (поддерживается на Windows).
-      // Если поток содержит аудио-трек, LiveKit сам публикует его как Track.Source.ScreenShareAudio.
+      // ВАЖНО про FPS: раньше здесь передавался LK.ScreenSharePresets.h1080fps30.resolution - у этого
+      // пресета frameRate жёстко равен 30, и он попадает в getDisplayMedia() как ideal/max frameRate -
+      // то есть сама браузерная захватка кадра ограничивалась 30 FPS ещё до энкодера, независимо от
+      // videoEncoding.maxFramerate ниже. Задаём resolution вручную с frameRate = выбранное пользователем
+      // значение (state.screenShareFps, переключатель 15/30/60 рядом с кнопкой демонстрации).
+      const fps = state.screenShareFps
+      const hint = state.screenShareContentHint
       const pub = await room.localParticipant.setScreenShareEnabled(true, {
         video: { displaySurface: 'monitor' },
-        audio: true, // запрашиваем звук с устройства - и браузер, и наш Electron-обработчик его предоставят
+        audio: true, // всегда запрашиваем звук - живое вкл/выкл делается позже мьютом трека, не пересозданием
         systemAudio: 'include',
-        resolution: LK.ScreenSharePresets.h1080fps30.resolution,
-        contentHint: 'motion'
+        resolution: { width: 1920, height: 1080, frameRate: fps },
+        contentHint: hint
       }, {
-        videoEncoding: { maxBitrate: 8_000_000, maxFramerate: 60 },
-        simulcast: false
+        videoEncoding: { maxBitrate: bitrateForFps(fps), maxFramerate: fps },
+        // degradationPreference по умолчанию для ScreenShare = "maintain-resolution" - при перегрузке
+        // CPU/сети WebRTC-энкодер режет именно FPS, сохраняя разрешение, отсюда и проседание до 40-50
+        // на 60 FPS. Для плавности важнее стабильный FPS, чем максимальная резкость - переключаем на
+        // "balanced", чтобы энкодер мог слегка снизить резкость/битрейт, но удерживал частоту кадров.
+        degradationPreference: 'balanced',
+        simulcast: false,
+        // H264 имеет аппаратное ускорение кодирования на Windows (наша целевая платформа для Electron) -
+        // при наличии GPU это даёт заметно более плавную и лёгкую по CPU демонстрацию, ближе к тому,
+        // как это работает в Discord. В браузере (не Electron) большинство десктопов также поддерживают
+        // аппаратный H264-энкодер в Chromium, поэтому применяем это ко всем платформам.
+        videoCodec: 'h264'
       })
 
       if (!pub) return // пользователь отменил выбор источника
+
+      // Дополнительная защита: явно применяем те же настройки к реальному видео-треку/сендеру
+      // (contentHint + попытка выставить frameRate через applyConstraints), т.к. некоторые браузеры
+      // игнорируют frameRate в getDisplayMedia() constraints и отдают дефолтные ~30 FPS потока.
+      try {
+        const msTrack = pub.track && pub.track.mediaStreamTrack
+        if (msTrack) {
+          msTrack.contentHint = hint
+          if (typeof msTrack.applyConstraints === 'function') {
+            await msTrack.applyConstraints({ frameRate: { ideal: fps, min: Math.min(fps, 30) } }).catch(() => {})
+          }
+        }
+      } catch {}
+
       isScreenSharing = true
       currentScreenTrackSid = pub.trackSid
       screenBtn.classList.add('active')
 
-      const t = makeScreenTile(room.localParticipant.identity, state.displayName + ' (Вы)', pub.trackSid, true)
+      const t = ensureScreenTile(room.localParticipant.identity, state.displayName + ' (Вы)', pub.trackSid, true)
       pub.track.attach(t.video)
-      document.body.appendChild(t.tile)
-      state.screenShares.set(pub.trackSid, { identity: room.localParticipant.identity, name: state.displayName })
-      relayout()
+
+      // Применяем текущее состояние "Поделиться звуком стрима" к только что созданному аудио-треку
+      // (если пользователь ранее выключил звук через контекстное меню - он остаётся выключенным и
+      // для новой демонстрации, пока не включит явно обратно)
+      applyScreenShareAudioState()
 
       // Если пользователь остановил демку через системный UI браузера/ОС
       pub.track.mediaStreamTrack.addEventListener('ended', () => {
@@ -942,10 +1260,7 @@ async function enterRoom(joinData) {
           isScreenSharing = false
           currentScreenTrackSid = null
           screenBtn.classList.remove('active')
-          const tile = document.getElementById(`tile-screen-${pub.trackSid}`)
-          if (tile) tile.remove()
-          state.screenShares.delete(pub.trackSid)
-          relayout()
+          removeScreenTile(pub.trackSid)
         }
       })
     } catch (e) {
@@ -953,7 +1268,103 @@ async function enterRoom(joinData) {
         showToast('Не удалось начать демонстрацию экрана', 'error')
         console.error(e)
       }
+    } finally {
+      screenShareBusy = false
     }
+  }
+
+  // ---- Остановить свою демонстрацию экрана ----
+  async function stopScreenShare() {
+    if (screenShareBusy || !isScreenSharing) return
+    screenShareBusy = true
+    try {
+      await room.localParticipant.setScreenShareEnabled(false)
+    } finally {
+      screenShareBusy = false
+    }
+    isScreenSharing = false
+    screenBtn.classList.remove('active')
+    if (currentScreenTrackSid) {
+      removeScreenTile(currentScreenTrackSid)
+      currentScreenTrackSid = null
+    }
+  }
+
+  // ---- Сменить источник демонстрации (другой экран/окно), без выхода из режима демонстрации ----
+  // Останавливаем текущий трек и сразу запускаем новый - для веба откроется системный диалог выбора
+  // экрана повторно, для Electron - наш picker.html повторно (через setDisplayMediaRequestHandler).
+  async function changeScreenSource() {
+    if (screenShareBusy) return
+    if (isScreenSharing) await stopScreenShare()
+    await startScreenShare()
+  }
+
+  // ---- Живое вкл/выкл звука демонстрации (чекбокс "Поделиться звуком стрима" в контекстном меню) ----
+  // Мьютим/анмьютим уже опубликованный аудио-трек ScreenShareAudio, НЕ пересоздавая демонстрацию -
+  // так переключение мгновенное и не прерывает видео.
+  function applyScreenShareAudioState() {
+    const pub = room.localParticipant.getTrackPublication(LK.Track.Source.ScreenShareAudio)
+    if (!pub) return
+    if (state.screenShareAudioShared) pub.unmute()
+    else pub.mute()
+  }
+
+  function toggleScreenShareAudio() {
+    state.screenShareAudioShared = !state.screenShareAudioShared
+    localStorage.setItem('screenShareAudioShared', state.screenShareAudioShared ? '1' : '0')
+    applyScreenShareAudioState()
+    showToast(state.screenShareAudioShared ? 'Звук стрима включён' : 'Звук стрима выключен')
+  }
+
+  // ---- "Другие настройки" -> оптимизация контента (движение/чёткость) ----
+  function setScreenShareContentHint(hint) {
+    state.screenShareContentHint = hint
+    localStorage.setItem('screenShareContentHint', hint)
+    if (!isScreenSharing) return
+    const pub = room.localParticipant.getTrackPublication(LK.Track.Source.ScreenShare)
+    const msTrack = pub && pub.track && pub.track.mediaStreamTrack
+    if (msTrack) msTrack.contentHint = hint
+    showToast(hint === 'motion' ? 'Оптимизация: движение' : 'Оптимизация: чёткость')
+  }
+
+  // ---- "Стрим в отдельном окне" - Document Picture-in-Picture API ----
+  // Поддерживается в Chromium (обычный браузер на его основе, а также сам Electron - тоже Chromium),
+  // позволяет вынести произвольный <video> в отдельное всегда-поверх-окно, которое можно двигать
+  // независимо от основного окна приложения/вкладки.
+  async function openScreenSharePiP(video) {
+    if (!('documentPictureInPicture' in window)) {
+      showToast('Режим "отдельное окно" не поддерживается этим браузером', 'error')
+      return
+    }
+    try {
+      const pipWindow = await window.documentPictureInPicture.requestWindow({
+        width: video.videoWidth || 960,
+        height: video.videoHeight || 540
+      })
+      // Копируем базовые стили, чтобы видео заполняло PiP-окно целиком
+      const style = pipWindow.document.createElement('style')
+      style.textContent = 'html,body{margin:0;background:#000;height:100%;} video{width:100%;height:100%;object-fit:contain;display:block;}'
+      pipWindow.document.head.appendChild(style)
+
+      const originalParent = video.parentElement
+      const placeholder = document.createComment('pip-placeholder')
+      originalParent.insertBefore(placeholder, video)
+      pipWindow.document.body.appendChild(video)
+
+      pipWindow.addEventListener('pagehide', () => {
+        // Возвращаем видео обратно в основной документ, когда PiP-окно закрыто
+        placeholder.replaceWith(video)
+      }, { once: true })
+    } catch (e) {
+      showToast('Не удалось открыть отдельное окно', 'error')
+      console.error(e)
+    }
+  }
+
+  screenBtn.addEventListener('click', async () => {
+    if (screenShareBusy) return // клик во время уже идущего старта/остановки - игнорируем, чтобы не запустить процесс дважды
+    if (isScreenSharing) await stopScreenShare()
+    else await startScreenShare()
   })
 
   leaveBtn.addEventListener('click', () => {
