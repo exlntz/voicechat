@@ -30,7 +30,9 @@ function randomId(len = 8) {
 }
 
 function sanitizeName(input: string, fallbackPrefix: string) {
-  const cleaned = (input || '').trim().slice(0, 40).replace(/[^\w\- ]/g, '')
+  // См. подробное объяснение в vps-backend-deployed-copy/src/server.js - \w матчит только ASCII,
+  // кириллица без явного разрешения диапазона вырезалась целиком ("баг: русские ники не отображаются").
+  const cleaned = (input || '').trim().slice(0, 40).replace(/[^\w\u0400-\u04FF\u00C0-\u017F\- ]/g, '')
   return cleaned || `${fallbackPrefix}-${randomId(4)}`
 }
 

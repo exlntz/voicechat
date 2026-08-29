@@ -52,7 +52,11 @@ function randomId(len = 8) {
 }
 
 function sanitizeName(input, fallbackPrefix) {
-  const cleaned = (input || '').trim().slice(0, 40).replace(/[^\w\- ]/g, '')
+  // ВАЖНО ("баг: русские ники не отображаются"): \w в JS regex матчит ТОЛЬКО ASCII-буквы [A-Za-z0-9_],
+  // поэтому старый /[^\w\- ]/g вырезал вообще все кириллические символы из имени - "Иван" превращался
+  // в пустую строку и заменялся на "Гость-XXXX". Явно разрешаем диапазон кириллицы (а также латиницу
+  // с диакритикой \u00C0-\u017F на всякий случай) в дополнение к \w.
+  const cleaned = (input || '').trim().slice(0, 40).replace(/[^\w\u0400-\u04FF\u00C0-\u017F\- ]/g, '')
   return cleaned || `${fallbackPrefix}-${randomId(4)}`
 }
 
