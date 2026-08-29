@@ -587,13 +587,35 @@ async function enterRoom(joinData) {
   // Пересчитать раскладку при повороте телефона / изменении размера окна (например, вызов
   // виртуальной клавиатуры или переход портрет<->ландшафт) - без этого сетка "застревала"
   // в раскладке, посчитанной на момент последнего relayout(), а не текущей ширины экрана
+  // ВАЖНО ("баг: полный экран открывается на 1мс и сразу закрывается обратно"): relayout()
+  // делает stage.innerHTML = '' и appendChild() каждого тайла ЗАНОВО - то есть физически вынимает
+  // DOM-узел из документа и вставляет обратно. У requestFullscreen() есть окно браузера, и когда
+  // ОНО меняет размер (пропадают/появляются тулбары, адресная строка) - это САМО ПО СЕБЕ стреляет
+  // window resize событием. Получается цикл: клик на fullscreen -> requestFullscreen() -> браузер
+  // ужимает вьюпорт -> resize -> relayout() удаляет и заново вставляет ЭТОТ ЖЕ тайл (который сейчас
+  // document.fullscreenElement) -> по спецификации Fullscreen API удаление/детач элемента из DOM
+  // ПРИНУДИТЕЛЬНО завершает fullscreen -> браузер сам откатывает обратно за ~100-200мс. Из-за этого
+  // выглядит как "мигает и не открывается". Фикс: если сейчас активен fullscreen (или прошло меньше
+  // 400мс с момента входа/выхода из него - за это время дребезжит несколько resize подряд), просто
+  // не трогаем DOM тайлов в этом цикле relayout(), а откладываем на momент, когда fullscreen точно
+  // закрыт - тогда resize после реального fullscreenchange безопасен.
   let relayoutRAF = null
   window.addEventListener('resize', () => {
     if (relayoutRAF) return
     relayoutRAF = requestAnimationFrame(() => {
       relayoutRAF = null
+      if (document.fullscreenElement) return // не дёргаем DOM, пока какой-то тайл в fullscreen
       relayout()
     })
+  })
+  // Как только fullscreen закрывается (штатно или из-за гонки выше) - пересчитываем раскладку разово,
+  // чтобы вернуть тайл в его нормальное место в сетке (на случай, если resize во время fullscreen был
+  // пропущен из-за проверки выше).
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) {
+      if (relayoutRAF) cancelAnimationFrame(relayoutRAF)
+      relayoutRAF = requestAnimationFrame(() => { relayoutRAF = null; relayout() })
+    }
   })
 
   // ---- Регулятор громкости (слайдер + иконка), общий для камеры и демонстрации ----
