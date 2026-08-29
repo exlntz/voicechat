@@ -956,6 +956,49 @@ async function enterRoom(joinData) {
     relayout()
   }
 
+  // ---- Убрать ЧУЖИЕ тайлы демонстрации того же участника, если у него появился НОВЫЙ trackSid ----
+  // ВАЖНО ("баг: демки копятся, некорректно завершаются"): у одного участника может быть только
+  // ОДНА активная демонстрация экрана одновременно (бизнес-правило приложения). Если на клиента
+  // приходит TrackSubscribed с новым trackSid для identity, у которого уже есть тайл со старым
+  // trackSid (например, после нестабильной сети участник разорвал соединение и переопубликовал
+  // демку без того, чтобы этот клиент успел получить TrackUnsubscribed на старый трек), старый
+  // тайл-призрак остаётся висеть навечно, пока explicit ParticipantDisconnected не прилетит (а он
+  // может не прилететь вовсе при resume-реконнекте без полного разрыва). Явно убираем все чужие
+  // тайлы того же participant.identity, кроме keepSid, при каждой (пере)подписке на его демку.
+  function removeStaleScreenTilesOf(identity, keepSid) {
+    for (const [sid, info] of Array.from(state.screenShares.entries())) {
+      if (info.identity === identity && sid !== keepSid) removeScreenTile(sid)
+    }
+  }
+
+  // ---- Полная сверка тайлов демонстрации экрана с фактическим состоянием LiveKit-комнаты ----
+  // Вызывается после (пере)подключения (RoomEvent.Reconnected) и периодически как защитная сетка -
+  // при потере части событий TrackSubscribed/Unsubscribed во время нестабильного соединения (см.
+  // логи LiveKit: множественные "channel congestion" + "resuming RTC session" на этом проекте)
+  // тайлы могут накопиться (устаревшие остаются) или пропасть (актуальные не отрисовались).
+  // Строим множество "актуальных" trackSid из реального состояния room и удаляем всё остальное.
+  function reconcileScreenTiles() {
+    const liveSids = new Set()
+    if (isScreenSharing && currentScreenTrackSid) liveSids.add(currentScreenTrackSid)
+    room.remoteParticipants.forEach((participant) => {
+      const pub = participant.getTrackPublication(LK.Track.Source.ScreenShare)
+      if (pub && pub.track && !pub.isMuted) {
+        liveSids.add(pub.trackSid)
+        // Если у этого участника уже отрисован тайл со старым sid - убираем его (см. removeStaleScreenTilesOf)
+        removeStaleScreenTilesOf(participant.identity, pub.trackSid)
+        if (!screenTilesMap.has(pub.trackSid)) {
+          const t = ensureScreenTile(participant.identity, participant.name || participant.identity, pub.trackSid)
+          pub.track.attach(t.video)
+        }
+      }
+    })
+    // Убираем тайлы, для которых больше нет актуального живого трека (участник вышел, демка
+    // остановлена, или это был "призрак" от разорванного соединения)
+    for (const sid of Array.from(screenTilesMap.keys())) {
+      if (!liveSids.has(sid)) removeScreenTile(sid)
+    }
+  }
+
   // ---- Track handling ----
   room.on(LK.RoomEvent.TrackSubscribed, (track, publication, participant) => {
     const name = participant.name || participant.identity
@@ -974,6 +1017,10 @@ async function enterRoom(joinData) {
       updateMicIndicator(participant.identity, publication.isMuted)
     } else if (track.source === LK.Track.Source.ScreenShare) {
       const alreadyExisted = screenTilesMap.has(publication.trackSid)
+      // См. removeStaleScreenTilesOf(): у participant.identity могла остаться демка-призрак
+      // со старым trackSid (после разрыва/переподключения по нестабильной сети) - убираем её,
+      // прежде чем показать новую, чтобы тайлы не копились.
+      removeStaleScreenTilesOf(participant.identity, publication.trackSid)
       const t = ensureScreenTile(participant.identity, name, publication.trackSid)
       track.attach(t.video)
       if (!alreadyExisted) showToast(`${name} начал демонстрацию экрана`)
@@ -1048,7 +1095,13 @@ async function enterRoom(joinData) {
   })
 
   room.on(LK.RoomEvent.Reconnecting, () => setStatus('Переподключение...', 'connecting'))
-  room.on(LK.RoomEvent.Reconnected, () => setStatus('Подключено', ''))
+  // ВАЖНО ("баг: демки копятся, некорректно завершаются"): после успешного восстановления
+  // соединения (частое явление на этом проекте - см. логи LiveKit с "channel congestion" при
+  // нестабильной сети) часть событий TrackSubscribed/TrackUnsubscribed, произошедших ВО ВРЕМЯ
+  // разрыва, может не долететь до этого клиента. reconcileScreenTiles() сверяет тайлы демонстрации
+  // с фактическим состоянием room сразу после Reconnected, убирая тайлы-призраки и добавляя
+  // пропущенные - это защитная сетка сверх точечных фиксов в TrackSubscribed/ParticipantDisconnected.
+  room.on(LK.RoomEvent.Reconnected, () => { setStatus('Подключено', ''); reconcileScreenTiles() })
 
   // ---- Connect ----
   try {
@@ -1262,6 +1315,19 @@ async function enterRoom(joinData) {
       // для новой демонстрации, пока не включит явно обратно)
       applyScreenShareAudioState()
 
+      // ВАЖНО ("баг: демки копятся, некорректно завершаются"): если ПРЕДЫДУЩАЯ демонстрация ЭТОГО
+      // ЖЕ участника завершилась некорректно (разрыв сети/крэш/force-quit, без штатного unpublish),
+      // на сервере LiveKit могла остаться "висящая" публикация со старым trackSid - сервер её
+      // физически видит и учитывает в лимите /api/rooms/:code/screen-shares, хотя показывать её
+      // больше некому. Явно просим backend замьютить любые чужие (по trackSid) ScreenShare/
+      // ScreenShareAudio публикации ЭТОГО identity сразу после того, как новая демка успешно
+      // стартовала - надёжная точка, потому что мы точно знаем актуальный keepTrackSid именно тут.
+      fetch(`/api/rooms/${state.roomCode}/screen-shares/reconcile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identity: room.localParticipant.identity, keepTrackSid: pub.trackSid })
+      }).catch(() => {})
+
       // Если пользователь остановил демку через системный UI браузера/ОС
       pub.track.mediaStreamTrack.addEventListener('ended', () => {
         if (currentScreenTrackSid === pub.trackSid) {
@@ -1379,7 +1445,18 @@ async function enterRoom(joinData) {
     cleanupAndGoLobby()
   })
 
+  // ---- Периодическая защитная сверка тайлов демонстрации экрана (safety net) ----
+  // ВАЖНО ("баг: демки копятся, некорректно завершаются"): reconcileScreenTiles() уже вызывается
+  // точечно на RoomEvent.Reconnected, но иногда соединение "зависает" в промежуточном состоянии
+  // без полноценного Reconnecting/Reconnected цикла (например, при кратковременной потере пакетов
+  // сигнального WS без разрыва) - события TrackSubscribed/Unsubscribed могут быть потеряны молча.
+  // Раз в 15 секунд дополнительно сверяем тайлы с фактическим состоянием room - дешёвая операция
+  // (просто перебор уже загруженных в память participants/publications, без сетевых запросов),
+  // страхует от накопления тайлов-призраков в длительных звонках.
+  const screenTilesReconcileInterval = setInterval(() => { try { reconcileScreenTiles() } catch {} }, 15000)
+
   function cleanupAndGoLobby() {
+    clearInterval(screenTilesReconcileInterval)
     try { room.disconnect() } catch {}
     document.querySelectorAll('audio').forEach((a) => a.remove())
     history.pushState({}, '', '/')
@@ -1387,6 +1464,7 @@ async function enterRoom(joinData) {
   }
 
   window.addEventListener('beforeunload', () => {
+    clearInterval(screenTilesReconcileInterval)
     try { room.disconnect() } catch {}
   })
 }

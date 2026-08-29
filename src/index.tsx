@@ -125,6 +125,9 @@ app.post('/api/join', async (c) => {
 })
 
 // ---------- API: check current screen-share count in a room (клиент вызывает перед стартом демки) ----------
+// ВАЖНО ("баг: 4 демонстрации экрана копятся, некорректно завершаются") - см. подробное объяснение
+// в vps-backend-deployed-copy/src/server.js: считаем УНИКАЛЬНЫХ УЧАСТНИКОВ, а не треки, т.к. при
+// reconnect по нестабильной сети сервер может временно видеть старый+новый трек одного участника.
 app.get('/api/rooms/:code/screen-shares', async (c) => {
   const { env } = c
   const code = c.req.param('code')
@@ -132,13 +135,14 @@ app.get('/api/rooms/:code/screen-shares', async (c) => {
 
   try {
     const participants = await svc.listParticipants(code)
-    let screenShareCount = 0
+    const sharingIdentities = new Set<string>()
     for (const p of participants) {
       for (const t of p.tracks) {
         // TrackSource.SCREEN_SHARE === 3 в protobuf enum
-        if (t.source === 3 && !t.muted) screenShareCount++
+        if (t.source === 3 && !t.muted) { sharingIdentities.add(p.identity); break }
       }
     }
+    const screenShareCount = sharingIdentities.size
     return c.json({
       current: screenShareCount,
       max: MAX_SCREEN_SHARES,
@@ -146,6 +150,32 @@ app.get('/api/rooms/:code/screen-shares', async (c) => {
     })
   } catch {
     return c.json({ current: 0, max: MAX_SCREEN_SHARES, available: MAX_SCREEN_SHARES })
+  }
+})
+
+// ---------- API: force-cleanup stale screen-share publications of a participant (см. app.js) ----------
+app.post('/api/rooms/:code/screen-shares/reconcile', async (c) => {
+  const { env } = c
+  const code = c.req.param('code')
+  const body = await c.req.json().catch(() => ({} as any))
+  const identity = (body.identity || '').trim()
+  const keepTrackSid = (body.keepTrackSid || '').trim()
+  if (!identity) return c.json({ error: 'bad_request' }, 400)
+  const svc = new RoomServiceClient(env.LIVEKIT_HTTP_URL, env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET)
+  try {
+    const participants = await svc.listParticipants(code)
+    const me = participants.find((p) => p.identity === identity)
+    if (!me) return c.json({ success: true, cleaned: 0 })
+    let cleaned = 0
+    for (const t of me.tracks) {
+      const isScreen = t.source === 3 || t.source === 4 // SCREEN_SHARE=3, SCREEN_SHARE_AUDIO=4
+      if (isScreen && t.sid !== keepTrackSid && !t.muted) {
+        try { await svc.mutePublishedTrack(code, identity, t.sid, true); cleaned++ } catch {}
+      }
+    }
+    return c.json({ success: true, cleaned })
+  } catch {
+    return c.json({ error: 'reconcile_failed' }, 500)
   }
 })
 
