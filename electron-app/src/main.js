@@ -41,10 +41,19 @@ function createMainWindow() {
 
   Menu.setApplicationMenu(null)
 
-  // Автоматически разрешаем доступ к камере/микрофону (нужно самому пользователю для звонка)
+  // Автоматически разрешаем доступ к камере/микрофону (нужно самому пользователю для звонка).
+  // 'fullscreen' обязательно должен быть в списке - это отдельное разрешение Chromium для Fullscreen
+  // API (document.requestFullscreen()). Без него Electron тихо отклоняет ЛЮБОЙ запрос на полноэкранный
+  // режим (кнопка/дабл-клик на тайле демонстрации или камеры) - баг "не открывается на фулл" в .exe.
   mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
-    const allowed = ['media', 'audioCapture', 'videoCapture', 'display-capture']
+    const allowed = ['media', 'audioCapture', 'videoCapture', 'display-capture', 'fullscreen']
     callback(allowed.includes(permission))
+  })
+  // permissionCheckHandler дополняет permissionRequestHandler - некоторые проверки (в т.ч. fullscreen)
+  // идут именно через check, а не request, и без этого обработчика Electron может отказать по умолчанию.
+  mainWindow.webContents.session.setPermissionCheckHandler((webContents, permission) => {
+    const allowed = ['media', 'audioCapture', 'videoCapture', 'display-capture', 'fullscreen']
+    return allowed.includes(permission)
   })
 
   mainWindow.loadURL(SERVER_URL)
@@ -159,10 +168,14 @@ app.whenReady().then(() => {
         callback({})
         return
       }
-      callback({
-        video: picked.source,
-        audio: picked.shareAudio ? 'loopback' : undefined
-      })
+      // ВАЖНО ("баг: демка без звука не запускается, если снять галочку"): Electron требует, чтобы
+      // ключ audio либо был валидной строкой ('loopback'/'loopbackWithMute'), либо ПОЛНОСТЬЮ
+      // ОТСУТСТВОВАЛ в объекте - передача audio: undefined (когда shareAudio === false) кидает
+      // TypeError внутри Electron ("audio must be a WebFrameMain, loopback or loopbackWithMute"),
+      // из-за чего promise getDisplayMedia() зависает/рвётся и демонстрация не стартует вообще.
+      const result = { video: picked.source }
+      if (picked.shareAudio) result.audio = 'loopback'
+      callback(result)
     } catch (e) {
       callback({})
     }
