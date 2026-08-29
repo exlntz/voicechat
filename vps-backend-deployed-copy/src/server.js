@@ -175,16 +175,28 @@ app.post('/api/rooms/:code/kick', async (c) => {
 })
 
 // ---------- API: текущее число демонстраций экрана в комнате ----------
+// ВАЖНО ("баг: 4 демонстрации экрана копятся, некорректно завершаются"): раньше здесь считались
+// ТРЕКИ (t.source === SCREEN_SHARE), а не УЧАСТНИКИ. При нестабильной сети LiveKit-клиент делает
+// full-reconnect ("resuming RTC session", видно в логах livekit по частым channel congestion) -
+// на протяжении небольшого окна на сервере может существовать одновременно СТАРЫЙ трек демки
+// (ещё не отменённый публикацией) и НОВЫЙ (уже переопубликованный при восстановлении соединения)
+// от одного и того же участника. Подсчёт по трекам в этот момент даёт двойной (а при нескольких
+// реконнектах - кратный) счёт, из-за чего лимит MAX_SCREEN_SHARES быстро "забивается" фантомными
+// демками, которые физически никто не показывает, и /api/rooms/:code/screen-shares начинает
+// отдавать available: 0 всем, хотя реально идёт 0-1 демка. Считаем по УНИКАЛЬНЫМ УЧАСТНИКАМ
+// (Set по identity) - у одного человека не может быть больше одной "живой" демонстрации экрана
+// с точки зрения бизнес-логики приложения, даже если временно существует 2 трека при reconnect.
 app.get('/api/rooms/:code/screen-shares', async (c) => {
   const code = c.req.param('code')
   try {
     const participants = await svc.listParticipants(code)
-    let screenShareCount = 0
+    const sharingIdentities = new Set()
     for (const p of participants) {
       for (const t of p.tracks) {
-        if (t.source === 3 && !t.muted) screenShareCount++ // TrackSource.SCREEN_SHARE === 3
+        if (t.source === 3 && !t.muted) { sharingIdentities.add(p.identity); break } // TrackSource.SCREEN_SHARE === 3
       }
     }
+    const screenShareCount = sharingIdentities.size
     return c.json({
       current: screenShareCount,
       max: MAX_SCREEN_SHARES,
@@ -192,6 +204,38 @@ app.get('/api/rooms/:code/screen-shares', async (c) => {
     })
   } catch {
     return c.json({ current: 0, max: MAX_SCREEN_SHARES, available: MAX_SCREEN_SHARES })
+  }
+})
+
+// ---------- API: принудительно снять "зависшие" публикации демонстрации экрана участника ----------
+// Вызывается клиентом (см. app.js) сразу после того, как ОН САМ успешно (пере)опубликовал свой
+// screen-share трек - если у этого же участника (identity) на сервере остались от предыдущего
+// (некорректно завершённого / оборванного по сети) сеанса демонстрации другие ScreenShare/
+// ScreenShareAudio публикации с ДРУГИМ trackSid, они принудительно отписываются через
+// RoomServiceClient.mutePublishedTrack + updateParticipant не поддерживают удаление чужого трека
+// напрямую, поэтому используем самый надёжный API LiveKit для этого - removeParticipant есть,
+// но выгонять самого себя не нужно; вместо этого мьютим неактуальные старые треки, чтобы серверный
+// счётчик /screen-shares перестал их учитывать (t.muted проверяется в подсчёте выше).
+app.post('/api/rooms/:code/screen-shares/reconcile', async (c) => {
+  const code = c.req.param('code')
+  const body = await c.req.json().catch(() => ({}))
+  const identity = (body.identity || '').trim()
+  const keepTrackSid = (body.keepTrackSid || '').trim()
+  if (!identity) return c.json({ error: 'bad_request' }, 400)
+  try {
+    const participants = await svc.listParticipants(code)
+    const me = participants.find((p) => p.identity === identity)
+    if (!me) return c.json({ success: true, cleaned: 0 })
+    let cleaned = 0
+    for (const t of me.tracks) {
+      const isScreen = t.source === 3 || t.source === 4 // SCREEN_SHARE=3, SCREEN_SHARE_AUDIO=4
+      if (isScreen && t.sid !== keepTrackSid && !t.muted) {
+        try { await svc.mutePublishedTrack(code, identity, t.sid, true); cleaned++ } catch {}
+      }
+    }
+    return c.json({ success: true, cleaned })
+  } catch (e) {
+    return c.json({ error: 'reconcile_failed' }, 500)
   }
 })
 
