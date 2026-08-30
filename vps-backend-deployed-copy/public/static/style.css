@@ -201,10 +201,62 @@ html, body {
   justify-content: center;
   padding: 24px;
   overflow-y: auto;
+  /* Раньше вокруг карточки была просто плоская сплошная var(--bg) - на широких экранах
+     смотрелось пусто. isolation:isolate создаёт отдельный стекинг-контекст для этого экрана,
+     чтобы декоративные "блобы" ниже (::before/::after) с z-index:0 надёжно оставались позади
+     карточки регистрации/входа (у неё z-index:1), не влияя на остальные экраны приложения. */
+  position: relative;
+  isolation: isolate;
+}
+
+/* Декоративный фон экрана авторизации: два мягких размытых акцентных "блоба" по углам -
+   тот же приём (радиальная подсветка малой прозрачности), что уже используется на панели
+   .auth-overlay, просто вынесенный на весь экран, чтобы пустое пространство вокруг карточки
+   на широких экранах не выглядело "голым". Медленный дрейф (translate/scale) добавляет немного
+   жизни без резких движений; для пользователей с prefers-reduced-motion анимация отключается. */
+.auth-screen::before,
+.auth-screen::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  border-radius: 50%;
+  filter: blur(110px);
+  opacity: 0.5;
+  pointer-events: none;
+  will-change: transform;
+  animation: auth-blob-drift 22s ease-in-out infinite alternate;
+}
+
+.auth-screen::before {
+  width: 46vmax;
+  height: 46vmax;
+  top: -18vmax;
+  left: -16vmax;
+  background: var(--accent);
+}
+
+.auth-screen::after {
+  width: 42vmax;
+  height: 42vmax;
+  bottom: -16vmax;
+  right: -14vmax;
+  background: var(--success);
+  animation-delay: -11s;
+}
+
+@keyframes auth-blob-drift {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(3vmax, 2vmax) scale(1.08); }
+  100% { transform: translate(-2vmax, 1.5vmax) scale(0.96); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-screen::before, .auth-screen::after { animation: none; }
 }
 
 .auth-container {
   position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 760px;
   min-height: 460px;
@@ -1176,6 +1228,43 @@ html, body {
   height: 1px;
   background: var(--border);
   margin: 4px 2px;
+}
+
+/* Пункт-слайдер в контекстном меню (напр. "Громкость стрима" / "Громкость пользователя" на чужой
+   демонстрации). В отличие от обычного .screen-ctx-item не подсвечивается целиком при hover и
+   не реагирует на клик как на "выбор пункта" - только сам <input type=range> внутри интерактивен. */
+.screen-ctx-item.screen-ctx-slider {
+  cursor: default;
+  align-items: flex-start;
+  white-space: normal;
+}
+.screen-ctx-item.screen-ctx-slider:hover { background: none; color: var(--text-dim); }
+.screen-ctx-item.screen-ctx-slider .ctx-icon { margin-top: 3px; }
+
+.ctx-slider-body { flex: 1; min-width: 140px; }
+
+.ctx-slider-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.ctx-slider-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  opacity: .75;
+  flex-shrink: 0;
+}
+
+.screen-ctx-item.screen-ctx-slider input[type="range"] {
+  display: block;
+  width: 100%;
+  height: 4px;
+  cursor: pointer;
+  accent-color: var(--accent);
+  background: transparent;
 }
 
 .screen-ctx-submenu {
