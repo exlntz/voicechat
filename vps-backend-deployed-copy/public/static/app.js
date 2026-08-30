@@ -859,6 +859,17 @@ async function enterRoom(joinData) {
     return wrap
   }
 
+  // Обновить визуальное состояние (значение слайдера + иконка) уже существующего .volume-control
+  // на тайле (камера/демонстрация) - используется, чтобы слайдер в контекстном меню и штатный
+  // регулятор громкости на самом тайле оставались синхронизированы между собой.
+  function syncVolumeControlUI(wrap, v) {
+    if (!wrap) return
+    const slider = wrap.querySelector('input[type="range"]')
+    const icon = wrap.querySelector('i')
+    if (slider) slider.value = String(Math.round(v * 100))
+    if (icon) icon.className = v === 0 ? 'fas fa-volume-mute' : v < 0.5 ? 'fas fa-volume-down' : 'fas fa-volume-up'
+  }
+
   function makeCameraTile(identity, name, isLocal, hostBadge) {
     const tile = el('div', { class: 'tile camera-tile', id: `tile-cam-${identity}` })
     const video = el('video', { autoplay: true, playsinline: true, ...(isLocal ? { muted: true } : {}) })
@@ -1005,6 +1016,9 @@ async function enterRoom(joinData) {
   })
   window.addEventListener('resize', closeScreenContextMenu)
   window.addEventListener('blur', closeScreenContextMenu)
+  // При входе/выходе из fullscreen (в т.ч. если пользователь нажал Esc прямо с открытым меню)
+  // закрываем меню - его хост (body/fullscreenElement) меняется, проще переоткрыть заново по ПКМ
+  document.addEventListener('fullscreenchange', closeScreenContextMenu)
 
   function ctxItem({ icon, label, checked, chevron, destructive, onClick, selected }) {
     const classes = ['screen-ctx-item']
@@ -1028,8 +1042,42 @@ async function enterRoom(joinData) {
     return item
   }
 
+  // Пункт-слайдер внутри контекстного меню (регулятор громкости). В отличие от ctxItem() не
+  // закрывает меню при взаимодействии - клики/движения по самому слайдеру не должны всплывать
+  // до document-обработчика closeScreenContextMenu().
+  function ctxSlider({ icon, label, initial = 1, onChange }) {
+    const slider = el('input', { type: 'range', min: '0', max: '150', value: String(Math.round(initial * 100)) })
+    const valueLabel = el('span', { class: 'ctx-slider-value' }, `${Math.round(initial * 100)}%`)
+    const item = el('div', { class: 'screen-ctx-item screen-ctx-slider' }, [
+      el('span', { class: 'ctx-icon' }, [el('i', { class: icon })]),
+      el('div', { class: 'ctx-slider-body' }, [
+        el('div', { class: 'ctx-slider-top' }, [el('span', { class: 'ctx-label' }, label), valueLabel]),
+        slider
+      ])
+    ])
+    slider.addEventListener('input', (e) => {
+      e.stopPropagation()
+      const v = Number(slider.value) / 100
+      valueLabel.textContent = `${Math.round(v * 100)}%`
+      onChange(v)
+    })
+    item.addEventListener('click', (e) => e.stopPropagation())
+    item.addEventListener('mousedown', (e) => e.stopPropagation())
+    return item
+  }
+
+  // ВАЖНО ("баг: ПКМ не работает в fullscreen"): пока какой-то тайл в фактическом fullscreen
+  // (document.fullscreenElement), браузер рендерит ТОЛЬКО поддерево этого элемента - всё остальное,
+  // включая document.body, физически не отображается (уходит "за" fullscreen-элемент), хотя и
+  // остаётся в DOM. Раньше меню всегда добавлялось в document.body - оно создавалось (contextmenu
+  // срабатывал), но было невидимым, если открывалось поверх тайла в fullscreen. Поэтому меню нужно
+  // класть внутрь текущего fullscreen-элемента (если он есть), а не всегда в body.
+  function getFloatingHost() {
+    return document.fullscreenElement || document.body
+  }
+
   function positionFloating(node, x, y) {
-    document.body.appendChild(node)
+    getFloatingHost().appendChild(node)
     const vw = window.innerWidth, vh = window.innerHeight
     const rect = node.getBoundingClientRect()
     let left = x, top = y
@@ -1109,21 +1157,45 @@ async function enterRoom(joinData) {
       })
       items.push(otherItem)
     } else {
-      // Чужая демонстрация - только просмотровые действия
+      // Чужая демонстрация - просмотровые действия + два регулятора громкости.
+      // "Качество приёма" (какой simulcast-слой видео подписываться) специально не выведено в меню -
+      // это техническая настройка, которую обычный пользователь практически никогда не станет
+      // трогать руками, поэтому вместо селектора мы просто всегда принудительно запрашиваем
+      // максимальное качество (см. forceHighRemoteScreenQuality(), вызывается при подписке на трек).
       items.push(ctxItem({
         icon: 'fas fa-up-right-from-square', label: 'Стрим в отдельном окне',
         onClick: () => { closeScreenContextMenu(); openScreenSharePiP(ctx.video) }
       }))
       items.push(el('div', { class: 'screen-ctx-divider' }))
-      const qualityItem = ctxItem({ icon: 'fas fa-gauge-high', label: 'Качество приёма', chevron: true })
-      qualityItem.addEventListener('mouseenter', () => {
-        openSubmenu(qualityItem, () => [
-          ctxItem({ label: 'Высокое', onClick: () => { setRemoteScreenQuality(identity, LK.VideoQuality.HIGH); closeScreenContextMenu() } }),
-          ctxItem({ label: 'Среднее', onClick: () => { setRemoteScreenQuality(identity, LK.VideoQuality.MEDIUM); closeScreenContextMenu() } }),
-          ctxItem({ label: 'Низкое', onClick: () => { setRemoteScreenQuality(identity, LK.VideoQuality.LOW); closeScreenContextMenu() } })
-        ])
-      })
-      items.push(qualityItem)
+
+      // Громкость звука самой демонстрации (то, что играет с устройства демонстрирующего - музыка,
+      // видео и т.п.) и громкость голоса самого участника (его микрофон) - это две независимые
+      // аудио-дорожки LiveKit (ScreenShareAudio и Microphone), поэтому у них отдельные слайдеры.
+      // Начальное значение берём из уже существующих регуляторов на тайлах (если такие тайлы сейчас
+      // на экране), чтобы слайдер в меню и слайдер на тайле всегда показывали одно и то же значение.
+      const screenTileRef = screenTilesMap.get(sid)
+      const camTileRef = cameraTilesMap.get(identity)
+      const screenVolInput = screenTileRef && screenTileRef.volumeCtl ? screenTileRef.volumeCtl.querySelector('input[type="range"]') : null
+      const micVolInput = camTileRef && camTileRef.volumeCtl ? camTileRef.volumeCtl.querySelector('input[type="range"]') : null
+      const screenVolInitial = screenVolInput ? Number(screenVolInput.value) / 100 : 1
+      const micVolInitial = micVolInput ? Number(micVolInput.value) / 100 : 1
+
+      items.push(ctxSlider({
+        icon: 'fas fa-desktop', label: 'Громкость стрима', initial: screenVolInitial,
+        onChange: (v) => {
+          const p = room.getParticipantByIdentity(identity)
+          if (p) p.setVolume(v, LK.Track.Source.ScreenShareAudio)
+          if (screenTileRef && screenTileRef.volumeCtl) syncVolumeControlUI(screenTileRef.volumeCtl, v)
+        }
+      }))
+      items.push(ctxSlider({
+        icon: 'fas fa-microphone', label: 'Громкость пользователя', initial: micVolInitial,
+        onChange: (v) => {
+          const p = room.getParticipantByIdentity(identity)
+          if (p) p.setVolume(v, LK.Track.Source.Microphone)
+          if (camTileRef && camTileRef.volumeCtl) syncVolumeControlUI(camTileRef.volumeCtl, v)
+        }
+      }))
     }
 
     const menu = el('div', { class: 'screen-ctx-menu' }, items)
@@ -1133,11 +1205,21 @@ async function enterRoom(joinData) {
     activeCtxMenu = menu
   }
 
-  function setRemoteScreenQuality(identity, quality) {
+  // ---- "Качество приёма" демонстрации чужого экрана ----
+  // LiveKit при подписке на видео-трек умеет запрашивать один из нескольких simulcast-слоёв
+  // (HIGH/MEDIUM/LOW - грубо говоря, полное разрешение/среднее/сильно сжатое видео, которое шлёт
+  // сам браузер демонстрирующего). Раньше это было отдельным подменю в контекстном меню ("Высокое/
+  // Среднее/Низкое"), но угадать, когда обычному пользователю понадобится вручную занижать себе
+  // качество показа экрана собеседника, довольно сложно - на практике почти никто это не трогает,
+  // а adaptiveStream (см. настройки Room выше) уже сам адаптирует качество под размер тайла на
+  // экране. Поэтому убрали селектор из меню и просто всегда принудительно запрашиваем максимальное
+  // качество (HIGH) как только подписываемся на чужую демонстрацию - чтобы никто не унаследовал
+  // низкое качество от предыдущей версии кода без возможности вернуть его обратно через UI.
+  function forceHighRemoteScreenQuality(identity) {
     const p = room.getParticipantByIdentity(identity)
     if (!p) return
     const pub = p.getTrackPublication(LK.Track.Source.ScreenShare)
-    if (pub && typeof pub.setVideoQuality === 'function') pub.setVideoQuality(quality)
+    if (pub && typeof pub.setVideoQuality === 'function') pub.setVideoQuality(LK.VideoQuality.HIGH)
   }
 
   document.addEventListener('fullscreenchange', () => {
@@ -1234,6 +1316,7 @@ async function enterRoom(joinData) {
         if (!screenTilesMap.has(pub.trackSid)) {
           const t = ensureScreenTile(participant.identity, participant.name || participant.identity, pub.trackSid)
           pub.track.attach(t.video)
+          forceHighRemoteScreenQuality(participant.identity)
         }
       }
     })
@@ -1268,6 +1351,7 @@ async function enterRoom(joinData) {
       removeStaleScreenTilesOf(participant.identity, publication.trackSid)
       const t = ensureScreenTile(participant.identity, name, publication.trackSid)
       track.attach(t.video)
+      forceHighRemoteScreenQuality(participant.identity)
       if (!alreadyExisted) showToast(`${name} начал демонстрацию экрана`)
     } else if (track.source === LK.Track.Source.ScreenShareAudio) {
       const audioEl = document.body.appendChild(el('audio', { autoplay: true, style: 'display:none' }))
@@ -1389,6 +1473,7 @@ async function enterRoom(joinData) {
           } else if (pub.source === LK.Track.Source.ScreenShare) {
             const t = ensureScreenTile(participant.identity, participant.name || participant.identity, pub.trackSid)
             pub.track.attach(t.video)
+            forceHighRemoteScreenQuality(participant.identity)
           }
         }
       })

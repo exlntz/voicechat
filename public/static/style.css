@@ -1178,6 +1178,43 @@ html, body {
   margin: 4px 2px;
 }
 
+/* Пункт-слайдер в контекстном меню (напр. "Громкость стрима" / "Громкость пользователя" на чужой
+   демонстрации). В отличие от обычного .screen-ctx-item не подсвечивается целиком при hover и
+   не реагирует на клик как на "выбор пункта" - только сам <input type=range> внутри интерактивен. */
+.screen-ctx-item.screen-ctx-slider {
+  cursor: default;
+  align-items: flex-start;
+  white-space: normal;
+}
+.screen-ctx-item.screen-ctx-slider:hover { background: none; color: var(--text-dim); }
+.screen-ctx-item.screen-ctx-slider .ctx-icon { margin-top: 3px; }
+
+.ctx-slider-body { flex: 1; min-width: 140px; }
+
+.ctx-slider-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.ctx-slider-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  opacity: .75;
+  flex-shrink: 0;
+}
+
+.screen-ctx-item.screen-ctx-slider input[type="range"] {
+  display: block;
+  width: 100%;
+  height: 4px;
+  cursor: pointer;
+  accent-color: var(--accent);
+  background: transparent;
+}
+
 .screen-ctx-submenu {
   position: fixed;
   z-index: 2001;
