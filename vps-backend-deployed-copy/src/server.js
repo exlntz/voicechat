@@ -39,7 +39,7 @@ try { db.exec('ALTER TABLE rooms ADD COLUMN host_secret TEXT') } catch {}
 // ---------- Система пользователей (регистрация/вход) ----------
 // Простая собственная реализация без внешних зависимостей: пароли хешируются scrypt'ом (встроен в
 // node:crypto) со случайной солью на каждого пользователя, сессии - случайный токен в httpOnly-cookie,
-// сама сессия хранится в SQLite (а не JWT), чтобы можно было мгновенно \"убить\" сессию через logout.
+// сама сессия хранится в SQLite (а не JWT), чтобы можно было мгновенно "убить" сессию через logout.
 db.exec(`CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT NOT NULL,
@@ -147,9 +147,9 @@ function randomId(len = 8) {
 }
 
 function sanitizeName(input, fallbackPrefix) {
-  // ВАЖНО (\"баг: русские ники не отображаются\"): \w в JS regex матчит ТОЛЬКО ASCII-буквы [A-Za-z0-9_],
-  // поэтому старый /[^\w\- ]/g вырезал вообще все кириллические символы из имени - \"Иван\" превращался
-  // в пустую строку и заменялся на \"Гость-XXXX\". Явно разрешаем диапазон кириллицы (а также латиницу
+  // ВАЖНО ("баг: русские ники не отображаются"): \w в JS regex матчит ТОЛЬКО ASCII-буквы [A-Za-z0-9_],
+  // поэтому старый /[^\w\- ]/g вырезал вообще все кириллические символы из имени - "Иван" превращался
+  // в пустую строку и заменялся на "Гость-XXXX". Явно разрешаем диапазон кириллицы (а также латиницу
   // с диакритикой \u00C0-\u017F на всякий случай) в дополнение к \w.
   const cleaned = (input || '').trim().slice(0, 40).replace(/[^\w\u0400-\u04FF\u00C0-\u017F\- ]/g, '')
   return cleaned || `${fallbackPrefix}-${randomId(4)}`
@@ -359,16 +359,16 @@ app.post('/api/rooms/:code/kick', async (c) => {
 })
 
 // ---------- API: текущее число демонстраций экрана в комнате ----------
-// ВАЖНО (\"баг: 4 демонстрации экрана копятся, некорректно завершаются\"): раньше здесь считались
+// ВАЖНО ("баг: 4 демонстрации экрана копятся, некорректно завершаются"): раньше здесь считались
 // ТРЕКИ (t.source === SCREEN_SHARE), а не УЧАСТНИКИ. При нестабильной сети LiveKit-клиент делает
-// full-reconnect (\"resuming RTC session\", видно в логах livekit по частым channel congestion) -
+// full-reconnect ("resuming RTC session", видно в логах livekit по частым channel congestion) -
 // на протяжении небольшого окна на сервере может существовать одновременно СТАРЫЙ трек демки
 // (ещё не отменённый публикацией) и НОВЫЙ (уже переопубликованный при восстановлении соединения)
 // от одного и того же участника. Подсчёт по трекам в этот момент даёт двойной (а при нескольких
-// реконнектах - кратный) счёт, из-за чего лимит MAX_SCREEN_SHARES быстро \"забивается\" фантомными
+// реконнектах - кратный) счёт, из-за чего лимит MAX_SCREEN_SHARES быстро "забивается" фантомными
 // демками, которые физически никто не показывает, и /api/rooms/:code/screen-shares начинает
 // отдавать available: 0 всем, хотя реально идёт 0-1 демка. Считаем по УНИКАЛЬНЫМ УЧАСТНИКАМ
-// (Set по identity) - у одного человека не может быть больше одной \"живой\" демонстрации экрана
+// (Set по identity) - у одного человека не может быть больше одной "живой" демонстрации экрана
 // с точки зрения бизнес-логики приложения, даже если временно существует 2 трека при reconnect.
 app.get('/api/rooms/:code/screen-shares', async (c) => {
   const code = c.req.param('code')
@@ -391,7 +391,7 @@ app.get('/api/rooms/:code/screen-shares', async (c) => {
   }
 })
 
-// ---------- API: принудительно снять \"зависшие\" публикации демонстрации экрана участника ----------
+// ---------- API: принудительно снять "зависшие" публикации демонстрации экрана участника ----------
 // Вызывается клиентом (см. app.js) сразу после того, как ОН САМ успешно (пере)опубликовал свой
 // screen-share трек - если у этого же участника (identity) на сервере остались от предыдущего
 // (некорректно завершённого / оборванного по сети) сеанса демонстрации другие ScreenShare/
@@ -441,7 +441,7 @@ app.get('/api/rooms/:code', async (c) => {
 
 // ---------- HTML страницы ----------
 function renderPage(title) {
-  return `<!DOCTYPE html><html lang=\"ru\"><head><meta charset=\"UTF-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover\"/><meta name=\"mobile-web-app-capable\" content=\"yes\"/><meta name=\"apple-mobile-web-app-capable\" content=\"yes\"/><meta name=\"theme-color\" content=\"#0a0a0f\"/><title>${title}</title><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"/><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin/><link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap\" rel=\"stylesheet\"/><link href=\"https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css\" rel=\"stylesheet\"/><script src=\"https://cdn.jsdelivr.net/npm/livekit-client@2.22.1/dist/livekit-client.umd.min.js\"></script><link href=\"/static/style.css\" rel=\"stylesheet\"/></head><body><div id=\"app-root\"></div><script src=\"/static/app.js\"></script><script src=\"/static/annotate.js\"></script></body></html>`
+  return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/><meta name="mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-capable" content="yes"/><meta name="theme-color" content="#0a0a0f"/><title>${title}</title><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/><link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet"/><script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.1/dist/livekit-client.umd.min.js"></script><link href="/static/style.css" rel="stylesheet"/></head><body><div id="app-root"></div><script src="/static/app.js"></script><script src="/static/annotate.js"></script></body></html>`
 }
 
 app.get('/', (c) => c.html(renderPage('Звонки — Главная')))
