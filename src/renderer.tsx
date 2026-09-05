@@ -17,6 +17,7 @@ export const renderer = jsxRenderer(({ children, title }) => {
       <body>
         {children}
         <script src="/static/app.js"></script>
+        <script src="/static/annotate.js"></script>
       </body>
     </html>
   )
