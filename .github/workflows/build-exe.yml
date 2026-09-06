@@ -28,11 +28,12 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      # v5 вместо v4: раннеры GitHub больше не поддерживают Node.js 20 внутри actions
       - name: Забрать код
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Поставить Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'npm'
