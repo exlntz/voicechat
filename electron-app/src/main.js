@@ -1,6 +1,7 @@
 // ===================== Электрон: главный процесс =====================
 const { app, BrowserWindow, ipcMain, desktopCapturer, session, screen, Menu, globalShortcut } = require('electron')
 const path = require('path')
+const fs = require('fs')
 
 // URL веб-приложения (Cloudflare Pages control-plane + фронтенд).
 // Меняется на реальный адрес после деплоя backend'а.
@@ -26,6 +27,10 @@ app.commandLine.appendSwitch('disable-frame-rate-limit')
 app.commandLine.appendSwitch('disable-gpu-vsync')
 app.commandLine.appendSwitch('enable-zero-copy')
 app.commandLine.appendSwitch('force_high_performance_gpu')
+// Без этих двух Chromium усыпляет таймеры и рендерер, когда окно перекрыто другой
+// программой - а во время урока оно перекрыто практически всегда.
+app.commandLine.appendSwitch('disable-background-timer-throttling')
+app.commandLine.appendSwitch('disable-renderer-backgrounding')
 
 let mainWindow = null
 let pickerWindow = null
@@ -34,6 +39,7 @@ let pickerWindow = null
 let overlayWindow = null
 let overlayActive = false      // true = окно ловит мышь и можно рисовать
 let overlayDisplayId = null    // на каком мониторе рисуем (тот, который демонстрируем)
+let activeShortcuts = []       // горячие клавиши, которые реально удалось забрать у системы
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -75,15 +81,21 @@ function createMainWindow() {
 
   mainWindow.loadURL(SERVER_URL)
 
-  // В десктопной сборке сразу выставляем максимальную плавность демонстрации: сайт хранит
-  // выбранный FPS в глобальном state, и в .exe нет смысла стартовать с компромиссного значения.
-  // Всё в try/catch: если сайт обновится и этих переменных не станет, приложение не сломается.
+  // ---- Донастройка сайта под десктоп ----
+  // Флаги Chromium выше снимают лимит рендера, но этого НЕ достаточно для 60 FPS в стриме:
+  // потолок также задают constraints захвата и параметры публикации LiveKit (пресеты 15/30 FPS).
+  // Их можно переопределить только внутри страницы - для этого впрыскиваем site-boost.js.
+  // Скрипт лежит отдельным файлом, а не строкой в коде, чтобы его можно было нормально править.
   mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow.webContents.executeJavaScript(
-      "(function(){try{if(window.state){window.state.screenShareFps=60;}" +
-      "if(typeof applyScreenShareFps==='function'){applyScreenShareFps(60);}" +
-      "}catch(e){}})()"
-    ).catch(() => {})
+    let boost = ''
+    try {
+      boost = fs.readFileSync(path.join(__dirname, 'site-boost.js'), 'utf8')
+    } catch (e) {
+      boost = ''
+    }
+    if (boost) {
+      mainWindow.webContents.executeJavaScript(boost).catch(() => {})
+    }
   })
 
   mainWindow.on('closed', () => { mainWindow = null })
@@ -98,7 +110,7 @@ function createMainWindow() {
 // Два режима:
 //  - пассивный: рисунок виден, но клики проходят насквозь - можно спокойно работать в любых программах;
 //  - активный: окно ловит мышь, видна панель инструментов, рисуем.
-// Переключение - глобальной горячей клавишей, которая работает из любого приложения.
+// Переключение - кнопкой в интерфейсе или глобальной горячей клавишей из любого приложения.
 
 function getTargetDisplay() {
   const displays = screen.getAllDisplays()
@@ -213,6 +225,10 @@ function hideOverlay() {
 
 ipcMain.on('overlay-exit', () => setOverlayActive(false))
 ipcMain.on('overlay-hide', () => hideOverlay())
+// Кнопка "Рисовать" из интерфейса сайта (site-boost.js -> preload -> сюда).
+// Горячая клавиша может быть занята другой программой, поэтому нужен явный видимый способ включения.
+ipcMain.on('toggle-drawing', () => toggleOverlayDrawing())
+ipcMain.handle('get-drawing-shortcuts', () => activeShortcuts)
 
 // ---- Обработчик системного выбора источника экрана/окна ----
 // Electron сам не показывает системный диалог выбора экрана как в браузере — рисуем свой,
@@ -296,14 +312,32 @@ ipcMain.handle('choose-screen-source', async () => {
   return picked ? picked.source.id : null
 })
 
+// ---- Регистрация горячих клавиш с запасными вариантами ----
+// globalShortcut.register возвращает false, если комбинация уже занята другой программой
+// (например, Ctrl+Shift+D любят занимать браузеры и панели GPU) - и раньше это проходило
+// тихо, из-за чего рисование выглядело полностью отсутствующим. Теперь перебираем варианты
+// и запоминаем, что реально сработало, чтобы показать это в интерфейсе.
+function registerShortcut(candidates, handler, label) {
+  for (const accel of candidates) {
+    try {
+      if (globalShortcut.register(accel, handler)) {
+        activeShortcuts.push({ action: label, accelerator: accel })
+        return accel
+      }
+    } catch (e) { /* пробуем следующий вариант */ }
+  }
+  return null
+}
+
 app.whenReady().then(() => {
   createMainWindow()
 
   // ---- Глобальные горячие клавиши рисования ----
   // Работают из любого приложения, даже когда наше окно свёрнуто - ради этого всё и затевалось.
-  globalShortcut.register('Control+Shift+D', toggleOverlayDrawing)
-  globalShortcut.register('Control+Shift+Z', () => sendOverlayCommand('undo'))
-  globalShortcut.register('Control+Shift+X', () => sendOverlayCommand('clear'))
+  // F8/F9/F10 идут запасными: одиночные функциональные клавиши редко заняты в системе.
+  registerShortcut(['Control+Shift+D', 'Alt+D', 'F8'], toggleOverlayDrawing, 'вкл/выкл рисования')
+  registerShortcut(['Control+Shift+Z', 'Alt+Z', 'F9'], () => sendOverlayCommand('undo'), 'отмена')
+  registerShortcut(['Control+Shift+X', 'Alt+X', 'F10'], () => sendOverlayCommand('clear'), 'стереть всё')
 
   // ---- Захват экрана + системного звука для getDisplayMedia() из рендерера ----
   // Рендерер (app.js) вызывает navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }) -
