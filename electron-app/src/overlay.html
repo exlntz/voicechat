@@ -14,16 +14,16 @@
   #canvas { position: fixed; inset: 0; width: 100%; height: 100%; }
   body.drawing #canvas { cursor: crosshair; }
 
-  /* Пока рисование выключено, панель не показываем и рамку не рисуем */
-  #bar, #frame, #hint { display: none; }
-  body.drawing #bar, body.drawing #frame, body.drawing #hint { display: flex; }
+  /* Режим мыши: рисунок остаётся на экране, но холст не ловит курсор -
+     клики уходят в обычные программы, можно листать и двигать что угодно. */
+  body.cursor-mode #canvas { pointer-events: none; cursor: default; }
 
-  /* Тонкая рамка по краю экрана - явный признак, что режим рисования активен */
-  #frame {
-    position: fixed; inset: 0; pointer-events: none;
-    border: 2px solid rgba(255, 59, 48, 0.75);
-    box-shadow: inset 0 0 24px rgba(255, 59, 48, 0.18);
-  }
+  /* Пока рисование выключено, панель не показываем */
+  #bar, #hint { display: none; }
+  body.drawing #bar { display: flex; }
+  body.drawing.show-hint #hint { display: flex; }
+
+  /* Рамки по краю экрана СПЕЦИАЛЬНО нет: она попадала в стрим и мешала смотреть. */
 
   #bar {
     position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
@@ -34,6 +34,12 @@
     box-shadow: 0 10px 34px rgba(0, 0, 0, 0.55);
     z-index: 10;
   }
+
+  /* Вертикальный режим: включается автоматически, если панель перетащили к левому или правому краю */
+  #bar.vert { flex-direction: column; }
+  #bar.vert .sep { width: 24px; height: 1px; margin: 4px 0; }
+  #bar.vert #colors, #bar.vert #widths { flex-direction: column; }
+
   .btn {
     display: inline-flex; align-items: center; justify-content: center;
     min-width: 34px; height: 34px; padding: 0 8px;
@@ -51,12 +57,23 @@
   .wbtn.sel { background: #2d6cff; }
   .wdot { background: #fff; border-radius: 50%; }
 
+  /* За эту ручку панель можно таскать по экрану */
+  #grip {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 30px; color: #7f8798; font-size: 15px;
+    cursor: grab; border-radius: 7px;
+  }
+  #grip:hover { background: rgba(255,255,255,0.08); color: #cdd4e3; }
+  #grip.dragging { cursor: grabbing; }
+
   #hint {
     position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
     padding: 7px 14px; border-radius: 10px;
     background: rgba(20, 22, 28, 0.9); color: #b9c2d4; font-size: 12px;
     border: 1px solid rgba(255,255,255,0.1); pointer-events: none;
+    transition: opacity 0.4s ease; opacity: 1;
   }
+  #hint.fade { opacity: 0; }
   #textInput {
     position: fixed; display: none; z-index: 20;
     background: rgba(20,22,28,0.95); color: #fff; border: 1px solid #2d6cff;
@@ -66,10 +83,12 @@
 </head>
 <body>
 <canvas id="canvas"></canvas>
-<div id="frame"></div>
 <input id="textInput" type="text" placeholder="текст + Enter" />
 
 <div id="bar">
+  <div id="grip" title="Перетащить панель (к левому/правому краю - станет вертикальной)">⁙</div>
+  <button class="btn" id="cursor" title="Режим мыши: рисунок остаётся, можно работать в программах (F7)">🖱️</button>
+  <div class="sep"></div>
   <button class="btn" data-tool="pen" title="Карандаш (P)">✏️</button>
   <button class="btn" data-tool="marker" title="Маркер (M)">🖍️</button>
   <button class="btn" data-tool="arrow" title="Стрелка (A)">➜</button>
@@ -89,7 +108,7 @@
   <button class="btn" id="done" title="Выйти из рисования (Esc)">✕</button>
 </div>
 
-<div id="hint">Ctrl+Shift+D — выйти/войти в режим рисования · Esc — выйти · Ctrl+Z — отменить</div>
+<div id="hint">F7 - мышь/рисование · F8 - выйти · панель можно таскать за точки слева</div>
 
 <script>
 (function () {
@@ -98,11 +117,16 @@
   var canvas = document.getElementById('canvas')
   var ctx = canvas.getContext('2d')
   var bar = document.getElementById('bar')
+  var grip = document.getElementById('grip')
+  var hint = document.getElementById('hint')
+  var cursorBtn = document.getElementById('cursor')
   var textInput = document.getElementById('textInput')
+  var api = window.overlayAPI || null
 
   var COLORS = ['#ff3b30', '#ffd60a', '#32d74b', '#0a84ff', '#ffffff', '#111111']
   var WIDTHS = [2, 4, 8, 16]
   var LASER_TTL = 1300
+  var EDGE_SNAP = 130   // насколько близко к краю надо подтащить, чтобы панель стала вертикальной
 
   var state = {
     active: false,
@@ -124,7 +148,7 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     dirty = true
   }
-  window.addEventListener('resize', resize)
+  window.addEventListener('resize', function () { resize(); clampBar() })
   resize()
 
   // ---------- отрисовка ----------
@@ -236,7 +260,7 @@
   var drawingNow = false
 
   canvas.addEventListener('pointerdown', function (e) {
-    if (!state.active) return
+    if (!state.active || cursorMode) return
     canvas.setPointerCapture(e.pointerId)
     var x = e.clientX, y = e.clientY
 
@@ -339,9 +363,16 @@
     for (var j = 0; j < sw.length; j++) sw[j].classList.toggle('sel', sw[j].dataset.color === state.color)
     var wb = widthsBox.querySelectorAll('.wbtn')
     for (var k = 0; k < wb.length; k++) wb[k].classList.toggle('sel', Number(wb[k].dataset.width) === state.width)
+    cursorBtn.classList.toggle('sel', cursorMode)
   }
 
-  function setTool(t) { state.tool = t; localStorage.setItem('ovTool', t); syncBar() }
+  function setTool(t) {
+    state.tool = t
+    localStorage.setItem('ovTool', t)
+    // Выбрал инструмент - очевидно хочет рисовать, а не возить мышкой.
+    if (cursorMode) setCursorMode(false)
+    syncBar()
+  }
   function setColor(c) { state.color = c; localStorage.setItem('ovColor', c); syncBar() }
   function setWidth(w) { state.width = w; localStorage.setItem('ovWidth', String(w)); syncBar() }
 
@@ -352,11 +383,156 @@
   document.getElementById('undo').addEventListener('click', undo)
   document.getElementById('clear').addEventListener('click', clearAll)
   document.getElementById('done').addEventListener('click', function () {
-    if (window.overlayAPI) window.overlayAPI.exit()
+    if (api) api.exit()
   })
+  cursorBtn.addEventListener('click', function () { setCursorMode(!cursorMode) })
 
   function undo() { strokes.pop(); dirty = true }
   function clearAll() { strokes = []; current = null; laser = []; dirty = true }
+
+  // ================= Режим мыши =================
+  // Самое важное удобство: рисунок и панель остаются на экране, но клики уходят
+  // в программы под оверлеем - можно листать, переключать окна, двигать что угодно.
+  //
+  // Техника: окно переводим в setIgnoreMouseEvents(true, { forward: true }). При forward оно продолжает
+  // получать mousemove, хотя клики уже не ловит. По этим mousemove понимаем, когда курсор
+  // навёлся на панель, и на это время возвращаем захват мыши - так кнопки остаются рабочими.
+  var cursorMode = false
+  var ignoreNow = false
+
+  function setIgnore(ig) {
+    if (ig === ignoreNow) return
+    ignoreNow = ig
+    if (api && api.setMouseIgnore) api.setMouseIgnore(ig)
+  }
+
+  function overBar(x, y) {
+    var r = bar.getBoundingClientRect()
+    var pad = 8
+    return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad
+  }
+
+  function setCursorMode(on) {
+    cursorMode = !!on
+    document.body.classList.toggle('cursor-mode', cursorMode)
+    // Недорисованную фигуру бросаем, чтобы она не тянулась за курсором.
+    drawingNow = false
+    if (current) { current = null; dirty = true }
+    closeTextInput(false)
+
+    if (cursorMode) {
+      setIgnore(true)
+    } else {
+      setIgnore(false)
+      // Без возврата фокуса не работали бы локальные клавиши инструментов и Esc.
+      if (api && api.focusOverlay) api.focusOverlay()
+    }
+    syncBar()
+  }
+
+  window.addEventListener('mousemove', function (e) {
+    if (!state.active || !cursorMode || dragging) return
+    setIgnore(!overBar(e.clientX, e.clientY))
+  })
+
+  // ================= Перетаскивание панели =================
+  var dragging = false
+  var dragDx = 0
+  var dragDy = 0
+
+  function place(left, top) {
+    bar.style.transform = 'none'
+    bar.style.left = Math.round(left) + 'px'
+    bar.style.top = Math.round(top) + 'px'
+  }
+
+  function setVertical(v) {
+    bar.classList.toggle('vert', !!v)
+  }
+
+  function clampBar() {
+    if (!bar.style.left) return
+    var r = bar.getBoundingClientRect()
+    place(
+      Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - r.width - 8)),
+      Math.min(Math.max(8, r.top), Math.max(8, window.innerHeight - r.height - 8))
+    )
+  }
+
+  function saveBarPos() {
+    var r = bar.getBoundingClientRect()
+    try {
+      localStorage.setItem('ovBar', JSON.stringify({
+        left: r.left, top: r.top, vert: bar.classList.contains('vert')
+      }))
+    } catch (err) { /* не критично */ }
+  }
+
+  function restoreBarPos() {
+    var raw = null
+    try { raw = localStorage.getItem('ovBar') } catch (err) { raw = null }
+    if (!raw) return
+    var p = null
+    try { p = JSON.parse(raw) } catch (err) { return }
+    if (!p || typeof p.left !== 'number') return
+    setVertical(!!p.vert)
+    place(p.left, p.top)
+    clampBar()
+  }
+
+  // К левому/правому краю - панель становится вертикальной и прилипает к краю.
+  function snapBar() {
+    var r = bar.getBoundingClientRect()
+    var cx = r.left + r.width / 2
+    var edge = null
+    if (cx < EDGE_SNAP) edge = 'left'
+    else if (cx > window.innerWidth - EDGE_SNAP) edge = 'right'
+
+    var keepTop = r.top
+    setVertical(!!edge)
+
+    // После смены ориентации размеры другие - измеряем заново.
+    var r2 = bar.getBoundingClientRect()
+    var left
+    if (edge === 'left') left = 8
+    else if (edge === 'right') left = window.innerWidth - r2.width - 8
+    else left = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - r2.width - 8))
+
+    var top = Math.min(Math.max(8, keepTop), Math.max(8, window.innerHeight - r2.height - 8))
+    place(left, top)
+    saveBarPos()
+  }
+
+  grip.addEventListener('pointerdown', function (e) {
+    if (!state.active) return
+    e.preventDefault()
+    var r = bar.getBoundingClientRect()
+    place(r.left, r.top)      // фиксируем текущее место, чтобы уйти от transform: translateX(-50%)
+    dragging = true
+    dragDx = e.clientX - r.left
+    dragDy = e.clientY - r.top
+    grip.classList.add('dragging')
+    grip.setPointerCapture(e.pointerId)
+    // На время перетаскивания окно должно держать мышь, даже в режиме мыши.
+    setIgnore(false)
+  })
+
+  grip.addEventListener('pointermove', function (e) {
+    if (!dragging) return
+    place(e.clientX - dragDx, e.clientY - dragDy)
+  })
+
+  function endDrag(e) {
+    if (!dragging) return
+    dragging = false
+    grip.classList.remove('dragging')
+    snapBar()
+    if (cursorMode) setIgnore(!overBar(e.clientX, e.clientY))
+  }
+  grip.addEventListener('pointerup', endDrag)
+  grip.addEventListener('pointercancel', endDrag)
+
+  restoreBarPos()
 
   // ---------- клавиатура ----------
   var HOTKEYS = { p: 'pen', m: 'marker', a: 'arrow', l: 'line', r: 'rect', o: 'ellipse', t: 'text', k: 'laser', e: 'eraser' }
@@ -364,25 +540,51 @@
     if (!state.active) return
     if (e.key === 'Escape') {
       if (textPos) { closeTextInput(false); return }
-      if (window.overlayAPI) window.overlayAPI.exit()
+      if (api) api.exit()
       return
     }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'я')) { e.preventDefault(); undo(); return }
     var k = e.key.toLowerCase()
+    if (k === 'c' || k === 'с') { setCursorMode(!cursorMode); return }
     if (HOTKEYS[k]) setTool(HOTKEYS[k])
   })
 
+  // ---------- подсказка гаснет сама, чтобы не висеть в стриме ----------
+  var hintTimer = null
+  function flashHint() {
+    document.body.classList.add('show-hint')
+    hint.classList.remove('fade')
+    if (hintTimer) clearTimeout(hintTimer)
+    hintTimer = setTimeout(function () {
+      hint.classList.add('fade')
+      setTimeout(function () { document.body.classList.remove('show-hint') }, 500)
+    }, 3500)
+  }
+
   // ---------- связь с главным процессом ----------
-  if (window.overlayAPI) {
-    window.overlayAPI.onState(function (s) {
+  if (api) {
+    api.onState(function (s) {
+      var wasActive = state.active
       state.active = !!(s && s.active)
       document.body.classList.toggle('drawing', state.active)
-      if (!state.active) { closeTextInput(false); drawingNow = false; current = null }
+      if (!state.active) {
+        closeTextInput(false)
+        drawingNow = false
+        current = null
+        // Вышли из рисования - режим мыши больше не нужен, иначе следующий вход будет без рисования.
+        cursorMode = false
+        ignoreNow = false
+        document.body.classList.remove('cursor-mode')
+        syncBar()
+      } else if (!wasActive) {
+        flashHint()
+      }
       dirty = true
     })
-    window.overlayAPI.onCommand(function (cmd) {
+    api.onCommand(function (cmd) {
       if (cmd === 'undo') undo()
       if (cmd === 'clear') clearAll()
+      if (cmd === 'cursor') setCursorMode(!cursorMode)
     })
   }
 
