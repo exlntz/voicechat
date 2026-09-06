@@ -6,15 +6,17 @@
 #   Settings -> Secrets and variables -> Actions -> Secrets:
 #     VPS_HOST      - IP или домен сервера, например 185.199.199.114
 #     VPS_USER      - пользователь SSH, например root
-#     VPS_SSH_KEY   - ПРИВАТНЫЙ ssh-ключ целиком (весь файл, вместе со строками BEGIN/END),
-#                     обязательно без passphrase
+#     VPS_SSH_KEY   - ПРИВАТНЫЙ ssh-ключ целиком (без passphrase)
 #     VPS_PORT      - (необязательно) порт SSH, если не 22
 #
-# Пути уже прописаны под текущий сервер:
+# Пути прописаны под текущий сервер:
 #     DEPLOY_PATH = /opt/zvonki-backend   (pm2 describe -> exec cwd)
 #     PM2_APP     = zvonki-backend        (pm2 list -> name)
-# Если когда-нибудь переедешь на другой сервер/путь - заведи Variables
-# DEPLOY_PATH и PM2_APP, они перекроют значения ниже без правки кода.
+# Перекрыть их можно переменными (Variables) с теми же именами.
+#
+# Важно: после заливки идёт сверка md5 ключевых файлов. Если rsync
+# отрапортовал успешно, но файл на сервере не обновился - деплой упадёт,
+# а не покажет ложный зелёный статус.
 
 name: Deploy to VPS
 
@@ -71,6 +73,15 @@ jobs:
           ssh-keyscan -p "${VPS_PORT:-22}" -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           chmod 600 ~/.ssh/known_hosts
 
+      - name: Показать, что собираемся заливать
+        run: |
+          set -euo pipefail
+          echo "commit: $GITHUB_SHA"
+          md5sum vps-backend-deployed-copy/src/server.js
+          md5sum public/static/*.js public/static/*.css || true
+          grep -c 'annotate.js' vps-backend-deployed-copy/src/server.js \
+            || echo "::warning::в vps-backend-deployed-copy/src/server.js нет строки подключения annotate.js"
+
       - name: Залить файлы на сервер
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -81,7 +92,8 @@ jobs:
           set -euo pipefail
           DEPLOY_PATH="${DEPLOY_PATH:-/opt/zvonki-backend}"
           SSH_CMD="ssh -i ~/.ssh/deploy_key -p ${VPS_PORT:-22} -o StrictHostKeyChecking=yes"
-          RSYNC_OPTS=(-az --human-readable --checksum
+          # -i/--itemize-changes показывает каждый переданный файл, --stats - итог
+          RSYNC_OPTS=(-az --itemize-changes --stats --human-readable --checksum
             --exclude 'node_modules'
             --exclude '.env'
             --exclude '*.db'
@@ -90,19 +102,60 @@ jobs:
             --exclude '*.sqlite3'
             --exclude 'data/')
 
-          echo "--- статика -> $DEPLOY_PATH/public/"
+          echo "::group::статика -> $DEPLOY_PATH/public/"
           rsync "${RSYNC_OPTS[@]}" -e "$SSH_CMD" \
             public/ "$VPS_USER@$VPS_HOST:$DEPLOY_PATH/public/"
+          echo "::endgroup::"
 
-          echo "--- бэкенд -> $DEPLOY_PATH/src/"
+          echo "::group::бэкенд -> $DEPLOY_PATH/src/"
           rsync "${RSYNC_OPTS[@]}" -e "$SSH_CMD" \
             vps-backend-deployed-copy/src/ "$VPS_USER@$VPS_HOST:$DEPLOY_PATH/src/"
+          echo "::endgroup::"
 
-          echo "--- зависимости -> $DEPLOY_PATH/"
+          echo "::group::зависимости -> $DEPLOY_PATH/"
           rsync "${RSYNC_OPTS[@]}" -e "$SSH_CMD" \
             vps-backend-deployed-copy/package.json \
             vps-backend-deployed-copy/package-lock.json \
             "$VPS_USER@$VPS_HOST:$DEPLOY_PATH/"
+          echo "::endgroup::"
+
+      - name: Сверить файлы на сервере с репозиторием
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          DEPLOY_PATH="${DEPLOY_PATH:-/opt/zvonki-backend}"
+          SSH="ssh -i ~/.ssh/deploy_key -p ${VPS_PORT:-22} -o StrictHostKeyChecking=yes $VPS_USER@$VPS_HOST"
+
+          fail=0
+          check() {
+            local local_path="$1"
+            local remote_path="$2"
+            local local_md5 remote_md5
+            local_md5=$(md5sum "$local_path" | cut -d' ' -f1)
+            remote_md5=$($SSH "md5sum '$remote_path' 2>/dev/null | cut -d' ' -f1" || true)
+            if [ "$local_md5" = "$remote_md5" ]; then
+              echo "OK   $remote_path"
+            else
+              echo "РАСХОЖДЕНИЕ $remote_path"
+              echo "     в репозитории: $local_md5"
+              echo "     на сервере:      ${remote_md5:-файл не найден}"
+              fail=1
+            fi
+          }
+
+          check vps-backend-deployed-copy/src/server.js "$DEPLOY_PATH/src/server.js"
+          check public/static/app.js               "$DEPLOY_PATH/public/static/app.js"
+          check public/static/annotate.js          "$DEPLOY_PATH/public/static/annotate.js"
+          check public/static/style.css            "$DEPLOY_PATH/public/static/style.css"
+
+          if [ "$fail" != "0" ]; then
+            echo "::error::Файлы на сервере не совпадают с репозиторием - rsync не применился"
+            exit 1
+          fi
 
       - name: Установить зависимости и перезапустить pm2
         env:
@@ -149,6 +202,13 @@ jobs:
             echo "health check: НЕ ответил, последние логи:"
             pm2 logs "$PM2_APP" --lines 40 --nostream || true
             exit 1
+          fi
+
+          # проверяем, что сервер реально отдаёт HTML с подключённым annotate.js
+          if curl -fsS --max-time 10 http://127.0.0.1:3001/ | grep -q 'annotate.js'; then
+            echo "annotate.js подключён в отдаваемом HTML: OK"
+          else
+            echo "::warning::в отдаваемом HTML нет annotate.js"
           fi
           REMOTE
 
