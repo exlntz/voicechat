@@ -5,18 +5,16 @@
 # Что нужно один раз настроить в GitHub:
 #   Settings -> Secrets and variables -> Actions -> Secrets:
 #     VPS_HOST      - IP или домен сервера, например 185.199.199.114
-#     VPS_USER      - пользователь SSH, например root или deploy
-#     VPS_SSH_KEY   - ПРИВАТНЫЙ ssh-ключ целиком (весь файл, вместе со строками BEGIN/END)
+#     VPS_USER      - пользователь SSH, например root
+#     VPS_SSH_KEY   - ПРИВАТНЫЙ ssh-ключ целиком (весь файл, вместе со строками BEGIN/END),
+#                     обязательно без passphrase
 #     VPS_PORT      - (необязательно) порт SSH, если не 22
-#   Settings -> Secrets and variables -> Actions -> Variables:
-#     DEPLOY_PATH   - путь к приложению на сервере, например /opt/zvonki
-#                     (внутри должны быть src/ и public/)
-#     PM2_APP       - имя процесса в pm2, например zvonki
 #
-# Как сделать ключ (на своей машине):
-#   ssh-keygen -t ed25519 -C "github-deploy" -f ~/.ssh/gh_deploy
-#   ssh-copy-id -i ~/.ssh/gh_deploy.pub USER@HOST
-#   cat ~/.ssh/gh_deploy   <- это значение положить в секрет VPS_SSH_KEY
+# Пути уже прописаны под текущий сервер:
+#     DEPLOY_PATH = /opt/zvonki-backend   (pm2 describe -> exec cwd)
+#     PM2_APP     = zvonki-backend        (pm2 list -> name)
+# Если когда-нибудь переедешь на другой сервер/путь - заведи Variables
+# DEPLOY_PATH и PM2_APP, они перекроют значения ниже без правки кода.
 
 name: Deploy to VPS
 
@@ -81,7 +79,7 @@ jobs:
           DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
         run: |
           set -euo pipefail
-          DEPLOY_PATH="${DEPLOY_PATH:-/opt/zvonki}"
+          DEPLOY_PATH="${DEPLOY_PATH:-/opt/zvonki-backend}"
           SSH_CMD="ssh -i ~/.ssh/deploy_key -p ${VPS_PORT:-22} -o StrictHostKeyChecking=yes"
           RSYNC_OPTS=(-az --human-readable --checksum
             --exclude 'node_modules'
@@ -115,8 +113,8 @@ jobs:
           PM2_APP: ${{ vars.PM2_APP }}
         run: |
           set -euo pipefail
-          DEPLOY_PATH="${DEPLOY_PATH:-/opt/zvonki}"
-          PM2_APP="${PM2_APP:-zvonki}"
+          DEPLOY_PATH="${DEPLOY_PATH:-/opt/zvonki-backend}"
+          PM2_APP="${PM2_APP:-zvonki-backend}"
 
           ssh -i ~/.ssh/deploy_key -p "${VPS_PORT:-22}" \
             -o StrictHostKeyChecking=yes \
