@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>Аннотации</title>
+<style>
+  /* Окно прозрачное: фон обязан быть полностью прозрачным, иначе Windows нарисует чёрный прямоугольник */
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: transparent; overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    cursor: default; user-select: none;
+  }
+  #canvas { position: fixed; inset: 0; width: 100%; height: 100%; }
+  body.drawing #canvas { cursor: crosshair; }
+
+  /* Пока рисование выключено, панель не показываем и рамку не рисуем */
+  #bar, #frame, #hint { display: none; }
+  body.drawing #bar, body.drawing #frame, body.drawing #hint { display: flex; }
+
+  /* Тонкая рамка по краю экрана - явный признак, что режим рисования активен */
+  #frame {
+    position: fixed; inset: 0; pointer-events: none;
+    border: 2px solid rgba(255, 59, 48, 0.75);
+    box-shadow: inset 0 0 24px rgba(255, 59, 48, 0.18);
+  }
+
+  #bar {
+    position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+    align-items: center; gap: 6px; padding: 8px 10px;
+    background: rgba(20, 22, 28, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.55);
+    z-index: 10;
+  }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 34px; height: 34px; padding: 0 8px;
+    border: 1px solid transparent; border-radius: 9px;
+    background: rgba(255, 255, 255, 0.06); color: #e9edf5;
+    font-size: 15px; line-height: 1; cursor: pointer;
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.14); }
+  .btn.sel { background: #2d6cff; border-color: #4d86ff; color: #fff; }
+  .btn.danger:hover { background: #b3261e; }
+  .sep { width: 1px; height: 24px; margin: 0 4px; background: rgba(255, 255, 255, 0.14); }
+  .swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.25); cursor: pointer; }
+  .swatch.sel { border-color: #fff; transform: scale(1.14); }
+  .wbtn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid transparent; background: rgba(255,255,255,0.06); cursor: pointer; display:inline-flex; align-items:center; justify-content:center; }
+  .wbtn.sel { background: #2d6cff; }
+  .wdot { background: #fff; border-radius: 50%; }
+
+  #hint {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    padding: 7px 14px; border-radius: 10px;
+    background: rgba(20, 22, 28, 0.9); color: #b9c2d4; font-size: 12px;
+    border: 1px solid rgba(255,255,255,0.1); pointer-events: none;
+  }
+  #textInput {
+    position: fixed; display: none; z-index: 20;
+    background: rgba(20,22,28,0.95); color: #fff; border: 1px solid #2d6cff;
+    border-radius: 8px; padding: 6px 8px; font-size: 18px; outline: none; min-width: 160px;
+  }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="frame"></div>
+<input id="textInput" type="text" placeholder="текст + Enter" />
+
+<div id="bar">
+  <button class="btn" data-tool="pen" title="Карандаш (P)">✏️</button>
+  <button class="btn" data-tool="marker" title="Маркер (M)">🖍️</button>
+  <button class="btn" data-tool="arrow" title="Стрелка (A)">➜</button>
+  <button class="btn" data-tool="line" title="Линия (L)">╱</button>
+  <button class="btn" data-tool="rect" title="Прямоугольник (R)">▭</button>
+  <button class="btn" data-tool="ellipse" title="Овал (O)">◯</button>
+  <button class="btn" data-tool="text" title="Текст (T)">T</button>
+  <button class="btn" data-tool="laser" title="Лазер (K)">🔴</button>
+  <button class="btn" data-tool="eraser" title="Ластик (E)">🧽</button>
+  <div class="sep"></div>
+  <div id="colors"></div>
+  <div class="sep"></div>
+  <div id="widths"></div>
+  <div class="sep"></div>
+  <button class="btn" id="undo" title="Отменить (Ctrl+Z)">↶</button>
+  <button class="btn danger" id="clear" title="Стереть всё (Ctrl+Shift+X)">🗑</button>
+  <button class="btn" id="done" title="Выйти из рисования (Esc)">✕</button>
+</div>
+
+<div id="hint">Ctrl+Shift+D — выйти/войти в режим рисования · Esc — выйти · Ctrl+Z — отменить</div>
+
+<script>
+(function () {
+  'use strict'
+
+  var canvas = document.getElementById('canvas')
+  var ctx = canvas.getContext('2d')
+  var bar = document.getElementById('bar')
+  var textInput = document.getElementById('textInput')
+
+  var COLORS = ['#ff3b30', '#ffd60a', '#32d74b', '#0a84ff', '#ffffff', '#111111']
+  var WIDTHS = [2, 4, 8, 16]
+  var LASER_TTL = 1300
+
+  var state = {
+    active: false,
+    tool: localStorage.getItem('ovTool') || 'pen',
+    color: localStorage.getItem('ovColor') || COLORS[0],
+    width: Number(localStorage.getItem('ovWidth')) || 4
+  }
+
+  var strokes = []       // завершённые фигуры
+  var current = null     // фигура, которую рисуем прямо сейчас
+  var laser = []         // точки лазерной указки {x, y, t}
+  var dirty = true
+
+  // ---------- размер холста с учётом масштабирования Windows ----------
+  function resize() {
+    var dpr = window.devicePixelRatio || 1
+    canvas.width = Math.round(window.innerWidth * dpr)
+    canvas.height = Math.round(window.innerHeight * dpr)
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    dirty = true
+  }
+  window.addEventListener('resize', resize)
+  resize()
+
+  // ---------- отрисовка ----------
+  function drawShape(s) {
+    var pts = s.points
+    if (!pts.length) return
+    ctx.save()
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.strokeStyle = s.color
+    ctx.fillStyle = s.color
+    ctx.lineWidth = s.width
+    if (s.tool === 'marker') {
+      ctx.globalAlpha = 0.38
+      ctx.lineWidth = s.width * 3
+    }
+
+    var a = pts[0]
+    var b = pts[pts.length - 1]
+
+    if (s.tool === 'pen' || s.tool === 'marker') {
+      ctx.beginPath()
+      ctx.moveTo(pts[0].x, pts[0].y)
+      for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
+      ctx.stroke()
+    } else if (s.tool === 'line') {
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke()
+    } else if (s.tool === 'rect') {
+      ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y)
+    } else if (s.tool === 'ellipse') {
+      ctx.beginPath()
+      ctx.ellipse((a.x + b.x) / 2, (a.y + b.y) / 2, Math.abs(b.x - a.x) / 2, Math.abs(b.y - a.y) / 2, 0, 0, Math.PI * 2)
+      ctx.stroke()
+    } else if (s.tool === 'arrow') {
+      var head = Math.max(12, s.width * 4)
+      var ang = Math.atan2(b.y - a.y, b.x - a.x)
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(b.x, b.y)
+      ctx.lineTo(b.x - head * Math.cos(ang - Math.PI / 7), b.y - head * Math.sin(ang - Math.PI / 7))
+      ctx.lineTo(b.x - head * Math.cos(ang + Math.PI / 7), b.y - head * Math.sin(ang + Math.PI / 7))
+      ctx.closePath()
+      ctx.fill()
+    } else if (s.tool === 'text' && s.text) {
+      ctx.font = '600 ' + Math.max(16, s.width * 6) + 'px Segoe UI, sans-serif'
+      ctx.textBaseline = 'top'
+      ctx.lineWidth = 4
+      ctx.strokeStyle = 'rgba(0,0,0,0.55)'
+      ctx.strokeText(s.text, a.x, a.y)
+      ctx.fillText(s.text, a.x, a.y)
+    }
+    ctx.restore()
+  }
+
+  function render() {
+    var now = Date.now()
+    laser = laser.filter(function (p) { return now - p.t < LASER_TTL })
+
+    if (dirty || laser.length) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      for (var i = 0; i < strokes.length; i++) drawShape(strokes[i])
+      if (current) drawShape(current)
+
+      if (laser.length) {
+        ctx.save()
+        ctx.lineCap = 'round'
+        for (var j = 1; j < laser.length; j++) {
+          var p0 = laser[j - 1], p1 = laser[j]
+          var age = (now - p1.t) / LASER_TTL
+          ctx.globalAlpha = Math.max(0, 1 - age)
+          ctx.strokeStyle = '#ff3b30'
+          ctx.lineWidth = 6
+          ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke()
+        }
+        ctx.restore()
+      }
+      dirty = laser.length > 0
+    }
+    requestAnimationFrame(render)
+  }
+  requestAnimationFrame(render)
+
+  // ---------- ластик: удаляем фигуру под курсором ----------
+  function eraseAt(x, y) {
+    var r = 14
+    for (var i = strokes.length - 1; i >= 0; i--) {
+      var pts = strokes[i].points
+      for (var j = 0; j < pts.length; j++) {
+        if (Math.abs(pts[j].x - x) < r && Math.abs(pts[j].y - y) < r) {
+          strokes.splice(i, 1)
+          dirty = true
+          return
+        }
+      }
+      // для фигур по двум точкам проверяем ещё и рамку
+      if (pts.length === 2) {
+        var a = pts[0], b = pts[1]
+        if (x > Math.min(a.x, b.x) - r && x < Math.max(a.x, b.x) + r &&
+            y > Math.min(a.y, b.y) - r && y < Math.max(a.y, b.y) + r) {
+          strokes.splice(i, 1)
+          dirty = true
+          return
+        }
+      }
+    }
+  }
+
+  // ---------- ввод мышью ----------
+  var drawingNow = false
+
+  canvas.addEventListener('pointerdown', function (e) {
+    if (!state.active) return
+    canvas.setPointerCapture(e.pointerId)
+    var x = e.clientX, y = e.clientY
+
+    if (state.tool === 'eraser') { drawingNow = true; eraseAt(x, y); return }
+    if (state.tool === 'laser') { drawingNow = true; laser.push({ x: x, y: y, t: Date.now() }); dirty = true; return }
+    if (state.tool === 'text') { openTextInput(x, y); return }
+
+    drawingNow = true
+    current = { tool: state.tool, color: state.color, width: state.width, points: [{ x: x, y: y }] }
+    dirty = true
+  })
+
+  canvas.addEventListener('pointermove', function (e) {
+    if (!state.active || !drawingNow) return
+    var x = e.clientX, y = e.clientY
+
+    if (state.tool === 'eraser') { eraseAt(x, y); return }
+    if (state.tool === 'laser') { laser.push({ x: x, y: y, t: Date.now() }); dirty = true; return }
+    if (!current) return
+
+    if (current.tool === 'pen' || current.tool === 'marker') {
+      current.points.push({ x: x, y: y })
+    } else {
+      current.points[1] = { x: x, y: y }
+    }
+    dirty = true
+  })
+
+  function finish() {
+    drawingNow = false
+    if (current && current.points.length > 1) strokes.push(current)
+    current = null
+    dirty = true
+  }
+  canvas.addEventListener('pointerup', finish)
+  canvas.addEventListener('pointercancel', finish)
+
+  // ---------- текст ----------
+  var textPos = null
+  function openTextInput(x, y) {
+    textPos = { x: x, y: y }
+    textInput.style.display = 'block'
+    textInput.style.left = x + 'px'
+    textInput.style.top = y + 'px'
+    textInput.style.color = state.color
+    textInput.value = ''
+    setTimeout(function () { textInput.focus() }, 0)
+  }
+  function closeTextInput(commit) {
+    if (commit && textPos && textInput.value.trim()) {
+      strokes.push({ tool: 'text', color: state.color, width: state.width, points: [textPos], text: textInput.value.trim() })
+      dirty = true
+    }
+    textInput.style.display = 'none'
+    textPos = null
+  }
+  textInput.addEventListener('keydown', function (e) {
+    e.stopPropagation()
+    if (e.key === 'Enter') closeTextInput(true)
+    if (e.key === 'Escape') closeTextInput(false)
+  })
+
+  // ---------- панель инструментов ----------
+  var colorsBox = document.getElementById('colors')
+  COLORS.forEach(function (c) {
+    var d = document.createElement('span')
+    d.className = 'swatch'
+    d.style.background = c
+    d.dataset.color = c
+    d.addEventListener('click', function () { setColor(c) })
+    colorsBox.appendChild(d)
+  })
+  colorsBox.style.display = 'inline-flex'
+  colorsBox.style.gap = '6px'
+  colorsBox.style.alignItems = 'center'
+
+  var widthsBox = document.getElementById('widths')
+  WIDTHS.forEach(function (w) {
+    var b = document.createElement('span')
+    b.className = 'wbtn'
+    b.dataset.width = String(w)
+    var dot = document.createElement('span')
+    dot.className = 'wdot'
+    dot.style.width = Math.min(16, w + 3) + 'px'
+    dot.style.height = Math.min(16, w + 3) + 'px'
+    b.appendChild(dot)
+    b.addEventListener('click', function () { setWidth(w) })
+    widthsBox.appendChild(b)
+  })
+  widthsBox.style.display = 'inline-flex'
+  widthsBox.style.gap = '6px'
+  widthsBox.style.alignItems = 'center'
+
+  function syncBar() {
+    var toolBtns = bar.querySelectorAll('[data-tool]')
+    for (var i = 0; i < toolBtns.length; i++) {
+      toolBtns[i].classList.toggle('sel', toolBtns[i].dataset.tool === state.tool)
+    }
+    var sw = colorsBox.querySelectorAll('.swatch')
+    for (var j = 0; j < sw.length; j++) sw[j].classList.toggle('sel', sw[j].dataset.color === state.color)
+    var wb = widthsBox.querySelectorAll('.wbtn')
+    for (var k = 0; k < wb.length; k++) wb[k].classList.toggle('sel', Number(wb[k].dataset.width) === state.width)
+  }
+
+  function setTool(t) { state.tool = t; localStorage.setItem('ovTool', t); syncBar() }
+  function setColor(c) { state.color = c; localStorage.setItem('ovColor', c); syncBar() }
+  function setWidth(w) { state.width = w; localStorage.setItem('ovWidth', String(w)); syncBar() }
+
+  bar.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-tool]')
+    if (el) { setTool(el.dataset.tool); return }
+  })
+  document.getElementById('undo').addEventListener('click', undo)
+  document.getElementById('clear').addEventListener('click', clearAll)
+  document.getElementById('done').addEventListener('click', function () {
+    if (window.overlayAPI) window.overlayAPI.exit()
+  })
+
+  function undo() { strokes.pop(); dirty = true }
+  function clearAll() { strokes = []; current = null; laser = []; dirty = true }
+
+  // ---------- клавиатура ----------
+  var HOTKEYS = { p: 'pen', m: 'marker', a: 'arrow', l: 'line', r: 'rect', o: 'ellipse', t: 'text', k: 'laser', e: 'eraser' }
+  window.addEventListener('keydown', function (e) {
+    if (!state.active) return
+    if (e.key === 'Escape') {
+      if (textPos) { closeTextInput(false); return }
+      if (window.overlayAPI) window.overlayAPI.exit()
+      return
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'я')) { e.preventDefault(); undo(); return }
+    var k = e.key.toLowerCase()
+    if (HOTKEYS[k]) setTool(HOTKEYS[k])
+  })
+
+  // ---------- связь с главным процессом ----------
+  if (window.overlayAPI) {
+    window.overlayAPI.onState(function (s) {
+      state.active = !!(s && s.active)
+      document.body.classList.toggle('drawing', state.active)
+      if (!state.active) { closeTextInput(false); drawingNow = false; current = null }
+      dirty = true
+    })
+    window.overlayAPI.onCommand(function (cmd) {
+      if (cmd === 'undo') undo()
+      if (cmd === 'clear') clearAll()
+    })
+  }
+
+  syncBar()
+})()
+</script>
+</body>
+</html>
