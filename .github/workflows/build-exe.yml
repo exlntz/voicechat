@@ -1,0 +1,70 @@
+name: Build Windows EXE
+
+# Собирает готовый .exe прямо на серверах GitHub (windows-latest).
+# Ничего ставить локально и лезть на VPS не нужно - готовый файл скачивается
+# со страницы запуска в разделе Actions (блок Artifacts внизу).
+
+on:
+  push:
+    # Любое изменение десктопного кода в main сразу даёт новую сборку.
+    # Пуш тега вида v1.2.3 тоже собирает и дополнительно публикует Release
+    # с постоянной ссылкой на скачивание (артефакты живут ограниченное время).
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - 'electron-app/**'
+      - '.github/workflows/build-exe.yml'
+  # Кнопка "Run workflow" - собрать вручную в любой момент, без коммитов
+  workflow_dispatch:
+
+# Нужно, чтобы шаг публикации Release мог создать релиз в репозитории
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Собрать .exe
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Забрать код
+        uses: actions/checkout@v4
+
+      - name: Поставить Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: electron-app/package-lock.json
+
+      - name: Установить зависимости
+        working-directory: electron-app
+        run: npm ci
+
+      - name: Собрать portable .exe
+        working-directory: electron-app
+        # portable-сборка: один файл, ничего устанавливать не надо - скачал и запустил
+        run: npx electron-builder --win portable --x64 --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Показать, что собралось
+        working-directory: electron-app
+        shell: bash
+        run: ls -la release/
+
+      - name: Выложить .exe в артефакты
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zvonki-Windows-exe
+          path: electron-app/release/*.exe
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Опубликовать Release (только для тегов v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: electron-app/release/*.exe
+          generate_release_notes: true
