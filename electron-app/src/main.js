@@ -1,5 +1,5 @@
 // ===================== Электрон: главный процесс =====================
-const { app, BrowserWindow, ipcMain, desktopCapturer, session, screen, Menu } = require('electron')
+const { app, BrowserWindow, ipcMain, desktopCapturer, session, screen, Menu, globalShortcut } = require('electron')
 const path = require('path')
 
 // URL веб-приложения (Cloudflare Pages control-plane + фронтенд).
@@ -18,8 +18,22 @@ app.commandLine.appendSwitch('enable-gpu-rasterization')
 // Явно включаем WebRTC H264 hardware encoding через Chromium feature flags
 app.commandLine.appendSwitch('enable-features', 'WebRtcH264WithOpenH264FFmpeg,VaapiVideoEncoder,VaapiVideoDecoder')
 
+// ---- Флаги ради стабильных 60 FPS демонстрации ----
+// По умолчанию Chromium ограничивает частоту кадров захвата и рендера вертикальной синхронизацией
+// и внутренним лимитом - именно поэтому на сайте потолок получается около 40-50 кадров.
+// В своём .exe эти ограничения можно снять - браузер такого не позволяет.
+app.commandLine.appendSwitch('disable-frame-rate-limit')
+app.commandLine.appendSwitch('disable-gpu-vsync')
+app.commandLine.appendSwitch('enable-zero-copy')
+app.commandLine.appendSwitch('force_high_performance_gpu')
+
 let mainWindow = null
 let pickerWindow = null
+
+// ---- Состояние оверлея для рисования поверх любых приложений ----
+let overlayWindow = null
+let overlayActive = false      // true = окно ловит мышь и можно рисовать
+let overlayDisplayId = null    // на каком мониторе рисуем (тот, который демонстрируем)
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -33,9 +47,12 @@ function createMainWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      // Разрешаем доступ к getUserMedia/getDisplayMedia без системного диалога Chromium —
+      // Разрешаем доступ к getUserMedia/getDisplayMedia без системного диалога Chromium -
       // диалог мы рисуем сами через chooseScreenSource()
-      sandbox: false
+      sandbox: false,
+      // Без этого Chromium режет частоту кадров и таймеры, когда окно свёрнуто или перекрыто
+      // другим приложением - а при демонстрации экрана окно почти всегда перекрыто.
+      backgroundThrottling: false
     }
   })
 
@@ -58,8 +75,144 @@ function createMainWindow() {
 
   mainWindow.loadURL(SERVER_URL)
 
+  // В десктопной сборке сразу выставляем максимальную плавность демонстрации: сайт хранит
+  // выбранный FPS в глобальном state, и в .exe нет смысла стартовать с компромиссного значения.
+  // Всё в try/catch: если сайт обновится и этих переменных не станет, приложение не сломается.
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow.webContents.executeJavaScript(
+      "(function(){try{if(window.state){window.state.screenShareFps=60;}" +
+      "if(typeof applyScreenShareFps==='function'){applyScreenShareFps(60);}" +
+      "}catch(e){}})()"
+    ).catch(() => {})
+  })
+
   mainWindow.on('closed', () => { mainWindow = null })
 }
+
+// ===================== Оверлей для рисования поверх экрана =====================
+// Главная идея: это отдельное прозрачное окно без рамки размером во весь монитор, которое
+// висит поверх всех окон ОС. Поскольку оно физически нарисовано на экране, захват экрана
+// забирает его вместе с картинкой - собеседники видят рисунок как часть видео, без отдельного
+// сетевого протокола и без задержки синхронизации.
+//
+// Два режима:
+//  - пассивный: рисунок виден, но клики проходят насквозь - можно спокойно работать в любых программах;
+//  - активный: окно ловит мышь, видна панель инструментов, рисуем.
+// Переключение - глобальной горячей клавишей, которая работает из любого приложения.
+
+function getTargetDisplay() {
+  const displays = screen.getAllDisplays()
+  if (overlayDisplayId !== null && overlayDisplayId !== undefined) {
+    const found = displays.find((d) => String(d.id) === String(overlayDisplayId))
+    if (found) return found
+  }
+  // Если не знаем, какой экран демонстрируется - берём тот, где сейчас курсор.
+  try {
+    return screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+  } catch (e) {
+    return screen.getPrimaryDisplay()
+  }
+}
+
+function createOverlayWindow() {
+  if (overlayWindow && !overlayWindow.isDestroyed()) return overlayWindow
+
+  const bounds = getTargetDisplay().bounds
+
+  overlayWindow = new BrowserWindow({
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    transparent: true,
+    frame: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    show: false,
+    // Без backgroundColor с нулевой альфой Windows может залить окно чёрным.
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload: path.join(__dirname, 'overlay-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false
+    }
+  })
+
+  // 'screen-saver' - самый высокий уровень: оверлей остаётся поверх даже полноэкранных приложений.
+  overlayWindow.setAlwaysOnTop(true, 'screen-saver')
+  overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  // Стартуем в пассивном режиме: клики проходят насквозь в обычные программы.
+  overlayWindow.setIgnoreMouseEvents(true, { forward: true })
+  overlayWindow.loadFile(path.join(__dirname, 'overlay.html'))
+
+  overlayWindow.on('closed', () => {
+    overlayWindow = null
+    overlayActive = false
+  })
+
+  return overlayWindow
+}
+
+function showOverlayPassive() {
+  const win = createOverlayWindow()
+  if (!win.isVisible()) win.showInactive()
+  sendOverlayState()
+}
+
+function sendOverlayState() {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('overlay-state', { active: overlayActive })
+  }
+}
+
+function setOverlayActive(active) {
+  const win = createOverlayWindow()
+  overlayActive = !!active
+
+  if (overlayActive) {
+    // Окно могло остаться на старом мониторе или пережить смену разрешения - выравниваем по экрану.
+    const bounds = getTargetDisplay().bounds
+    win.setBounds(bounds)
+    win.setIgnoreMouseEvents(false)
+    win.show()
+    win.focus()
+  } else {
+    win.setIgnoreMouseEvents(true, { forward: true })
+    if (!win.isVisible()) win.showInactive()
+    // Возвращаем фокус тому, с чем работал пользователь, чтобы оверлей не перехватывал клавиатуру.
+    if (win.blur) win.blur()
+  }
+
+  sendOverlayState()
+}
+
+function toggleOverlayDrawing() {
+  setOverlayActive(!overlayActive)
+}
+
+function sendOverlayCommand(command) {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('overlay-command', command)
+  }
+}
+
+function hideOverlay() {
+  overlayActive = false
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('overlay-command', 'clear')
+    overlayWindow.hide()
+    overlayWindow.setIgnoreMouseEvents(true, { forward: true })
+  }
+}
+
+ipcMain.on('overlay-exit', () => setOverlayActive(false))
+ipcMain.on('overlay-hide', () => hideOverlay())
 
 // ---- Обработчик системного выбора источника экрана/окна ----
 // Electron сам не показывает системный диалог выбора экрана как в браузере — рисуем свой,
@@ -146,6 +299,12 @@ ipcMain.handle('choose-screen-source', async () => {
 app.whenReady().then(() => {
   createMainWindow()
 
+  // ---- Глобальные горячие клавиши рисования ----
+  // Работают из любого приложения, даже когда наше окно свёрнуто - ради этого всё и затевалось.
+  globalShortcut.register('Control+Shift+D', toggleOverlayDrawing)
+  globalShortcut.register('Control+Shift+Z', () => sendOverlayCommand('undo'))
+  globalShortcut.register('Control+Shift+X', () => sendOverlayCommand('clear'))
+
   // ---- Захват экрана + системного звука для getDisplayMedia() из рендерера ----
   // Рендерер (app.js) вызывает navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }) -
   // Electron не показывает системный пикер (на Windows/Linux), поэтому мы сами открываем
@@ -168,6 +327,15 @@ app.whenReady().then(() => {
         callback({})
         return
       }
+
+      // Если демонстрируется целый экран - сразу готовим оверлей на этом же мониторе,
+      // чтобы рисунок гарантированно попадал в захват. Для захвата отдельного окна это
+      // не работает принципиально: ОС отдаёт содержимое ровно одного окна без того, что поверх него.
+      if (picked.source.id.startsWith('screen')) {
+        overlayDisplayId = picked.source.display_id || null
+        showOverlayPassive()
+      }
+
       // ВАЖНО ("баг: демка без звука не запускается, если снять галочку"): Electron требует, чтобы
       // ключ audio либо был валидной строкой ('loopback'/'loopbackWithMute'), либо ПОЛНОСТЬЮ
       // ОТСУТСТВОВАЛ в объекте - передача audio: undefined (когда shareAudio === false) кидает
@@ -184,6 +352,10 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
   })
+})
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
 })
 
 app.on('window-all-closed', () => {
