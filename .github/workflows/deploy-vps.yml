@@ -1,0 +1,159 @@
+# Автодеплой на VPS.
+#
+# Срабатывает при пуше в main (или вручную: Actions -> Deploy to VPS -> Run workflow).
+#
+# Что нужно один раз настроить в GitHub:
+#   Settings -> Secrets and variables -> Actions -> Secrets:
+#     VPS_HOST      - IP или домен сервера, например 185.199.199.114
+#     VPS_USER      - пользователь SSH, например root или deploy
+#     VPS_SSH_KEY   - ПРИВАТНЫЙ ssh-ключ целиком (весь файл, вместе со строками BEGIN/END)
+#     VPS_PORT      - (необязательно) порт SSH, если не 22
+#   Settings -> Secrets and variables -> Actions -> Variables:
+#     DEPLOY_PATH   - путь к приложению на сервере, например /opt/zvonki
+#                     (внутри должны быть src/ и public/)
+#     PM2_APP       - имя процесса в pm2, например zvonki
+#
+# Как сделать ключ (на своей машине):
+#   ssh-keygen -t ed25519 -C "github-deploy" -f ~/.ssh/gh_deploy
+#   ssh-copy-id -i ~/.ssh/gh_deploy.pub USER@HOST
+#   cat ~/.ssh/gh_deploy   <- это значение положить в секрет VPS_SSH_KEY
+
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "public/**"
+      - "vps-backend-deployed-copy/src/**"
+      - "vps-backend-deployed-copy/package.json"
+      - "vps-backend-deployed-copy/package-lock.json"
+      - ".github/workflows/deploy-vps.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: rsync + pm2 reload
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Забрать код
+        uses: actions/checkout@v4
+
+      - name: Проверить, что секреты заданы
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          missing=""
+          [ -n "$VPS_HOST" ]    || missing="$missing VPS_HOST"
+          [ -n "$VPS_USER" ]    || missing="$missing VPS_USER"
+          [ -n "$VPS_SSH_KEY" ] || missing="$missing VPS_SSH_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::Не заданы секреты:$missing (Settings -> Secrets and variables -> Actions)"
+            exit 1
+          fi
+
+      - name: Подготовить SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${VPS_PORT:-22}" -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Залить файлы на сервер
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          DEPLOY_PATH="${DEPLOY_PATH:-/opt/zvonki}"
+          SSH_CMD="ssh -i ~/.ssh/deploy_key -p ${VPS_PORT:-22} -o StrictHostKeyChecking=yes"
+          RSYNC_OPTS=(-az --human-readable --checksum
+            --exclude 'node_modules'
+            --exclude '.env'
+            --exclude '*.db'
+            --exclude '*.db-journal'
+            --exclude '*.sqlite'
+            --exclude '*.sqlite3'
+            --exclude 'data/')
+
+          echo "--- статика -> $DEPLOY_PATH/public/"
+          rsync "${RSYNC_OPTS[@]}" -e "$SSH_CMD" \
+            public/ "$VPS_USER@$VPS_HOST:$DEPLOY_PATH/public/"
+
+          echo "--- бэкенд -> $DEPLOY_PATH/src/"
+          rsync "${RSYNC_OPTS[@]}" -e "$SSH_CMD" \
+            vps-backend-deployed-copy/src/ "$VPS_USER@$VPS_HOST:$DEPLOY_PATH/src/"
+
+          echo "--- зависимости -> $DEPLOY_PATH/"
+          rsync "${RSYNC_OPTS[@]}" -e "$SSH_CMD" \
+            vps-backend-deployed-copy/package.json \
+            vps-backend-deployed-copy/package-lock.json \
+            "$VPS_USER@$VPS_HOST:$DEPLOY_PATH/"
+
+      - name: Установить зависимости и перезапустить pm2
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          PM2_APP: ${{ vars.PM2_APP }}
+        run: |
+          set -euo pipefail
+          DEPLOY_PATH="${DEPLOY_PATH:-/opt/zvonki}"
+          PM2_APP="${PM2_APP:-zvonki}"
+
+          ssh -i ~/.ssh/deploy_key -p "${VPS_PORT:-22}" \
+            -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' PM2_APP='$PM2_APP' bash -s" <<'REMOTE'
+          set -euo pipefail
+          export PATH="$PATH:/usr/local/bin:/usr/local/sbin:$HOME/.npm-global/bin"
+
+          cd "$DEPLOY_PATH"
+          echo "deploy path: $(pwd)"
+
+          if [ -f package-lock.json ]; then
+            npm ci --omit=dev
+          else
+            npm install --omit=dev
+          fi
+
+          # проверяем синтаксис перед перезапуском, чтобы не уронить живой сервер
+          node --check src/server.js
+
+          if pm2 describe "$PM2_APP" > /dev/null 2>&1; then
+            pm2 reload "$PM2_APP" --update-env
+          else
+            pm2 start src/server.js --name "$PM2_APP"
+          fi
+          pm2 save || true
+
+          sleep 3
+          if curl -fsS -o /dev/null --max-time 10 http://127.0.0.1:3001/; then
+            echo "health check: OK"
+          else
+            echo "health check: НЕ ответил, последние логи:"
+            pm2 logs "$PM2_APP" --lines 40 --nostream || true
+            exit 1
+          fi
+          REMOTE
+
+      - name: Убрать ключ
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
