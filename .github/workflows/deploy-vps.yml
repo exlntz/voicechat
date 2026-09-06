@@ -17,6 +17,9 @@
 # Важно: после заливки идёт сверка md5 ключевых файлов. Если rsync
 # отрапортовал успешно, но файл на сервере не обновился - деплой упадёт,
 # а не покажет ложный зелёный статус.
+#
+# Сверка идёт только по тем файлам, которые реально есть в репозитории:
+# если файл удалили осознанно (как annotate.js), деплой не должен падать.
 
 name: Deploy to VPS
 
@@ -41,8 +44,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # v5 вместо v4: раннеры GitHub больше не поддерживают Node.js 20 внутри actions
       - name: Забрать код
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Проверить, что секреты заданы
         env:
@@ -79,8 +83,6 @@ jobs:
           echo "commit: $GITHUB_SHA"
           md5sum vps-backend-deployed-copy/src/server.js
           md5sum public/static/*.js public/static/*.css || true
-          grep -c 'annotate.js' vps-backend-deployed-copy/src/server.js \
-            || echo "::warning::в vps-backend-deployed-copy/src/server.js нет строки подключения annotate.js"
 
       - name: Залить файлы на сервер
         env:
@@ -135,6 +137,11 @@ jobs:
             local local_path="$1"
             local remote_path="$2"
             local local_md5 remote_md5
+            # файла нет в репозитории (удалили осознанно) - сверять нечего
+            if [ ! -f "$local_path" ]; then
+              echo "SKIP $local_path (нет в репозитории)"
+              return 0
+            fi
             local_md5=$(md5sum "$local_path" | cut -d' ' -f1)
             remote_md5=$($SSH "md5sum '$remote_path' 2>/dev/null | cut -d' ' -f1" || true)
             if [ "$local_md5" = "$remote_md5" ]; then
@@ -149,7 +156,6 @@ jobs:
 
           check vps-backend-deployed-copy/src/server.js "$DEPLOY_PATH/src/server.js"
           check public/static/app.js               "$DEPLOY_PATH/public/static/app.js"
-          check public/static/annotate.js          "$DEPLOY_PATH/public/static/annotate.js"
           check public/static/style.css            "$DEPLOY_PATH/public/static/style.css"
 
           if [ "$fail" != "0" ]; then
@@ -204,11 +210,11 @@ jobs:
             exit 1
           fi
 
-          # проверяем, что сервер реально отдаёт HTML с подключённым annotate.js
+          # рисование на сайте убрано: в отдаваемом HTML annotate.js быть не должно
           if curl -fsS --max-time 10 http://127.0.0.1:3001/ | grep -q 'annotate.js'; then
-            echo "annotate.js подключён в отдаваемом HTML: OK"
+            echo "::warning::в отдаваемом HTML всё ещё есть annotate.js - на сервере старый server.js"
           else
-            echo "::warning::в отдаваемом HTML нет annotate.js"
+            echo "рисование на сайте отключено: OK"
           fi
           REMOTE
 
