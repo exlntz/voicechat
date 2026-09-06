@@ -8,10 +8,6 @@ const fs = require('fs')
 const SERVER_URL = process.env.ZVONKI_SERVER_URL || 'https://app.185.199.199.114.nip.io'
 
 // ---- GPU / аппаратное ускорение кодирования видео (для плавной демонстрации экрана, как в Discord) ----
-// Discord добивается плавности 60 FPS в первую очередь за счёт GPU-энкодера (NVENC/QuickSync/AMF),
-// а не софтверного JS/CPU-кодирования. Chromium (на котором построен Electron) умеет использовать
-// аппаратный видео-энкодер для WebRTC (H264), но по умолчанию иногда отключает его на некоторых GPU
-// из-за блок-листа совместимости. Эти флаги нужно выставить ДО app.whenReady().
 app.commandLine.appendSwitch('enable-accelerated-video-encode')
 app.commandLine.appendSwitch('enable-accelerated-video-decode')
 app.commandLine.appendSwitch('ignore-gpu-blocklist')
@@ -20,9 +16,6 @@ app.commandLine.appendSwitch('enable-gpu-rasterization')
 app.commandLine.appendSwitch('enable-features', 'WebRtcH264WithOpenH264FFmpeg,VaapiVideoEncoder,VaapiVideoDecoder')
 
 // ---- Флаги ради стабильных 60 FPS демонстрации ----
-// По умолчанию Chromium ограничивает частоту кадров захвата и рендера вертикальной синхронизацией
-// и внутренним лимитом - именно поэтому на сайте потолок получается около 40-50 кадров.
-// В своём .exe эти ограничения можно снять - браузер такого не позволяет.
 app.commandLine.appendSwitch('disable-frame-rate-limit')
 app.commandLine.appendSwitch('disable-gpu-vsync')
 app.commandLine.appendSwitch('enable-zero-copy')
@@ -53,27 +46,19 @@ function createMainWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      // Разрешаем доступ к getUserMedia/getDisplayMedia без системного диалога Chromium -
-      // диалог мы рисуем сами через chooseScreenSource()
       sandbox: false,
-      // Без этого Chromium режет частоту кадров и таймеры, когда окно свёрнуто или перекрыто
-      // другим приложением - а при демонстрации экрана окно почти всегда перекрыто.
+      // Без этого Chromium режет частоту кадров и таймеры, когда окно свёрнуто или перекрыто.
       backgroundThrottling: false
     }
   })
 
   Menu.setApplicationMenu(null)
 
-  // Автоматически разрешаем доступ к камере/микрофону (нужно самому пользователю для звонка).
-  // 'fullscreen' обязательно должен быть в списке - это отдельное разрешение Chromium для Fullscreen
-  // API (document.requestFullscreen()). Без него Electron тихо отклоняет ЛЮБОЙ запрос на полноэкранный
-  // режим (кнопка/дабл-клик на тайле демонстрации или камеры) - баг "не открывается на фулл" в .exe.
+  // Автоматически разрешаем доступ к камере/микрофону и fullscreen.
   mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
     const allowed = ['media', 'audioCapture', 'videoCapture', 'display-capture', 'fullscreen']
     callback(allowed.includes(permission))
   })
-  // permissionCheckHandler дополняет permissionRequestHandler - некоторые проверки (в т.ч. fullscreen)
-  // идут именно через check, а не request, и без этого обработчика Electron может отказать по умолчанию.
   mainWindow.webContents.session.setPermissionCheckHandler((webContents, permission) => {
     const allowed = ['media', 'audioCapture', 'videoCapture', 'display-capture', 'fullscreen']
     return allowed.includes(permission)
@@ -84,8 +69,6 @@ function createMainWindow() {
   // ---- Донастройка сайта под десктоп ----
   // Флаги Chromium выше снимают лимит рендера, но этого НЕ достаточно для 60 FPS в стриме:
   // потолок также задают constraints захвата и параметры публикации LiveKit (пресеты 15/30 FPS).
-  // Их можно переопределить только внутри страницы - для этого впрыскиваем site-boost.js.
-  // Скрипт лежит отдельным файлом, а не строкой в коде, чтобы его можно было нормально править.
   mainWindow.webContents.on('did-finish-load', () => {
     let boost = ''
     try {
@@ -102,17 +85,15 @@ function createMainWindow() {
 }
 
 // ===================== Оверлей для рисования поверх экрана =====================
-// Главная идея: это отдельное прозрачное окно без рамки размером во весь монитор, которое
-// висит поверх всех окон ОС. Поскольку оно физически нарисовано на экране, захват экрана
-// забирает его вместе с картинкой - собеседники видят рисунок как часть видео, без отдельного
-// сетевого протокола и без задержки синхронизации.
+// Отдельное прозрачное окно без рамки размером во весь монитор, которое висит поверх всех
+// окон ОС. Поскольку оно физически нарисовано на экране, захват экрана забирает его вместе
+// с картинкой - собеседники видят рисунок как часть видео, без сетевой синхронизации.
 //
 // Три режима:
-//  - скрыт/пассивный: рисунок виден, но клики проходят насквозь;
-//  - рисование: окно ловит мышь, видна панель инструментов, рисуем;
-//  - режим мыши (управляется из overlay.html): рисунок и панель остаются, но клики уходят
-//    в программы под оверлеем везде, кроме самой панели (см. 'overlay-set-ignore-mouse').
-// Переключение - кнопкой в интерфейсе или глобальной горячей клавишей из любого приложения.
+//  - пассивный: рисунок виден, клики проходят насквозь;
+//  - рисование: окно ловит мышь, видна панель инструментов;
+//  - режим мыши (управляется из overlay.html): рисунок и панель остаются на экране, но клики
+//    уходят в программы под оверлеем везде, кроме самой панели (см. 'overlay-set-ignore-mouse').
 
 function getTargetDisplay() {
   const displays = screen.getAllDisplays()
@@ -228,7 +209,6 @@ function hideOverlay() {
 ipcMain.on('overlay-exit', () => setOverlayActive(false))
 ipcMain.on('overlay-hide', () => hideOverlay())
 // Кнопка "Рисовать" из интерфейса сайта (site-boost.js -> preload -> сюда).
-// Горячая клавиша может быть занята другой программой, поэтому нужен явный видимый способ включения.
 ipcMain.on('toggle-drawing', () => toggleOverlayDrawing())
 ipcMain.handle('get-drawing-shortcuts', () => activeShortcuts)
 
@@ -246,4 +226,153 @@ ipcMain.on('overlay-focus', () => {
   if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.focus()
 })
 
-// ---- Обработчик системного выбора 
+// ---- Обработчик системного выбора источника экрана/окна ----
+// Electron сам не показывает системный диалог выбора экрана как в браузере - рисуем свой,
+// и отдаём выбранный источник через setDisplayMediaRequestHandler.
+// Возвращает { source, shareAudio } (или null при отмене).
+function openPickerWindow() {
+  return new Promise((resolve) => {
+    desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 300, height: 200 } })
+      .then((sources) => {
+        pickerWindow = new BrowserWindow({
+          width: 760,
+          height: 620,
+          resizable: false,
+          minimizable: false,
+          maximizable: false,
+          parent: mainWindow,
+          modal: true,
+          backgroundColor: '#0f1115',
+          autoHideMenuBar: true,
+          webPreferences: {
+            preload: path.join(__dirname, 'picker-preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false
+          }
+        })
+
+        pickerWindow.setMenuBarVisibility(false)
+        pickerWindow.loadFile(path.join(__dirname, 'picker.html'))
+
+        const sendSources = () => {
+          pickerWindow.webContents.send('sources-list', sources.map((s) => ({
+            id: s.id,
+            name: s.name,
+            // s.id обычно вида "screen:0:0" или "window:1234:0" - используем это как надёжный
+            // признак типа источника, т.к. поле s.display_id не всегда присутствует
+            type: s.id.startsWith('screen') ? 'screen' : 'window',
+            thumbnail: s.thumbnail.toDataURL()
+          })))
+        }
+
+        pickerWindow.webContents.once('did-finish-load', sendSources)
+
+        const onChosen = (_e, sourceId, shareAudio) => {
+          cleanup()
+          const source = sources.find((s) => s.id === sourceId) || null
+          resolve(source ? { source, shareAudio: shareAudio !== false } : null)
+        }
+        const onCancel = () => {
+          cleanup()
+          resolve(null)
+        }
+        const onClosed = () => {
+          cleanup()
+          resolve(null)
+        }
+
+        function cleanup() {
+          ipcMain.removeListener('picker-choose', onChosen)
+          ipcMain.removeListener('picker-cancel', onCancel)
+          if (pickerWindow) {
+            pickerWindow.removeListener('closed', onClosed)
+            pickerWindow.close()
+            pickerWindow = null
+          }
+        }
+
+        ipcMain.once('picker-choose', onChosen)
+        ipcMain.once('picker-cancel', onCancel)
+        pickerWindow.once('closed', onClosed)
+      })
+      .catch(() => resolve(null))
+  })
+}
+
+// Оставляем IPC-метод для обратной совместимости - возвращает только id источника.
+ipcMain.handle('choose-screen-source', async () => {
+  const picked = await openPickerWindow()
+  return picked ? picked.source.id : null
+})
+
+// ---- Регистрация горячих клавиш с запасными вариантами ----
+// globalShortcut.register возвращает false, если комбинация уже занята другой программой
+// (например, Ctrl+Shift+D любят занимать браузеры и панели GPU) - и раньше это проходило
+// тихо, из-за чего рисование выглядело полностью отсутствующим.
+function registerShortcut(candidates, handler, label) {
+  for (const accel of candidates) {
+    try {
+      if (globalShortcut.register(accel, handler)) {
+        activeShortcuts.push({ action: label, accelerator: accel })
+        return accel
+      }
+    } catch (e) { /* пробуем следующий вариант */ }
+  }
+  return null
+}
+
+app.whenReady().then(() => {
+  createMainWindow()
+
+  // ---- Глобальные горячие клавиши рисования ----
+  // Работают из любого приложения, даже когда наше окно свёрнуто.
+  // F7-F10 идут запасными: одиночные функциональные клавиши редко заняты в системе.
+  registerShortcut(['Control+Shift+D', 'Alt+D', 'F8'], toggleOverlayDrawing, 'вкл/выкл рисования')
+  // Переключение между карандашом и обычной мышкой без выхода из режима рисования:
+  // рисунок и панель остаются на экране, но можно листать и двигать окна.
+  registerShortcut(['Control+Shift+M', 'Alt+M', 'F7'], () => sendOverlayCommand('cursor'), 'мышь/рисование')
+  registerShortcut(['Control+Shift+Z', 'Alt+Z', 'F9'], () => sendOverlayCommand('undo'), 'отмена')
+  registerShortcut(['Control+Shift+X', 'Alt+X', 'F10'], () => sendOverlayCommand('clear'), 'стереть всё')
+
+  // ---- Захват экрана + системного звука для getDisplayMedia() из рендерера ----
+  // 'loopback' поддерживается на Windows (наша целевая платформа).
+  session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
+    try {
+      const picked = await openPickerWindow()
+      if (!picked) {
+        // Пользователь отменил выбор - отдаём пустой результат
+        callback({})
+        return
+      }
+
+      // Если демонстрируется целый экран - сразу готовим оверлей на этом же мониторе,
+      // чтобы рисунок гарантированно попадал в захват. Для захвата отдельного окна это
+      // не работает принципиально: ОС отдаёт содержимое ровно одного окна.
+      if (picked.source.id.startsWith('screen')) {
+        overlayDisplayId = picked.source.display_id || null
+        showOverlayPassive()
+      }
+
+      // ВАЖНО: Electron требует, чтобы ключ audio либо был валидной строкой
+      // ('loopback'/'loopbackWithMute'), либо ПОЛНОСТЬЮ ОТСУТСТВОВАЛ в объекте - передача
+      // audio: undefined кидает TypeError внутри Electron и демонстрация не стартует вообще.
+      const result = { video: picked.source }
+      if (picked.shareAudio) result.audio = 'loopback'
+      callback(result)
+    } catch (e) {
+      callback({})
+    }
+  }, { useSystemPicker: false })
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
+  })
+})
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
+})
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit()
+})
