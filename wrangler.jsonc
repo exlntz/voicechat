@@ -7,8 +7,8 @@
     "nodejs_compat"
   ],
   "vars": {
-    "LIVEKIT_URL": "wss://livekit.185.199.199.114.nip.io",
-    "LIVEKIT_HTTP_URL": "https://livekit.185.199.199.114.nip.io"
+    "LIVEKIT_URL": "wss://livekit.45.86.64.78.nip.io",
+    "LIVEKIT_HTTP_URL": "https://livekit.45.86.64.78.nip.io"
   },
   "d1_databases": [
     {
