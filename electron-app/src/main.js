@@ -5,7 +5,7 @@ const fs = require('fs')
 
 // URL веб-приложения (Cloudflare Pages control-plane + фронтенд).
 // Меняется на реальный адрес после деплоя backend'а.
-const SERVER_URL = process.env.ZVONKI_SERVER_URL || 'https://app.185.199.199.114.nip.io'
+const SERVER_URL = process.env.ZVONKI_SERVER_URL || 'https://app.45.86.64.78.nip.io'
 
 // ---- GPU / аппаратное ускорение кодирования видео (для плавной демонстрации экрана, как в Discord) ----
 app.commandLine.appendSwitch('enable-accelerated-video-encode')
