@@ -4,28 +4,67 @@
 <meta charset="UTF-8" />
 <title>Выберите экран или окно</title>
 <style>
+  /* ═══ АНКЕР · выбор источника демонстрации ═══
+     Тот же язык, что и в вебе: чернила, кость, латунь, нулевые радиусы,
+     плакатный Impact в заголовке, моношрифт в служебных подписях. */
+  :root {
+    --ink: #0F0D0B;
+    --ink-2: #16120E;
+    --ink-3: #1C1712;
+    --bone: #E9E1D0;
+    --bone-dim: #B9AE99;
+    --brass: #B8892F;
+    --brass-lt: #E4BF6C;
+    --lume: #93E7B4;
+    --rule: rgba(233, 225, 208, 0.14);
+    --dsp: Impact, Haettenschweiler, "Arial Narrow Bold", "Franklin Gothic Heavy", sans-serif;
+    --srf: Constantia, "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --mno: Consolas, "Courier New", ui-monospace, monospace;
+    --ease: cubic-bezier(0.16, 0.84, 0.24, 1);
+  }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    background: #0f1115;
-    color: #e8e9ec;
-    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    padding: 16px;
+    background:
+      repeating-linear-gradient(115deg, rgba(233, 225, 208, 0.022) 0 1px, transparent 1px 10px),
+      radial-gradient(100% 70% at 88% 0%, rgba(184, 137, 47, 0.13) 0%, transparent 62%),
+      var(--ink);
+    color: var(--bone);
+    font-family: var(--mno);
+    padding: 18px 18px 16px;
     user-select: none;
   }
   h1 {
-    font-size: 15px;
-    font-weight: 600;
-    margin: 0 0 12px;
-    color: #cfd2d8;
+    font-family: var(--dsp);
+    font-size: 25px;
+    font-weight: 400;
+    line-height: 0.9;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    margin: 0 0 4px;
+    color: var(--bone);
+  }
+  /* Курсивная сноска под заголовком — «подпись мастера» */
+  h1::after {
+    content: "выберите источник · двойной клик — сразу в эфир";
+    display: block;
+    margin-top: 7px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--rule);
+    font: italic 400 12.5px/1.4 var(--srf);
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--brass-lt);
+    opacity: 0.9;
   }
   h2.group-title {
-    font-size: 11px;
-    font-weight: 600;
+    font-family: var(--mno);
+    font-size: 9.5px;
+    font-weight: 400;
     text-transform: uppercase;
-    letter-spacing: .04em;
-    color: #7c8598;
-    margin: 12px 0 6px;
+    letter-spacing: 0.3em;
+    color: var(--brass);
+    margin: 14px 0 8px;
   }
   .grid {
     display: grid;
@@ -36,80 +75,158 @@
   .grids-wrap {
     max-height: 300px;
     overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--brass) transparent;
   }
+  .grids-wrap::-webkit-scrollbar { width: 9px; }
+  .grids-wrap::-webkit-scrollbar-track { background: rgba(233, 225, 208, 0.05); }
+  .grids-wrap::-webkit-scrollbar-thumb { background: rgba(184, 137, 47, 0.55); }
+  .grids-wrap::-webkit-scrollbar-thumb:hover { background: var(--brass); }
+
+  /* Плитка источника: хайрлайн + латунная засечка угла при наведении */
   .item {
-    border: 2px solid transparent;
-    border-radius: 8px;
+    position: relative;
+    border: 1px solid var(--rule);
+    border-radius: 0;
     padding: 6px;
     cursor: pointer;
-    background: #1a1d24;
-    transition: border-color .15s;
+    background: var(--ink-2);
+    transition: border-color 180ms var(--ease), transform 180ms var(--ease), background 180ms var(--ease);
   }
-  .item:hover { border-color: #3b82f6; }
-  .item.selected { border-color: #3b82f6; background: #1c2333; }
+  .item::after {
+    content: "";
+    position: absolute;
+    inset: 4px 4px auto auto;
+    width: 12px; height: 12px;
+    border-top: 1px solid var(--brass-lt);
+    border-right: 1px solid var(--brass-lt);
+    opacity: 0;
+    transition: opacity 180ms var(--ease);
+  }
+  .item:hover { border-color: var(--brass); transform: translateY(-2px); }
+  .item:hover::after { opacity: 1; }
+  .item.selected {
+    border-color: var(--brass-lt);
+    background: var(--ink-3);
+    box-shadow: inset 0 0 0 1px rgba(228, 191, 108, 0.35);
+  }
+  .item.selected::after { opacity: 1; }
   .item img {
     width: 100%;
     height: 90px;
     object-fit: cover;
-    border-radius: 4px;
+    border-radius: 0;
     background: #000;
     display: block;
+    filter: saturate(0.92) contrast(1.04);
   }
   .item .name {
-    font-size: 11px;
-    margin-top: 6px;
+    font-family: var(--mno);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    margin-top: 7px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: #b7bac1;
+    color: var(--bone-dim);
   }
+  .item.selected .name { color: var(--brass-lt); }
+
   .audio-row {
     display: flex;
     align-items: flex-start;
-    gap: 8px;
+    gap: 10px;
     margin-top: 14px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    background: #1a1d24;
+    padding: 11px 13px;
+    border-radius: 0;
+    border: 1px solid var(--rule);
+    border-left: 2px solid var(--brass);
+    background: var(--ink-2);
   }
   .audio-row input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-    margin: 2px 0 0;
-    accent-color: #3b82f6;
+    width: 15px;
+    height: 15px;
+    margin: 1px 0 0;
+    accent-color: var(--brass);
     cursor: pointer;
     flex-shrink: 0;
   }
   .audio-row label {
-    font-size: 13px;
+    font-family: var(--mno);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--bone);
     cursor: pointer;
     display: block;
   }
   .audio-row .audio-hint {
-    font-size: 11px;
-    color: #7c8598;
-    margin-top: 3px;
+    font: italic 400 12px/1.45 var(--srf);
+    color: var(--bone-dim);
+    margin-top: 5px;
   }
   .actions {
     display: flex;
     justify-content: flex-end;
-    gap: 8px;
+    align-items: center;
+    gap: 10px;
     margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--rule);
   }
+  /* Кнопки: мгновенная заливка «маской», моношрифт, нулевой радиус */
   button {
-    border: none;
-    border-radius: 6px;
-    padding: 8px 18px;
-    font-size: 13px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--rule);
+    border-radius: 0;
+    padding: 10px 20px;
+    font-family: var(--mno);
+    font-size: 10.5px;
+    font-weight: 400;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
     cursor: pointer;
-    font-weight: 500;
+    transition: color 200ms var(--ease), border-color 200ms var(--ease), transform 160ms var(--ease);
   }
-  .btn-cancel { background: #2a2e37; color: #d3d5da; }
-  .btn-cancel:hover { background: #343945; }
-  .btn-share { background: #3b82f6; color: #fff; }
-  .btn-share:disabled { background: #2a3550; color: #7c8598; cursor: not-allowed; }
-  .btn-share:not(:disabled):hover { background: #2f6fdb; }
-  .empty-hint { font-size: 12px; color: #7c8598; padding: 8px 0; }
+  button::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--brass);
+    transform: scaleY(0);
+    transform-origin: bottom;
+    transition: transform 260ms var(--ease);
+    z-index: -1;
+  }
+  button > * { position: relative; z-index: 1; }
+  button:not(:disabled):hover::before { transform: scaleY(1); }
+  button:not(:disabled):active { transform: scale(0.985); }
+  button:focus-visible { outline: 2px solid var(--brass-lt); outline-offset: 2px; }
+  .btn-cancel { background: transparent; color: var(--bone-dim); z-index: 0; }
+  .btn-cancel:hover { color: var(--ink); border-color: var(--brass); }
+  .btn-share {
+    background: var(--bone);
+    color: var(--ink);
+    border-color: var(--bone);
+    z-index: 0;
+  }
+  .btn-share::before { background: var(--brass-lt); }
+  .btn-share:disabled {
+    background: transparent;
+    color: rgba(233, 225, 208, 0.3);
+    border-color: var(--rule);
+    cursor: not-allowed;
+  }
+  .empty-hint {
+    font: italic 400 12.5px/1.4 var(--srf);
+    color: var(--bone-dim);
+    padding: 8px 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition-duration: 1ms !important; }
+    .item:hover { transform: none; }
+  }
 </style>
 </head>
 <body>
