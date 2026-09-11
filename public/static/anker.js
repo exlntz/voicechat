@@ -43,28 +43,6 @@
   // Кнопки, которые нельзя трогать: их подпись/содержимое меняет сам app.js или они иконочные
   var BTN_SKIP = '.password-toggle-btn, .fps-toggle-btn, .fps-menu-item, .tile-fullscreen-btn, .tile-kick-btn, .panel-close, .auth-switch-link, .screen-ctx-item'
 
-  var CURSOR_LABELS = [
-    ['.auth-signup .auth-submit-btn', 'аккаунт'],
-    ['.auth-signin .auth-submit-btn', 'вход'],
-    ['.auth-overlay-right .auth-ghost-btn', 'регистрация'],
-    ['.auth-overlay-left .auth-ghost-btn', 'вход'],
-    ['.lobby-logout-btn', 'выход'],
-    ['.test-sound-btn', 'проверка'],
-    ['.leave-btn', 'завершить'],
-    ['.room-code-badge', 'скопировать'],
-    ['.join-toggle-btn', 'вкл / выкл'],
-    ['.lobby-card > button', 'подключиться']
-  ]
-
-  function cursorLabelFor(node) {
-    if (node.dataset && node.dataset.cursor) return node.dataset.cursor
-    for (var i = 0; i < CURSOR_LABELS.length; i++) {
-      if (node.matches(CURSOR_LABELS[i][0])) return CURSOR_LABELS[i][1]
-    }
-    if (node.getAttribute && node.getAttribute('title')) return node.getAttribute('title')
-    return ''
-  }
-
   function enhanceButton(btn) {
     if (btn.matches(BTN_SKIP)) return
 
@@ -77,7 +55,9 @@
         if (n.textContent.trim()) plain += n.textContent
         drop.push(n)
       } else if (n.nodeType === 1 && n.tagName === 'SPAN' && !n.hasAttribute('data-ank') &&
-                 !n.children.length && n.textContent.trim()) {
+                 !n.className && !n.children.length && n.textContent.trim()) {
+        // Забираем только «безымянные» подписи: у служебных span-ов (бейдж счётчика
+        // демонстраций, метка FPS) есть класс — их трогать нельзя.
         plain += n.textContent
         drop.push(n)
       }
@@ -89,10 +69,6 @@
       if (own) { attachMagnet(btn); return }
       // Иконочная кнопка (например .ctrl-btn) — только курсор и магнит
       btn.classList.add('ank-btn')
-      if (!btn.dataset.cursor) {
-        var lbl = cursorLabelFor(btn)
-        if (lbl) btn.dataset.cursor = lbl
-      }
       attachMagnet(btn)
       return
     }
@@ -112,10 +88,6 @@
     btn.appendChild(roll)
     btn.appendChild(make('span', 'btn__dot'))
     btn.classList.add('ank-btn')
-    if (!btn.dataset.cursor) {
-      var lab = cursorLabelFor(btn)
-      if (lab) btn.dataset.cursor = lab
-    }
     attachMagnet(btn)
   }
 
@@ -195,8 +167,6 @@
 
     var label = make('label', 'fld__lbl', phShort)
     label.setAttribute('for', input.id)
-    var caret = make('span', 'fld__caret')
-    caret.setAttribute('aria-hidden', 'true')
     var bar = make('span', 'fld__bar')
     bar.setAttribute('aria-hidden', 'true')
     var msg = make('span', 'fld__msg')
@@ -204,11 +174,10 @@
     msg.dataset.hint = hint
     msg.textContent = hint
 
-    // Порядок важен: label/caret/bar должны идти ПОСЛЕ input — на этом держатся
+    // Порядок важен: label и bar должны идти ПОСЛЕ input — на этом держатся
     // CSS-селекторы всплытия подписи (input:focus ~ .fld__lbl).
     var after = input.nextSibling
     wrap.insertBefore(label, after)
-    wrap.insertBefore(caret, after)
     wrap.insertBefore(bar, after)
     wrap.appendChild(msg)
 
@@ -268,24 +237,21 @@
     }).observe(slot, { attributes: true, attributeFilter: ['style', 'class'], childList: true, characterData: true, subtree: true })
   }
 
-  /* ─────────────── 3. Часы и циферблат-марка ─────────────── */
+  /* ─────────────── 3. Знак-звонок и живые часы ─────────────── */
 
-  var dials = []
   var chips = []
 
-  function makeDial(size) {
-    var d = make('span', 'dialmark')
-    d.setAttribute('aria-hidden', 'true')
+  // Знак вместо логотипа: эмодзи трубки, которое «звонит» (анимация в CSS).
+  // Эмодзи лежит внутри span, чтобы дрожал только глиф, а волны — вокруг него.
+  function makeSigil(size) {
+    var d = make('span', 'ank-sigil')
+    d.setAttribute('role', 'img')
+    d.setAttribute('aria-label', 'звонок')
     if (size) d.style.setProperty('--d', size + 'px')
-    var face = make('span', 'dialmark__face')
-    var h = mark(document.createElement('i')); h.className = 'h'
-    var m = mark(document.createElement('i')); m.className = 'm'
-    var s = mark(document.createElement('i')); s.className = 's'
-    face.appendChild(h); face.appendChild(m); face.appendChild(s)
-    d.appendChild(face)
-    d.appendChild(make('span', 'dialmark__pin'))
-    d.__hands = { h: h, m: m, s: s }
-    dials.push(d)
+    var g = mark(document.createElement('span'))
+    g.className = 'ank-sigil__g'
+    g.textContent = '\ud83d\udcde'
+    d.appendChild(g)
     return d
   }
 
@@ -303,63 +269,102 @@
 
   function pad(n) { return n < 10 ? '0' + n : '' + n }
 
-  function tick() {
+  function tickClock() {
     var now = new Date()
-    var hh = now.getHours(), mm = now.getMinutes(), ss = now.getSeconds(), ms = now.getMilliseconds()
-    // Секундная стрелка «полутиками»: 8 шагов в секунду, как у механизма на 28 800 п/ч
-    var beat = calm() ? ss : ss + Math.floor(ms / 125) / 8
-    for (var i = dials.length - 1; i >= 0; i--) {
-      var d = dials[i]
-      if (!d.isConnected) { dials.splice(i, 1); continue }
-      var hands = d.__hands
-      hands.h.style.transform = 'rotate(' + ((hh % 12) * 30 + mm * 0.5) + 'deg)'
-      hands.m.style.transform = 'rotate(' + (mm * 6 + ss * 0.1) + 'deg)'
-      hands.s.style.transform = 'rotate(' + (beat * 6) + 'deg)'
-    }
+    var txt = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds())
     for (var j = chips.length - 1; j >= 0; j--) {
       var c = chips[j]
       if (!c.isConnected) { chips.splice(j, 1); continue }
-      c.__time.textContent = pad(hh) + ':' + pad(mm) + ':' + pad(ss)
+      if (c.__time.textContent !== txt) c.__time.textContent = txt
     }
-    requestAnimationFrame(tick)
   }
-  requestAnimationFrame(tick)
+  tickClock()
+  setInterval(tickClock, 1000)
 
-  /* ─────────────── 4. Курсор-компаньон ─────────────── */
+  /* ─────────────── 4. След за курсором ─────────────── */
 
-  var cursor = null
-  function initCursor() {
-    if (cursor || !fine() || calm()) return
-    cursor = make('div', 'ank-cursor')
-    var ring = make('span', 'ank-cursor__ring')
-    var dot = make('span', 'ank-cursor__dot')
-    var lbl = make('span', 'ank-cursor__lbl')
-    cursor.appendChild(ring); cursor.appendChild(dot); cursor.appendChild(lbl)
-    document.body.appendChild(cursor)
+  // Вместо кольца вокруг стрелки — сужающаяся латунная лента и тёплое пятно.
+  // Лента: цепочка узлов, каждый догоняет предыдущий, поэтому движение выходит
+  // плавным и слегка запаздывающим; толщина и длина растут со скоростью мыши.
+  var NODES = 9
+  var trail = null
 
-    var tx = window.innerWidth / 2, ty = window.innerHeight / 2, rx = tx, ry = ty
+  function initTrail() {
+    if (trail || !fine() || calm()) return
+
+    trail = make('div', 'ank-pointer')
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    mark(svg)
+    svg.setAttribute('aria-hidden', 'true')
+    var segs = []
+    for (var i = 0; i < NODES - 1; i++) {
+      var ln = document.createElementNS('http://www.w3.org/2000/svg', 'line')
+      svg.appendChild(ln)
+      segs.push(ln)
+    }
+    var aura = make('span', 'ank-aura')
+    trail.appendChild(aura)
+    trail.appendChild(svg)
+    document.body.appendChild(trail)
+
+    var tx = window.innerWidth / 2, ty = window.innerHeight / 2
+    var px = tx, py = ty            // прошлая позиция мыши — для скорости
+    var speed = 0
+    var ax = tx, ay = ty            // пятно идёт мягче самой ленты
+    var nx = [], ny = []
+    for (var k = 0; k < NODES; k++) { nx.push(tx); ny.push(ty) }
+
     window.addEventListener('pointermove', function (e) {
       if (e.pointerType && e.pointerType !== 'mouse') return
       tx = e.clientX; ty = e.clientY
-      cursor.classList.add('is-on')
+      trail.classList.add('is-on')
       var t = e.target
-      // Над видео, ползунками и меню кольцо мешает — прячем
+      // Над видео, ползунками и меню след мешает смотреть — гасим
       var mute = t.closest('.tile, video, input[type="range"], .screen-ctx-menu, .screen-ctx-submenu, select')
-      cursor.classList.toggle('is-off', !!mute)
-      var hot = t.closest('a, button, label, [data-cursor], .room-code-badge')
-      cursor.classList.toggle('is-hot', !!hot && !mute)
-      lbl.textContent = hot && !mute ? (hot.dataset.cursor || cursorLabelFor(hot) || '') : ''
+      trail.classList.toggle('is-off', !!mute)
+      trail.classList.toggle('is-hot', !mute && !!t.closest('a, button, label, .room-code-badge, input'))
     }, { passive: true })
-    window.addEventListener('pointerleave', function () { cursor.classList.remove('is-on') })
-    document.addEventListener('mouseleave', function () { cursor.classList.remove('is-on') })
+
+    var hide = function () { trail.classList.remove('is-on') }
+    window.addEventListener('blur', hide)
+    document.addEventListener('mouseleave', hide)
 
     ;(function loop() {
-      rx += (tx - rx) * 0.16
-      ry += (ty - ry) * 0.16
-      ring.style.transform = 'translate(' + rx.toFixed(1) + 'px,' + ry.toFixed(1) + 'px)' +
-        (cursor.classList.contains('is-hot') ? ' scale(1.8)' : '')
-      dot.style.transform = 'translate(' + tx + 'px,' + ty + 'px)'
-      lbl.style.transform = 'translate(' + (rx + 18).toFixed(1) + 'px,' + (ry + 16).toFixed(1) + 'px)'
+      // мгновенная скорость, сглаженная по кадрам
+      var vx = tx - px, vy = ty - py
+      px = tx; py = ty
+      var v = Math.min(Math.sqrt(vx * vx + vy * vy), 90)
+      speed += (v - speed) * 0.18
+
+      // голова цепочки догоняет мышь, остальные — предыдущий узел
+      nx[0] += (tx - nx[0]) * 0.34
+      ny[0] += (ty - ny[0]) * 0.34
+      for (var i = 1; i < NODES; i++) {
+        var k = 0.4 - i * 0.012
+        nx[i] += (nx[i - 1] - nx[i]) * k
+        ny[i] += (ny[i - 1] - ny[i]) * k
+      }
+
+      var boost = 1 + speed / 30
+      for (var j = 0; j < segs.length; j++) {
+        var s = segs[j]
+        s.setAttribute('x1', nx[j].toFixed(1))
+        s.setAttribute('y1', ny[j].toFixed(1))
+        s.setAttribute('x2', nx[j + 1].toFixed(1))
+        s.setAttribute('y2', ny[j + 1].toFixed(1))
+        // лента сужается к хвосту и толстеет на быстрых движениях
+        s.setAttribute('stroke-width', (Math.max(0.5, 3 - j * 0.32) * boost).toFixed(2))
+        s.setAttribute('stroke-opacity', (Math.max(0.05, 0.62 - j * 0.066) * Math.min(1, 0.42 + speed / 16)).toFixed(3))
+      }
+
+      // пятно света: мягче и с лёгким растяжением по вектору движения
+      ax += (tx - ax) * 0.09
+      ay += (ty - ay) * 0.09
+      var stretch = Math.min(speed / 150, 0.34)
+      var ang = Math.atan2(vy, vx) * 180 / Math.PI
+      aura.style.transform = 'translate3d(' + ax.toFixed(1) + 'px,' + ay.toFixed(1) + 'px,0) rotate(' +
+        ang.toFixed(1) + 'deg) scale(' + (1 + stretch).toFixed(3) + ',' + (1 - stretch * 0.62).toFixed(3) + ')'
+
       requestAnimationFrame(loop)
     })()
   }
@@ -411,12 +416,12 @@
     // Циферблат-марка и техническая сноска на «бумажной» панели
     var right = $('.auth-overlay-right', container)
     var left = $('.auth-overlay-left', container)
-    if (right && !$('.dialmark', right)) {
-      right.insertBefore(makeDial(62), right.firstChild)
+    if (right && !$('.ank-sigil', right)) {
+      right.insertBefore(makeSigil(62), right.firstChild)
       right.appendChild(make('p', 'ank-note', 'аккаунт нужен, чтобы вас видели по имени, а не «гость-3f8a»'))
     }
-    if (left && !$('.dialmark', left)) {
-      left.insertBefore(makeDial(62), left.firstChild)
+    if (left && !$('.ank-sigil', left)) {
+      left.insertBefore(makeSigil(62), left.firstChild)
       left.appendChild(make('p', 'ank-note', 'пароль храним хэшем pbkdf2 · 100 000 итераций · сессия 30 дней'))
     }
 
@@ -436,7 +441,7 @@
       var tx = make('div', 'ank-brand__tx')
       tx.appendChild(make('div', 'ank-brand__idx', '01 / связь без впн'))
       card.insertBefore(brand, h1)
-      brand.appendChild(makeDial(46))
+      brand.appendChild(makeSigil(46))
       brand.appendChild(tx)
       tx.appendChild(h1)
     }
@@ -461,8 +466,8 @@
     if (screen.__ankDone) return
     screen.__ankDone = true
     var topbar = $('.room-topbar', screen)
-    if (topbar && !$('.dialmark', topbar)) {
-      topbar.insertBefore(makeDial(28), topbar.firstChild)
+    if (topbar && !$('.ank-sigil', topbar)) {
+      topbar.insertBefore(makeSigil(30), topbar.firstChild)
       var last = topbar.lastElementChild
       topbar.insertBefore(makeChip('сеанс'), last)
     }
@@ -473,7 +478,7 @@
 
   function enhance(scope) {
     var ctx = scope && scope.nodeType === 1 ? scope : document
-    initCursor()
+    initTrail()
 
     $$(BTN_SEL, ctx).forEach(enhanceButton)
     if (ctx.matches && ctx.matches(BTN_SEL)) enhanceButton(ctx)
