@@ -1,8 +1,8 @@
 {
   "name": "zvonki-desktop",
-  "productName": "Звонки",
+  "productName": "Voice Lobby",
   "version": "1.0.0",
-  "description": "Десктопное приложение для видеозвонков без ВПН",
+  "description": "Voice Lobby — десктопное приложение для видеозвонков",
   "main": "src/main.js",
   "author": "Zvonki",
   "license": "UNLICENSED",
@@ -17,7 +17,7 @@
   },
   "build": {
     "appId": "com.zvonki.desktop",
-    "productName": "Звонки",
+    "productName": "Voice Lobby",
     "asar": true,
     "directories": {
       "output": "release"

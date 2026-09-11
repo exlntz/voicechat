@@ -94,13 +94,7 @@
     }, 200)
   }
 
-  // ---- 3. Интерфейс сайта тоже стартует с 60 ----
-  try {
-    if (window.state) window.state.screenShareFps = TARGET_FPS
-    if (typeof window.applyScreenShareFps === 'function') window.applyScreenShareFps(TARGET_FPS)
-  } catch (e) {}
-
-  // ---- 4. Кнопка рисования в интерфейсе ----
+  // ---- 3. Кнопка рисования в интерфейсе ----
   // Раньше оверлей вызывался только горячей клавишей - если она занята другой
   // программой, рисование выглядело как «его нет». Теперь есть видимая кнопка.
   function addDrawButton() {
@@ -114,10 +108,13 @@
     btn.textContent = '✏️ Рисовать'
     btn.style.cssText = [
       'position:fixed', 'right:16px', 'bottom:16px', 'z-index:2147483000',
-      'padding:10px 14px', 'border-radius:10px', 'border:1px solid rgba(255,255,255,.18)',
-      'background:#1f2430', 'color:#fff', 'font:600 14px/1 system-ui,sans-serif',
-      'cursor:pointer', 'box-shadow:0 6px 20px rgba(0,0,0,.35)'
+      'padding:11px 16px', 'border-radius:12px', 'border:1px solid rgba(4,88,207,.55)',
+      'background:#0458cf', 'color:#fff', 'font:600 14px/1 system-ui,sans-serif',
+      'cursor:pointer', 'box-shadow:0 10px 24px rgba(4,88,207,.3)',
+      'user-select:none', '-webkit-user-select:none'
     ].join(';')
+    btn.addEventListener('mouseenter', function () { btn.style.background = '#0b68e8' })
+    btn.addEventListener('mouseleave', function () { btn.style.background = '#0458cf' })
 
     btn.addEventListener('click', function () {
       try {

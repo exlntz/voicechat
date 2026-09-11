@@ -7,6 +7,12 @@ const fs = require('fs')
 // Меняется на реальный адрес после деплоя backend'а.
 const SERVER_URL = process.env.ZVONKI_SERVER_URL || 'https://voicelobby.online'
 
+// Продукт теперь называется Voice Lobby, но папка данных остаётся прежней:
+// иначе у всех, кто уже вошёл в приложении, слетела бы сессия и настройки устройств.
+try {
+  app.setPath('userData', path.join(app.getPath('appData'), 'Звонки'))
+} catch (e) {}
+
 // ---- GPU / аппаратное ускорение кодирования видео (для плавной демонстрации экрана, как в Discord) ----
 app.commandLine.appendSwitch('enable-accelerated-video-encode')
 app.commandLine.appendSwitch('enable-accelerated-video-decode')

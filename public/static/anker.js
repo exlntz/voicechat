@@ -1,15 +1,17 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   anker.js — слой микровзаимодействий «АНКЕР» поверх готового интерфейса.
+   anker.js — слой микровзаимодействий Voice Lobby поверх готового интерфейса.
 
    Принцип: скрипт НИЧЕГО не рендерит сам и не трогает бизнес-логику app.js.
    Он только «дооснащает» уже отрисованные узлы:
      · кнопки   — двойной перекатывающийся лейбл, точка-маркер, магнит к курсору;
-     · поля     — всплывающая подпись, латунное подчёркивание, печатающаяся
-                  подсказка, тряска при ошибке;
-     · экраны   — однократное появление блоков, параллакс фонового слова,
-                  живые часы и циферблат-марка (стрелки крутятся по реальному
-                  времени, секундная — «полутиками», 8 шагов в секунду);
-     · курсор   — кольцо-компаньон с подписью текущего действия.
+     · поля     — всплывающая подпись, подчёркивание, печатающаяся подсказка,
+                  подсветка при ошибке;
+     · экраны   — однократное появление блоков, параллакс, знак продукта;
+     · курсор   — мягкий след за мышью.
+
+   Служебных надписей (техническая сноска о хранении пароля, номера разделов,
+   таймер сеанса и часы) здесь больше нет: интерфейс показывает пользователю
+   только то, что ему нужно.
 
    app.js перерисовывает экраны целиком (root.innerHTML = ''), поэтому все
    улучшения навешиваются повторно через MutationObserver. Собственные вставки
@@ -41,7 +43,7 @@
   // Кнопки, которые оформляем «как на витрине»: текст перекатывается, точка раздувается.
   var BTN_SEL = '.auth-submit-btn, .auth-ghost-btn, .lobby-logout-btn, .test-sound-btn, .leave-btn, .join-toggle-btn, .lobby-card > button'
   // Кнопки, которые нельзя трогать: их подпись/содержимое меняет сам app.js или они иконочные
-  var BTN_SKIP = '.password-toggle-btn, .fps-toggle-btn, .fps-menu-item, .tile-fullscreen-btn, .tile-kick-btn, .panel-close, .auth-switch-link, .screen-ctx-item'
+  var BTN_SKIP = '.password-toggle-btn, .tile-fullscreen-btn, .tile-kick-btn, .panel-close, .auth-switch-link, .screen-ctx-item, .solo-copy-btn'
 
   function enhanceButton(btn) {
     if (btn.matches(BTN_SKIP)) return
@@ -118,12 +120,12 @@
   // Короткие моноширинные подсказки под строкой: подбираются по плейсхолдеру,
   // чтобы не дублировать его же текст всплывающей подписью.
   var HINTS = [
-    [/^юзернейм \(для входа\)/i, 'латиница, цифры, _ и -, 3–24 символа'],
+    [/^юзернейм \(для входа\)/i, 'английские буквы, цифры, _ и -'],
     [/^юзернейм/i, 'тот, с которым регистрировались'],
     [/^пароль \(мин/i, 'минимум 6 символов'],
     [/^пароль/i, 'пароль от аккаунта'],
     [/^отображаемое имя/i, 'его видят другие участники звонка'],
-    [/^код комнаты/i, 'пусто — создадим новую комнату']
+    [/^код комнаты/i, 'оставьте пустым — создадим новую']
   ]
 
   function hintFor(ph) {
@@ -237,9 +239,7 @@
     }).observe(slot, { attributes: true, attributeFilter: ['style', 'class'], childList: true, characterData: true, subtree: true })
   }
 
-  /* ─────────────── 3. Знак-звонок и живые часы ─────────────── */
-
-  var chips = []
+  /* ─────────────── 3. Знак продукта ─────────────── */
 
   // Знак вместо логотипа: эмодзи трубки, которое «звонит» (анимация в CSS).
   // Эмодзи лежит внутри span, чтобы дрожал только глиф, а волны — вокруг него.
@@ -255,35 +255,9 @@
     return d
   }
 
-  function makeChip(caption) {
-    var c = make('span', 'clockchip')
-    var dot = mark(document.createElement('i'))
-    var cap = mark(document.createElement('b'))
-    cap.textContent = caption
-    var time = mark(document.createElement('span'))
-    c.appendChild(dot); c.appendChild(cap); c.appendChild(time)
-    c.__time = time
-    chips.push(c)
-    return c
-  }
-
-  function pad(n) { return n < 10 ? '0' + n : '' + n }
-
-  function tickClock() {
-    var now = new Date()
-    var txt = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds())
-    for (var j = chips.length - 1; j >= 0; j--) {
-      var c = chips[j]
-      if (!c.isConnected) { chips.splice(j, 1); continue }
-      if (c.__time.textContent !== txt) c.__time.textContent = txt
-    }
-  }
-  tickClock()
-  setInterval(tickClock, 1000)
-
   /* ─────────────── 4. След за курсором ─────────────── */
 
-  // Вместо кольца вокруг стрелки — сужающаяся латунная лента и тёплое пятно.
+  // Вместо кольца вокруг стрелки — сужающаяся синяя лента и мягкое свечение.
   // Лента: цепочка узлов, каждый догоняет предыдущий, поэтому движение выходит
   // плавным и слегка запаздывающим; толщина и длина растут со скоростью мыши.
   var NODES = 9
@@ -408,22 +382,12 @@
     if (!container || container.__ankDone) return
     container.__ankDone = true
 
-    var signin = $('.auth-signin', container)
-    var signup = $('.auth-signup', container)
-    if (signin) signin.setAttribute('data-index', '01 / вход')
-    if (signup) signup.setAttribute('data-index', '02 / регистрация')
-
-    // Циферблат-марка и техническая сноска на «бумажной» панели
+    // Знак продукта на акцентной панели. Технических сносок (как хранится пароль,
+    // сколько живёт сессия, номера разделов) в интерфейсе быть не должно.
     var right = $('.auth-overlay-right', container)
     var left = $('.auth-overlay-left', container)
-    if (right && !$('.ank-sigil', right)) {
-      right.insertBefore(makeSigil(62), right.firstChild)
-      right.appendChild(make('p', 'ank-note', 'аккаунт нужен, чтобы вас видели по имени, а не «гость-3f8a»'))
-    }
-    if (left && !$('.ank-sigil', left)) {
-      left.insertBefore(makeSigil(62), left.firstChild)
-      left.appendChild(make('p', 'ank-note', 'пароль храним хэшем pbkdf2 · 100 000 итераций · сессия 30 дней'))
-    }
+    if (right && !$('.ank-sigil', right)) right.insertBefore(makeSigil(60), right.firstChild)
+    if (left && !$('.ank-sigil', left)) left.insertBefore(makeSigil(60), left.firstChild)
 
     attachParallax(screen)
     reveal([container])
@@ -434,28 +398,15 @@
     if (!card || card.__ankDone) return
     card.__ankDone = true
 
-    // Шапка: циферблат + нумерованный колонтитул + плакатный заголовок
+    // Шапка: знак продукта + название
     var h1 = $('h1', card)
     if (h1 && !$('.ank-brand', card)) {
       var brand = make('div', 'ank-brand')
       var tx = make('div', 'ank-brand__tx')
-      tx.appendChild(make('div', 'ank-brand__idx', '01 / связь без впн'))
       card.insertBefore(brand, h1)
-      brand.appendChild(makeSigil(46))
+      brand.appendChild(makeSigil(44))
       brand.appendChild(tx)
       tx.appendChild(h1)
-    }
-
-    // Живые часы рядом с именем пользователя
-    var bar = $('.lobby-userbar', card)
-    if (bar && !$('.clockchip', bar)) {
-      var nameRow = $(':scope > span', bar)
-      if (nameRow) {
-        var row = make('div', 'ank-userrow')
-        bar.insertBefore(row, nameRow)
-        row.appendChild(nameRow)
-        row.appendChild(makeChip('сейчас'))
-      }
     }
 
     attachParallax(screen)
@@ -468,8 +419,6 @@
     var topbar = $('.room-topbar', screen)
     if (topbar && !$('.ank-sigil', topbar)) {
       topbar.insertBefore(makeSigil(30), topbar.firstChild)
-      var last = topbar.lastElementChild
-      topbar.insertBefore(makeChip('сеанс'), last)
     }
     reveal([topbar, $('.controls-bar', screen)].filter(Boolean))
   }

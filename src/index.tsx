@@ -382,11 +382,11 @@ app.get('/api/rooms/:code', async (c) => {
 
 // ---------- Frontend ----------
 app.get('/', (c) => {
-  return c.render(<div id="app-root"></div>, { title: 'Звонки — Главная' })
+  return c.render(<div id="app-root"></div>, { title: 'Voice Lobby' })
 })
 
 app.get('/room/:code', (c) => {
-  return c.render(<div id="app-root"></div>, { title: 'Звонки — Комната' })
+  return c.render(<div id="app-root"></div>, { title: 'Voice Lobby — комната' })
 })
 
 export default app

@@ -1,4 +1,4 @@
-// ===================== Звонки: клиентское приложение =====================
+// ===================== Voice Lobby: клиентское приложение =====================
 // Работает как в браузере, так и внутри Electron (window.electronAPI, если доступен)
 const LK = window.LivekitClient
 const IS_ELECTRON = !!window.electronAPI
@@ -19,12 +19,20 @@ const state = {
   selectedSpeakerId: null,
   isHost: false, // является ли текущий пользователь создателем комнаты
   hostSecret: null, // секрет для управления комнатой (выгон участников), известен только создателю
-  screenShareFps: Number(localStorage.getItem('screenShareFps')) || 60, // выбранный FPS для демонстрации экрана (запоминается между звонками)
   // "Поделиться звуком стрима" - по умолчанию ВКЛЮЧЕНО (звук демонстрации должен быть слышен всегда,
   // если явно не выключен пользователем через кастомное контекстное меню на тайле демонстрации)
-  screenShareAudioShared: localStorage.getItem('screenShareAudioShared') !== '0',
-  screenShareContentHint: localStorage.getItem('screenShareContentHint') || 'motion' // 'motion' | 'detail'
+  screenShareAudioShared: localStorage.getItem('screenShareAudioShared') !== '0'
 }
+
+// ---- Демонстрация экрана: параметры без выбора в интерфейсе ----
+// Раньше рядом с кнопкой демонстрации был селектор 15/30/60 FPS и подменю
+// "Оптимизировать: движение/чёткость". Обычному пользователю эти настройки непонятны, а
+// правильный выбор для звонка всегда один и тот же, поэтому селекторы убраны, а значения
+// зафиксированы: максимальная плавность (60 кадров, высокий битрейт, contentHint = motion).
+// Дальше их подхватывают и degradationPreference: 'balanced', и site-boost.js в .exe.
+const SCREEN_SHARE_FPS = 60
+const SCREEN_SHARE_BITRATE = 8_000_000 // 8 Мбит/с - запас для 60 кадров без просадок
+const SCREEN_SHARE_CONTENT_HINT = 'motion' // плавность важнее резкости текста в звонке
 
 const root = document.getElementById('app-root')
 
@@ -140,7 +148,7 @@ function renderAuthScreen(afterLoginRoomCode = '') {
 
   const registerPanel = el('div', { class: 'auth-form-panel auth-signup' }, [
     el('h1', {}, 'Регистрация'),
-    el('div', { class: 'auth-form-hint' }, 'Имя - любой язык · Юзернейм - латиница/цифры/_/-, 3-24 символа'),
+    el('div', { class: 'auth-form-hint' }, 'Создайте аккаунт, чтобы заходить в звонки с любого устройства'),
     registerErrorSlot,
     registerDisplayName,
     registerUsername,
@@ -153,6 +161,7 @@ function renderAuthScreen(afterLoginRoomCode = '') {
   // левая CTA = "уже есть аккаунт") ----
   const toRegisterBtn = el('button', { type: 'button', class: 'auth-ghost-btn' }, 'Регистрация')
   const overlayRight = el('div', { class: 'auth-overlay-panel auth-overlay-right' }, [
+    el('div', { class: 'auth-brand' }, 'Voice Lobby'),
     el('h1', {}, 'Привет!'),
     el('p', {}, 'Введите логин и пароль, чтобы начать пользоваться сервисом'),
     toRegisterBtn
@@ -160,6 +169,7 @@ function renderAuthScreen(afterLoginRoomCode = '') {
 
   const toLoginBtn = el('button', { type: 'button', class: 'auth-ghost-btn' }, 'Войти')
   const overlayLeft = el('div', { class: 'auth-overlay-panel auth-overlay-left' }, [
+    el('div', { class: 'auth-brand' }, 'Voice Lobby'),
     el('h1', {}, 'С возвращением!'),
     el('p', {}, 'Чтобы продолжить, войдите с вашим логином и паролем'),
     toLoginBtn
@@ -171,6 +181,8 @@ function renderAuthScreen(afterLoginRoomCode = '') {
   container.appendChild(loginPanel)
   container.appendChild(registerPanel)
   container.appendChild(overlayContainer)
+  // На телефоне акцентная панель с названием скрыта — выводим название отдельной шапкой
+  screen.appendChild(el('div', { class: 'auth-brand-mobile' }, 'Voice Lobby'))
   screen.appendChild(container)
   root.appendChild(screen)
 
@@ -279,8 +291,7 @@ async function renderLobby(prefillRoomCode = '') {
   const screen = el('div', { class: 'lobby-screen' })
   const card = el('div', { class: 'lobby-card' })
 
-  card.appendChild(el('h1', {}, IS_ELECTRON ? 'Звонки' : 'Звонки (веб)'))
-  card.appendChild(el('div', { class: 'subtitle' }, 'Качественная связь без ВПН · до 5 участников · 2 демонстрации экрана в 60 FPS'))
+  card.appendChild(el('h1', {}, 'Voice Lobby'))
 
   const userBar = el('div', { class: 'lobby-userbar' })
   userBar.appendChild(el('span', {}, [el('i', { class: 'fas fa-user' }), ` ${state.currentUser.displayName || state.currentUser.username}`]))
@@ -298,7 +309,7 @@ async function renderLobby(prefillRoomCode = '') {
 
   // Device preview
   const preview = el('div', { class: 'device-preview' })
-  const previewVideo = el('video', { autoplay: true, muted: true, playsinline: true })
+  const previewVideo = el('video', { autoplay: true, muted: true, playsinline: true, 'webkit-playsinline': 'true' })
   const noCam = el('div', { class: 'no-cam' }, 'Камера отключена')
   preview.appendChild(previewVideo)
   preview.appendChild(noCam)
@@ -387,7 +398,7 @@ async function renderLobby(prefillRoomCode = '') {
   const joinBtn = el('button', {}, urlRoom ? 'Войти в комнату' : 'Создать / войти')
   card.appendChild(joinBtn)
 
-  const hint = el('div', { class: 'hint-text' }, 'Поделитесь кодом комнаты с другими для совместного звонка (до 5 человек).')
+  const hint = el('div', { class: 'hint-text' }, 'Поделитесь кодом комнаты с теми, кого хотите позвать в звонок.')
   card.appendChild(hint)
 
   screen.appendChild(card)
@@ -694,46 +705,15 @@ async function enterRoom(joinData) {
   // Демонстрация экрана через getDisplayMedia() не поддерживается в большинстве мобильных
   // браузеров (iOS Safari/Chrome, Android Chrome вне десктоп-режима) - без проверки пользователь
   // на телефоне видел бы активную кнопку, а по нажатию получал бы непонятную ошибку/тишину.
-  // Скрываем кнопку и FPS-переключатель целиком, если API физически отсутствует.
+  // Скрываем кнопку целиком, если API физически отсутствует.
   const canScreenShare = !!(navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === 'function')
-
-  // ---- Выбор FPS для демонстрации экрана: кнопка-шеврон открывает мини-меню с вариантами ----
-  const FPS_OPTIONS = [15, 30, 60]
-  const fpsGroup = el('div', { class: 'screen-fps-group' })
-  const fpsBtn = el('button', { class: 'ctrl-btn fps-toggle-btn', title: 'Частота кадров демонстрации' }, [
-    el('span', { class: 'fps-toggle-label' }, `${state.screenShareFps}`),
-    el('i', { class: 'fas fa-chevron-up fps-toggle-caret' })
-  ])
-  const fpsMenu = el('div', { class: 'fps-menu', style: 'display:none' })
-  FPS_OPTIONS.forEach((fps) => {
-    const item = el('button', { type: 'button', class: `fps-menu-item${fps === state.screenShareFps ? ' selected' : ''}` }, `${fps} FPS`)
-    item.addEventListener('click', (e) => {
-      e.stopPropagation()
-      state.screenShareFps = fps
-      localStorage.setItem('screenShareFps', String(fps))
-      fpsMenu.querySelectorAll('.fps-menu-item').forEach((el2) => el2.classList.remove('selected'))
-      item.classList.add('selected')
-      fpsBtn.querySelector('.fps-toggle-label').textContent = String(fps)
-      fpsMenu.style.display = 'none'
-      applyScreenShareFps(fps) // если демка уже идёт - применяем новое значение "живьём"
-    })
-    fpsMenu.appendChild(item)
-  })
-  fpsBtn.addEventListener('click', (e) => {
-    e.stopPropagation()
-    fpsMenu.style.display = fpsMenu.style.display === 'none' ? 'flex' : 'none'
-  })
-  document.addEventListener('click', () => { fpsMenu.style.display = 'none' })
-  fpsGroup.appendChild(screenBtn)
-  fpsGroup.appendChild(fpsBtn)
-  fpsGroup.appendChild(fpsMenu)
 
   const divider1 = el('div', { class: 'ctrl-divider' })
   const leaveBtn = el('button', { class: 'leave-btn' }, [el('i', { class: 'fas fa-phone-slash' }), ' Выйти'])
 
   controls.appendChild(micBtn)
   controls.appendChild(camBtn)
-  if (canScreenShare) controls.appendChild(fpsGroup)
+  if (canScreenShare) controls.appendChild(screenBtn)
   controls.appendChild(divider1)
   controls.appendChild(leaveBtn)
   screen.appendChild(controls)
@@ -770,92 +750,201 @@ async function enterRoom(joinData) {
     roomInfo.querySelector('span:nth-child(2)').textContent = text
   }
 
-  function relayout() {
-    // Камеры/аватары участников -> stage (центрированный flex, как в Discord). Демки экрана ->
-    // stage приоритетно, камеры уходят в сайдбар если есть демки.
-    const hasScreenShares = state.screenShares.size > 0
-    const cameraTiles = Array.from(document.querySelectorAll('.camera-tile'))
-    const screenTiles = Array.from(document.querySelectorAll('.screen-tile'))
-    // На узких экранах (телефон, особенно портретная ориентация) сетке физически негде
-    // расположить несколько колонок без сильного сжатия каждого тайла - принудительно
-    // уменьшаем число колонок, независимо от того, сколько тайлов реально помещалось бы
-    // на десктопе. Порог 860px совпадает с медиа-запросом в CSS, где сайдбар демок
-    // становится горизонтальной "плёнкой" под сценой вместо вертикальной колонки справа.
-    const isNarrow = window.innerWidth <= 860
+  // ---- Приглашение, когда в звонке пока только ты ----
+  // Отдельная раскладка "пустой комнаты": слева большая карточка себя (камера или аккуратные
+  // инициалы), справа - призыв позвать других и крупная кнопка "Скопировать ссылку".
+  // Как только подключается второй участник, карточка убирается и сетка становится обычной.
+  let soloInviteCard = null
+  let soloCopyTimer = null
 
-    stage.innerHTML = ''
-    sidebar.innerHTML = ''
-    stage.classList.add('stage-centered')
-    stage.classList.remove('screen-count-2')
+  function copyTextFallback(text) {
+    // Clipboard API недоступен (нет https/разрешения) - копируем через скрытое textarea.
+    // Выделение текста в интерфейсе отключено через CSS, но у input/textarea оно
+    // сохранено (user-select: text), поэтому execCommand('copy') здесь работает.
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.setAttribute('readonly', '')
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none'
+      document.body.appendChild(ta)
+      ta.select()
+      ta.setSelectionRange(0, text.length)
+      const ok = document.execCommand('copy')
+      ta.remove()
+      return ok
+    } catch {
+      return false
+    }
+  }
+
+  function getSoloInviteCard() {
+    if (soloInviteCard) return soloInviteCard
+
+    const btnIcon = el('i', { class: 'fas fa-link' })
+    const btnLabel = el('span', {}, 'Скопировать ссылку')
+    const copyBtn = el('button', { type: 'button', class: 'solo-copy-btn' }, [btnIcon, btnLabel])
+
+    copyBtn.addEventListener('click', async () => {
+      // Реальный адрес комнаты - ровно то, что открыто в адресной строке
+      const link = location.href
+      let ok = false
+      try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          await navigator.clipboard.writeText(link)
+          ok = true
+        }
+      } catch {
+        ok = false
+      }
+      if (!ok) ok = copyTextFallback(link)
+
+      if (!ok) {
+        showToast('Не удалось скопировать ссылку', 'error')
+        return
+      }
+      // Короткое подтверждение прямо на кнопке + тост
+      copyBtn.classList.add('is-copied')
+      btnIcon.className = 'fas fa-check'
+      btnLabel.textContent = 'Ссылка скопирована'
+      showToast('Ссылка на звонок скопирована', 'success')
+      clearTimeout(soloCopyTimer)
+      soloCopyTimer = setTimeout(() => {
+        copyBtn.classList.remove('is-copied')
+        btnIcon.className = 'fas fa-link'
+        btnLabel.textContent = 'Скопировать ссылку'
+      }, 2200)
+    })
+
+    soloInviteCard = el('div', { class: 'solo-invite' }, [
+      el('h2', { class: 'solo-invite__title' }, 'Чтобы пригласить других участников, отправьте им ссылку на звонок'),
+      copyBtn,
+      el('div', { class: 'solo-invite__code' }, ['Код комнаты: ', el('b', {}, state.roomCode || '')]),
+      el('p', { class: 'solo-invite__hint' }, 'Как только кто-то подключится, он появится рядом с вами.')
+    ])
+    return soloInviteCard
+  }
+
+  // ---- Инкрементальная расстановка узлов в контейнере ----
+  // Переставляет только то, что реально изменилось: узлы, которых быть не должно, убираются,
+  // остальные двигаются в нужный порядок. Если изменений нет - DOM не трогается вообще.
+  function placeTiles(container, nodes) {
+    for (const child of Array.from(container.children)) {
+      if (!nodes.includes(child)) child.remove()
+    }
+    nodes.forEach((node, i) => {
+      const current = container.children[i]
+      if (current !== node) container.insertBefore(node, current || null)
+    })
+  }
+
+  function relayout() {
+    // ВАЖНО ("баг: при уменьшении окна Chrome демонстрация исчезает и остаётся пустое место"):
+    // раньше эта функция брала тайлы из document.querySelectorAll('.camera-tile'/'.screen-tile')
+    // и начинала с stage.innerHTML = '' / sidebar.innerHTML = ''. Источником правды был DOM, а не
+    // screenTilesMap/cameraTilesMap - поэтому любой тайл, который на момент вызова оказался вне
+    // документа (его только что вынули из контейнера, видео ушло в PiP-окно, пришла гонка событий
+    // LiveKit), в выборку не попадал, а затем терялся вместе с очищенным контейнером: демонстрация
+    // продолжала идти (счётчик на кнопке показывал 1), но на сцене оставалась пустая область. Чаще
+    // всего relayout() вызывает именно resize окна - отсюда "исчезает при уменьшении окна Chrome".
+    // Плюс innerHTML='' физически вынимал <video> из документа и ставил его на паузу ("чёрный
+    // экран" после выхода из fullscreen). Теперь источник правды - Map'ы тайлов, а DOM приводится
+    // к нужному виду инкрементально (placeTiles): при обычном ресайзе узлы не переставляются
+    // вовсе, трек не переподключается, демонстрация не мигает и не может пропасть.
+    const screenTiles = Array.from(screenTilesMap.values(), (t) => t.tile)
+    const cameraTiles = Array.from(cameraTilesMap.values(), (t) => t.tile)
+    const hasScreenShares = screenTiles.length > 0
+    // "Я один в комнате" - особая раскладка с приглашением (см. getSoloInviteCard)
+    const isSolo = !hasScreenShares && cameraTiles.length === 1
+    // Две демонстрации рядом имеют смысл только на очень широкой сцене: паре кадров 16:9
+    // нужна пропорция около 32:9, иначе друг под другом они получаются заметно крупнее
+    // (на телефоне и в узком окне — тем более). Считаем по фактической сцене, а не по ширине окна.
+    const stageH = stage.clientHeight
+    const stageRatio = stageH > 0 ? stage.clientWidth / stageH : 1.6
+    const sideBySideScreens = screenTiles.length > 1 && stageRatio >= 3.1
+
+    stage.classList.toggle('stage-solo', isSolo)
+    stage.classList.toggle('stage-centered', !isSolo)
+    stage.classList.toggle('screen-count-2', hasScreenShares && sideBySideScreens)
+
+    // Сколько камер на сцене - от этого зависит размер плиток (CSS: .cam-count-N).
+    // Без этого плитки всегда были одной ширины и на большом экране вдвоем выглядели потерянно.
+    const camCount = hasScreenShares ? 0 : Math.min(cameraTiles.length, 5)
+    for (let n = 1; n <= 5; n++) stage.classList.toggle(`cam-count-${n}`, camCount === n)
 
     if (hasScreenShares) {
-      screenTiles.forEach((t) => stage.appendChild(t))
-      cameraTiles.forEach((t) => sidebar.appendChild(t))
+      placeTiles(stage, screenTiles)
+      placeTiles(sidebar, cameraTiles)
       sidebar.style.display = cameraTiles.length ? 'flex' : 'none'
-      const n = screenTiles.length
-      // Две демки одновременно на телефоне лучше показывать друг под другом, чем сжимать
-      // пополам по ширине - иначе контент демонстрации становится нечитаемым
-      if (n > 1 && !isNarrow) stage.classList.add('screen-count-2')
-      stage.style.gridTemplateColumns = ''
     } else {
+      placeTiles(stage, isSolo ? cameraTiles.concat([getSoloInviteCard()]) : cameraTiles)
+      placeTiles(sidebar, [])
       sidebar.style.display = 'none'
-      cameraTiles.forEach((t) => stage.appendChild(t))
-      stage.style.gridTemplateColumns = ''
     }
+    stage.style.gridTemplateColumns = ''
 
     screenCountBadge.style.display = state.screenShares.size > 0 ? 'block' : 'none'
     screenCountBadge.textContent = String(state.screenShares.size)
 
-    // ВАЖНО ("баг: чёрный экран после fullscreen -> Esc на своей демке/камере"): stage.innerHTML='' /
-    // sidebar.innerHTML='' в начале этой функции физически удаляет ВСЕ дочерние узлы из документа
-    // (включая уже смонтированные <video> с активным srcObject) - в браузере это безусловно ставит
-    // такой <video> на паузу (video.paused становится true). Ниже мы делаем appendChild() ТЕХ ЖЕ
-    // самых <video>-узлов обратно в DOM, но повторная вставка уже существующего узла НЕ считается
-    // "загрузкой" для autoplay - спецификация автовоспроизведения триггерится только при установке
-    // src/srcObject или при первой вставке нового узла, а не при перемещении внутри документа. Из-за
-    // этого видео просто остаётся на паузе навечно (первый застывший кадр = либо последний реальный
-    // кадр, либо чёрный, если для этого кадра ещё не было декодировано ни одного фрейма) - выглядит
-    // как "чёрный экран". Особенно заметно после выхода из fullscreen (Esc или кнопка), потому что
-    // fullscreenchange-обработчик сам вызывает relayout() сразу после закрытия. Фикс: после того как
-    // все тайлы вставлены обратно, на каждый <video> с уже назначенным srcObject/src вызываем play()
-    // как защитную сетку - если он и так уже играл, play() no-op; если поставился на паузу - продолжит.
-    stage.querySelectorAll('video').forEach((v) => { if (v.srcObject || v.src) v.play().catch(() => {}) })
-    sidebar.querySelectorAll('video').forEach((v) => { if (v.srcObject || v.src) v.play().catch(() => {}) })
+    // Защитная сетка: если <video> всё же оказался на паузе (браузер ставит видео на паузу, когда
+    // узел вынимали из документа - например, при первом монтировании тайла), продолжаем
+    // воспроизведение. Если видео и так играет, ничего не делаем.
+    stage.querySelectorAll('video').forEach((v) => { if ((v.srcObject || v.src) && v.paused) v.play().catch(() => {}) })
+    sidebar.querySelectorAll('video').forEach((v) => { if ((v.srcObject || v.src) && v.paused) v.play().catch(() => {}) })
   }
 
-  // Пересчитать раскладку при повороте телефона / изменении размера окна (например, вызов
-  // виртуальной клавиатуры или переход портрет<->ландшафт) - без этого сетка "застревала"
-  // в раскладке, посчитанной на момент последнего relayout(), а не текущей ширины экрана
-  // ВАЖНО ("баг: полный экран открывается на 1мс и сразу закрывается обратно"): relayout()
-  // делает stage.innerHTML = '' и appendChild() каждого тайла ЗАНОВО - то есть физически вынимает
-  // DOM-узел из документа и вставляет обратно. У requestFullscreen() есть окно браузера, и когда
-  // ОНО меняет размер (пропадают/появляются тулбары, адресная строка) - это САМО ПО СЕБЕ стреляет
-  // window resize событием. Получается цикл: клик на fullscreen -> requestFullscreen() -> браузер
-  // ужимает вьюпорт -> resize -> relayout() удаляет и заново вставляет ЭТОТ ЖЕ тайл (который сейчас
-  // document.fullscreenElement) -> по спецификации Fullscreen API удаление/детач элемента из DOM
-  // ПРИНУДИТЕЛЬНО завершает fullscreen -> браузер сам откатывает обратно за ~100-200мс. Из-за этого
-  // выглядит как "мигает и не открывается". Фикс: если сейчас активен fullscreen (или прошло меньше
-  // 400мс с момента входа/выхода из него - за это время дребезжит несколько resize подряд), просто
-  // не трогаем DOM тайлов в этом цикле relayout(), а откладываем на momент, когда fullscreen точно
-  // закрыт - тогда resize после реального fullscreenchange безопасен.
+  // Пересчёт раскладки собран в одну rAF-очередь: поворот телефона, ресайз окна Electron и
+  // изменение размеров самого контейнера сводятся к одному вызову за кадр.
   let relayoutRAF = null
-  window.addEventListener('resize', () => {
+  function scheduleRelayout() {
     if (relayoutRAF) return
     relayoutRAF = requestAnimationFrame(() => {
       relayoutRAF = null
-      if (document.fullscreenElement) return // не дёргаем DOM, пока какой-то тайл в fullscreen
+      // ВАЖНО ("баг: полный экран открывается на 1мс и закрывается"): по спецификации Fullscreen
+      // API перемещение элемента в DOM принудительно завершает fullscreen, а requestFullscreen()
+      // сам вызывает resize. relayout() теперь идемпотентен и при простом ресайзе DOM не трогает,
+      // но если раскладка реально меняется, узлы переставятся - поэтому, пока тайл в нативном
+      // fullscreen, откладываем пересчёт до его закрытия (см. fullscreenchange ниже).
+      if (document.fullscreenElement) return
       relayout()
     })
-  })
-  // Как только fullscreen закрывается (штатно или из-за гонки выше) - пересчитываем раскладку разово,
-  // чтобы вернуть тайл в его нормальное место в сетке (на случай, если resize во время fullscreen был
-  // пропущен из-за проверки выше).
+  }
+  window.addEventListener('resize', scheduleRelayout)
+  window.addEventListener('orientationchange', scheduleRelayout)
+  // Контейнер сцены может менять размер и без window resize (окно Electron, появление сайдбара,
+  // виртуальная клавиатура). ResizeObserver ловит это напрямую; relayout() идемпотентен, поэтому
+  // обратной связи "ресайз -> ресайз" не возникает.
+  let stageResizeObserver = null
+  if (typeof ResizeObserver === 'function') {
+    stageResizeObserver = new ResizeObserver(() => scheduleRelayout())
+    stageResizeObserver.observe(roomMain)
+  }
+  // Как только fullscreen закрывается (штатно или из-за гонки выше) - пересчитываем раскладку
+  // разово, чтобы вернуть тайл на его место в сетке.
   document.addEventListener('fullscreenchange', () => {
-    if (!document.fullscreenElement) {
-      if (relayoutRAF) cancelAnimationFrame(relayoutRAF)
-      relayoutRAF = requestAnimationFrame(() => { relayoutRAF = null; relayout() })
-    }
+    if (!document.fullscreenElement) scheduleRelayout()
   })
+
+  // ---- Высота вьюпорта на мобильных ----
+  // На iOS Safari адресная строка и панель жестов меняют высоту видимой области без window
+  // resize, а 100vh считается по "большому" вьюпорту - интерфейс уезжает под панели. CSS уже
+  // использует 100svh/100dvh, а --app-vh даёт точное значение для внутреннего полного экрана.
+  let viewportRAF = null
+  function syncViewportHeight() {
+    if (viewportRAF) return
+    viewportRAF = requestAnimationFrame(() => {
+      viewportRAF = null
+      const vv = window.visualViewport
+      const h = Math.round(vv ? vv.height : window.innerHeight)
+      if (h > 0) document.documentElement.style.setProperty('--app-vh', h + 'px')
+    })
+  }
+  syncViewportHeight()
+  window.addEventListener('resize', syncViewportHeight)
+  window.addEventListener('orientationchange', syncViewportHeight)
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', syncViewportHeight)
+    window.visualViewport.addEventListener('scroll', syncViewportHeight)
+  }
 
   // ---- Регулятор громкости (слайдер + иконка), общий для камеры и демонстрации ----
   function makeVolumeControl(onChange, initial = 1) {
@@ -888,7 +977,7 @@ async function enterRoom(joinData) {
 
   function makeCameraTile(identity, name, isLocal, hostBadge) {
     const tile = el('div', { class: 'tile camera-tile', id: `tile-cam-${identity}` })
-    const video = el('video', { autoplay: true, playsinline: true, ...(isLocal ? { muted: true } : {}) })
+    const video = el('video', { autoplay: true, playsinline: true, 'webkit-playsinline': 'true', ...(isLocal ? { muted: true } : {}) })
     if (isLocal) video.style.transform = 'scaleX(-1)'
     const placeholder = el('div', { class: 'no-video-placeholder' }, [el('div', { class: 'avatar-circle' }, initials(name))])
     const micIcon = el('i', { class: 'fas fa-microphone-slash', style: 'display:none' })
@@ -963,23 +1052,92 @@ async function enterRoom(joinData) {
     }
   }
 
-  // ---- Полноэкранный режим для тайла (демонстрация экрана) ----
+  // ---- Полноэкранный режим тайла: нативный + фолбэк для iPhone ----
+  // На iOS Safari Fullscreen API у обычных элементов отсутствует (document.fullscreenEnabled
+  // false, Element.requestFullscreen нет вовсе) - раньше кнопка "на весь экран" там просто
+  // показывала ошибку. Теперь порядок такой:
+  //   1) нативный requestFullscreen (десктоп, Android, Electron);
+  //   2) webkitEnterFullscreen у самого <video> (системный плеер iPhone, если трек уже играет);
+  //   3) "внутренний" полный экран - тайл раскрывается на весь вьюпорт через CSS
+  //      (position: fixed + высота 100dvh/--app-vh + safe-area), без Fullscreen API.
+  // Во всех трёх случаях повторное нажатие/Escape возвращает обычную раскладку.
+  const NATIVE_FS_SUPPORTED = !!(
+    typeof document !== 'undefined' &&
+    document.fullscreenEnabled &&
+    typeof Element !== 'undefined' &&
+    typeof Element.prototype.requestFullscreen === 'function'
+  )
+
+  function syncFullscreenButtons() {
+    document.querySelectorAll('.screen-tile, .camera-tile').forEach((t) => {
+      const on = document.fullscreenElement === t || t.classList.contains('in-app-fullscreen')
+      t.classList.toggle('is-fullscreen', on)
+      const icon = t.querySelector('.tile-fullscreen-btn i')
+      if (icon) icon.className = on ? 'fas fa-compress' : 'fas fa-expand'
+    })
+  }
+
+  function exitInAppFullscreen() {
+    const tile = document.querySelector('.tile.in-app-fullscreen')
+    if (!tile) return false
+    tile.classList.remove('in-app-fullscreen')
+    document.body.classList.remove('inapp-fullscreen')
+    syncFullscreenButtons()
+    // Тайл остаётся тем же DOM-узлом (его никто не вынимал из документа), поэтому видео
+    // продолжает играть; play() - только страховка.
+    const video = tile.querySelector('video')
+    if (video && (video.srcObject || video.src) && video.paused) video.play().catch(() => {})
+    return true
+  }
+
+  function enterInAppFullscreen(tile) {
+    exitInAppFullscreen()
+    syncViewportHeight()
+    tile.classList.add('in-app-fullscreen')
+    document.body.classList.add('inapp-fullscreen')
+    syncFullscreenButtons()
+    const video = tile.querySelector('video')
+    if (video && (video.srcObject || video.src) && video.paused) video.play().catch(() => {})
+  }
+
   function toggleTileFullscreen(tile) {
     if (document.fullscreenElement === tile) {
       document.exitFullscreen().catch(() => {})
-    } else {
-      tile.requestFullscreen().catch(() => showToast('Не удалось открыть полноэкранный режим', 'error'))
+      return
     }
+    if (tile.classList.contains('in-app-fullscreen')) {
+      exitInAppFullscreen()
+      return
+    }
+    if (NATIVE_FS_SUPPORTED && typeof tile.requestFullscreen === 'function') {
+      let p = null
+      try { p = tile.requestFullscreen() } catch { p = null }
+      if (p && typeof p.catch === 'function') {
+        p.catch(() => enterInAppFullscreen(tile)) // запрет из-за жеста/политики - открываем внутренний
+        return
+      }
+      if (p) return
+    }
+    const video = tile.querySelector('video')
+    if (video && typeof video.webkitEnterFullscreen === 'function' && video.readyState > 0) {
+      try {
+        video.webkitEnterFullscreen()
+        return
+      } catch {}
+    }
+    enterInAppFullscreen(tile)
   }
+
+  // Esc закрывает внутренний полный экран так же, как нативный
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') exitInAppFullscreen() })
 
   function makeScreenTile(identity, name, sid, isLocal) {
     const tile = el('div', { class: 'tile screen-tile', id: `tile-screen-${sid}` })
-    const video = el('video', { autoplay: true, playsinline: true, muted: true })
+    const video = el('video', { autoplay: true, playsinline: true, 'webkit-playsinline': 'true', muted: true })
     const label = el('div', { class: 'tile-label' }, [el('i', { class: 'fas fa-desktop' }), el('span', {}, `Демонстрация — ${name}`)])
-    // Бейджи LIVE + FPS в стиле Discord, в левом верхнем углу тайла демонстрации
+    // Бейдж LIVE в левом верхнем углу тайла демонстрации (технический FPS-бейдж убран)
     const liveBadge = el('div', { class: 'live-badge-group' }, [
-      el('span', { class: 'live-badge' }, [el('span', { class: 'live-dot' }), 'LIVE']),
-      el('span', { class: 'fps-badge' }, `${state.screenShareFps} FPS`)
+      el('span', { class: 'live-badge' }, [el('span', { class: 'live-dot' }), 'LIVE'])
     ])
     const fsBtn = el('button', { class: 'tile-fullscreen-btn', title: 'На весь экран' }, [el('i', { class: 'fas fa-expand' })])
     fsBtn.addEventListener('click', (e) => {
@@ -1000,21 +1158,15 @@ async function enterRoom(joinData) {
       tile.appendChild(volumeCtl)
     }
     tile.addEventListener('dblclick', () => toggleTileFullscreen(tile))
-    // Кастомное контекстное меню (ПКМ) вместо стандартного браузерного - в стиле Discord.
-    // Для своей демонстрации - полный набор действий (стоп/смена источника/звук/PiP/качество).
-    // Для чужой демонстрации - только просмотровые опции (PiP + качество приёма).
+    // Кастомное контекстное меню (ПКМ) вместо стандартного браузерного.
+    // Для своей демонстрации - действия над стримом (стоп/смена источника/звук/отдельное окно).
+    // Для чужой демонстрации - просмотровые опции (отдельное окно + громкости).
     tile.addEventListener('contextmenu', (e) => {
       e.preventDefault()
       e.stopPropagation()
       openScreenContextMenu(e.clientX, e.clientY, { tile, video, identity, sid, isLocal })
     })
-    return { tile, video, label, fsBtn, volumeCtl, fpsBadge: liveBadge.querySelector('.fps-badge') }
-  }
-
-  // ---- Обновить FPS-бейдж на тайле демонстрации ----
-  function updateScreenFpsBadge(sid, fps) {
-    const t = screenTilesMap.get(sid)
-    if (t && t.fpsBadge) t.fpsBadge.textContent = `${fps} FPS`
+    return { tile, video, label, fsBtn, volumeCtl }
   }
 
   // ===================== Кастомное контекстное меню тайла демонстрации (Discord-style) =====================
@@ -1128,25 +1280,6 @@ async function enterRoom(joinData) {
         icon: 'fas fa-arrows-rotate', label: 'Изменить источник',
         onClick: () => { closeScreenContextMenu(); changeScreenSource() }
       }))
-      const qualityItem = ctxItem({
-        icon: 'fas fa-gauge-high', label: 'Качество передачи', chevron: true
-      })
-      qualityItem.addEventListener('mouseenter', () => {
-        openSubmenu(qualityItem, () => FPS_OPTIONS.map((fps) => ctxItem({
-          label: `${fps} FPS`,
-          selected: fps === state.screenShareFps,
-          onClick: () => {
-            state.screenShareFps = fps
-            localStorage.setItem('screenShareFps', String(fps))
-            fpsBtn.querySelector('.fps-toggle-label').textContent = String(fps)
-            fpsMenu.querySelectorAll('.fps-menu-item').forEach((el2) => el2.classList.toggle('selected', el2.textContent === `${fps} FPS`))
-            applyScreenShareFps(fps)
-            if (currentScreenTrackSid) updateScreenFpsBadge(currentScreenTrackSid, fps)
-            closeScreenContextMenu()
-          }
-        })))
-      })
-      items.push(qualityItem)
       items.push(el('div', { class: 'screen-ctx-divider' }))
       items.push(ctxItem({
         label: 'Поделиться звуком стрима',
@@ -1157,21 +1290,9 @@ async function enterRoom(joinData) {
         icon: 'fas fa-up-right-from-square', label: 'Стрим в отдельном окне',
         onClick: () => { closeScreenContextMenu(); openScreenSharePiP(ctx.video) }
       }))
-      items.push(el('div', { class: 'screen-ctx-divider' }))
-      const otherItem = ctxItem({ icon: 'fas fa-sliders', label: 'Другие настройки', chevron: true })
-      otherItem.addEventListener('mouseenter', () => {
-        openSubmenu(otherItem, () => [
-          ctxItem({
-            label: 'Оптимизировать: движение', selected: state.screenShareContentHint === 'motion',
-            onClick: () => { setScreenShareContentHint('motion'); closeScreenContextMenu() }
-          }),
-          ctxItem({
-            label: 'Оптимизировать: чёткость', selected: state.screenShareContentHint === 'detail',
-            onClick: () => { setScreenShareContentHint('detail'); closeScreenContextMenu() }
-          })
-        ])
-      })
-      items.push(otherItem)
+      // Подменю "Другие настройки" -> "Оптимизировать: движение/чёткость" убрано: выбор был
+      // непонятным, а для звонка всегда нужен один и тот же режим (motion - плавность).
+      // Значение зафиксировано в SCREEN_SHARE_CONTENT_HINT и применяется при старте демонстрации.
     } else {
       // Чужая демонстрация - просмотровые действия + два регулятора громкости.
       // "Качество приёма" (какой simulcast-слой видео подписываться) специально не выведено в меню -
@@ -1238,14 +1359,9 @@ async function enterRoom(joinData) {
     if (pub && typeof pub.setVideoQuality === 'function') pub.setVideoQuality(LK.VideoQuality.HIGH)
   }
 
-  document.addEventListener('fullscreenchange', () => {
-    document.querySelectorAll('.screen-tile, .camera-tile').forEach((t) => {
-      const icon = t.querySelector('.tile-fullscreen-btn i')
-      if (!icon) return
-      icon.className = document.fullscreenElement === t ? 'fas fa-compress' : 'fas fa-expand'
-      t.classList.toggle('is-fullscreen', document.fullscreenElement === t)
-    })
-  })
+  document.addEventListener('fullscreenchange', syncFullscreenButtons)
+  // webkit-префикс: старые версии iOS/Safari шлют только это событие
+  document.addEventListener('webkitfullscreenchange', syncFullscreenButtons)
 
   const cameraTilesMap = new Map() // identity -> {tile, video, placeholder, label}
   const screenTilesMap = new Map() // trackSid -> {tile, video, label, fsBtn, volumeCtl}
@@ -1532,40 +1648,6 @@ async function enterRoom(joinData) {
   let screenShareBusy = false // защита от повторного/двойного клика во время async старта - вторая причина "раздвоения" демки
   let currentScreenTrackSid = null
 
-  // Битрейт подбираем под выбранный FPS - чем выше частота кадров, тем больше данных нужно
-  // передавать в секунду для сохранения резкости; на 15 FPS высокий битрейт не нужен.
-  function bitrateForFps(fps) {
-    if (fps <= 15) return 4_000_000
-    if (fps <= 30) return 6_000_000
-    return 8_000_000
-  }
-
-  // ---- Применить выбранный FPS к уже идущей демонстрации "живьём", без пересоздания трека ----
-  // Меняем и реальные constraints захвата (applyConstraints), и предел кодировщика (RTCRtpSender
-  // encodings[].maxFramerate) - иначе повышение FPS не даст эффекта, если сендер уже был ограничен
-  // более низким значением на старте публикации.
-  function applyScreenShareFps(fps) {
-    if (!isScreenSharing) return
-    const pub = room.localParticipant.getTrackPublication(LK.Track.Source.ScreenShare)
-    const track = pub && pub.track
-    if (!track) return
-    const msTrack = track.mediaStreamTrack
-    if (msTrack && typeof msTrack.applyConstraints === 'function') {
-      msTrack.applyConstraints({ frameRate: { ideal: fps, min: Math.min(fps, 30) } }).catch(() => {})
-    }
-    const sender = track.sender
-    if (sender && typeof sender.getParameters === 'function') {
-      try {
-        const params = sender.getParameters()
-        if (params.encodings && params.encodings.length) {
-          params.encodings.forEach((enc) => { enc.maxFramerate = fps; enc.maxBitrate = bitrateForFps(fps) })
-          Promise.resolve(sender.setParameters(params)).catch(() => {})
-        }
-      } catch {}
-    }
-    showToast(`FPS демонстрации изменён на ${fps}`)
-  }
-
   // ===================== Демонстрация экрана: start/stop/change-source отдельными функциями =====================
   // Вынесено из единого screenBtn-обработчика, чтобы этими же действиями можно было управлять
   // и из кастомного контекстного меню (ПКМ на тайле демонстрации): "Прекратить стрим", "Изменить источник".
@@ -1598,13 +1680,12 @@ async function enterRoom(joinData) {
 
     screenShareBusy = true
     try {
-      // ВАЖНО про FPS: раньше здесь передавался LK.ScreenSharePresets.h1080fps30.resolution - у этого
-      // пресета frameRate жёстко равен 30, и он попадает в getDisplayMedia() как ideal/max frameRate -
-      // то есть сама браузерная захватка кадра ограничивалась 30 FPS ещё до энкодера, независимо от
-      // videoEncoding.maxFramerate ниже. Задаём resolution вручную с frameRate = выбранное пользователем
-      // значение (state.screenShareFps, переключатель 15/30/60 рядом с кнопкой демонстрации).
-      const fps = state.screenShareFps
-      const hint = state.screenShareContentHint
+      // ВАЖНО про кадры: пресеты LiveKit (например LK.ScreenSharePresets.h1080fps30) жёстко
+      // ограничивают frameRate 30 кадрами ещё на уровне getDisplayMedia(), независимо от
+      // videoEncoding.maxFramerate ниже. Поэтому resolution задаём вручную с целевыми 60 кадрами.
+      // Выбора FPS в интерфейсе больше нет - значение фиксировано (см. SCREEN_SHARE_FPS).
+      const fps = SCREEN_SHARE_FPS
+      const hint = SCREEN_SHARE_CONTENT_HINT
       const pub = await room.localParticipant.setScreenShareEnabled(true, {
         video: { displaySurface: 'monitor' },
         // ВАЖНО ("баг: сам себя слышно, если включен звук на демке"): при захвате системного звука
@@ -1620,7 +1701,7 @@ async function enterRoom(joinData) {
         resolution: { width: 1920, height: 1080, frameRate: fps },
         contentHint: hint
       }, {
-        videoEncoding: { maxBitrate: bitrateForFps(fps), maxFramerate: fps },
+        videoEncoding: { maxBitrate: SCREEN_SHARE_BITRATE, maxFramerate: fps },
         // degradationPreference по умолчанию для ScreenShare = "maintain-resolution" - при перегрузке
         // CPU/сети WebRTC-энкодер режет именно FPS, сохраняя разрешение, отсюда и проседание до 40-50
         // на 60 FPS. Для плавности важнее стабильный FPS, чем максимальная резкость - переключаем на
@@ -1736,17 +1817,6 @@ async function enterRoom(joinData) {
     showToast(state.screenShareAudioShared ? 'Звук стрима включён' : 'Звук стрима выключен')
   }
 
-  // ---- "Другие настройки" -> оптимизация контента (движение/чёткость) ----
-  function setScreenShareContentHint(hint) {
-    state.screenShareContentHint = hint
-    localStorage.setItem('screenShareContentHint', hint)
-    if (!isScreenSharing) return
-    const pub = room.localParticipant.getTrackPublication(LK.Track.Source.ScreenShare)
-    const msTrack = pub && pub.track && pub.track.mediaStreamTrack
-    if (msTrack) msTrack.contentHint = hint
-    showToast(hint === 'motion' ? 'Оптимизация: движение' : 'Оптимизация: чёткость')
-  }
-
   // ---- "Стрим в отдельном окне" - Document Picture-in-Picture API ----
   // Поддерживается в Chromium (обычный браузер на его основе, а также сам Electron - тоже Chromium),
   // позволяет вынести произвольный <video> в отдельное всегда-поверх-окно, которое можно двигать
@@ -1790,6 +1860,49 @@ async function enterRoom(joinData) {
   leaveBtn.addEventListener('click', () => {
     cleanupAndGoLobby()
   })
+
+  // ---- Панель участников (кнопка в правом верхнем углу) ----
+  // Раньше кнопка была декоративной и ничего не делала. Теперь она открывает боковую панель
+  // со списком тех, кто сейчас в звонке: имя, инициалы, отметка создателя и состояние микрофона.
+  function closeParticipantsPanel() {
+    const existing = document.querySelector('.panel-overlay')
+    if (!existing) return false
+    existing.remove()
+    return true
+  }
+
+  function participantRow(name, isLocal, isHost, micMuted) {
+    const children = [
+      el('div', { class: 'avatar-circle' }, initials(name)),
+      el('span', {}, name + (isLocal ? ' (Вы)' : ''))
+    ]
+    if (isHost) children.push(el('i', { class: 'fas fa-crown host-crown', title: 'Создатель комнаты' }))
+    if (micMuted) children.push(el('i', { class: 'fas fa-microphone-slash', title: 'Микрофон выключен', style: 'color:var(--danger-soft)' }))
+    return el('div', { class: 'panel-participant' }, children)
+  }
+
+  function openParticipantsPanel() {
+    if (closeParticipantsPanel()) return // повторный клик закрывает панель
+
+    const panel = el('div', { class: 'panel' })
+    const closeBtn = el('button', { class: 'panel-close', type: 'button', 'aria-label': 'Закрыть' }, [el('i', { class: 'fas fa-times' })])
+    panel.appendChild(closeBtn)
+    panel.appendChild(el('h3', {}, `Участники · ${room.remoteParticipants.size + 1}`))
+    panel.appendChild(participantRow(state.displayName, true, state.isHost, !state.micEnabled))
+    room.remoteParticipants.forEach((p) => {
+      const micPub = p.getTrackPublication(LK.Track.Source.Microphone)
+      const micMuted = !micPub || micPub.isMuted
+      panel.appendChild(participantRow(p.name || p.identity, false, isParticipantHost(p), micMuted))
+    })
+
+    const overlay = el('div', { class: 'panel-overlay' }, [panel])
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeParticipantsPanel() })
+    closeBtn.addEventListener('click', closeParticipantsPanel)
+    document.body.appendChild(overlay)
+  }
+
+  participantsBtn.addEventListener('click', openParticipantsPanel)
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeParticipantsPanel() })
 
   // ---- Периодическая защитная сверка тайлов демонстрации экрана (safety net) ----
   // ВАЖНО ("баг: демки копятся, некорректно завершаются"): reconcileScreenTiles() уже вызывается

@@ -1,4 +1,4 @@
-// ===================== Звонки: standalone Node.js backend (без Cloudflare) =====================
+// ===================== Voice Lobby: standalone Node.js backend (без Cloudflare) =====================
 // Запускается напрямую на VPS через PM2. Хранилище — встроенный node:sqlite (файл на диске).
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
@@ -443,11 +443,11 @@ app.get('/api/rooms/:code', async (c) => {
 // Рисование поверх демонстрации живёт только в десктопном приложении (прозрачный оверлей
 // поверх всех окон), поэтому на сайте скрипт annotate.js больше не подключается.
 function renderPage(title) {
-  return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/><meta name="mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-capable" content="yes"/><meta name="theme-color" content="#0f0d0b"/><meta name="color-scheme" content="dark"/><title>${title}</title><link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet"/><script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.1/dist/livekit-client.umd.min.js"></script><link href="/static/style.css" rel="stylesheet"/></head><body><div id="app-root"></div><script src="/static/app.js"></script><script src="/static/anker.js"></script></body></html>`
+  return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/><meta name="mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-capable" content="yes"/><meta name="theme-color" content="#0f1115"/><meta name="color-scheme" content="dark"/><title>${title}</title><link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet"/><script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.1/dist/livekit-client.umd.min.js"></script><link href="/static/style.css" rel="stylesheet"/></head><body><div id="app-root"></div><script src="/static/app.js"></script><script src="/static/anker.js"></script></body></html>`
 }
 
-app.get('/', (c) => c.html(renderPage('Звонки — Главная')))
-app.get('/room/:code', (c) => c.html(renderPage('Звонки — Комната')))
+app.get('/', (c) => c.html(renderPage('Voice Lobby')))
+app.get('/room/:code', (c) => c.html(renderPage('Voice Lobby — комната')))
 
 serve({ fetch: app.fetch, port: PORT }, (info) => {
   console.log(`Zvonki backend listening on http://127.0.0.1:${info.port}`)
