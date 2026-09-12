@@ -1,0 +1,111 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   typography.css — заголовочная гарнитура. issue #22, п.4
+
+   Подключается после style.css. Дизайн-система не ломается: текст и кнопки
+   остаются на --font / --mono, меняется только слой заголовков.
+
+   Внешних CDN здесь нет и быть не должно.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* САМОХОСТИНГ ШРИФТА
+   Бинарный woff2 в этом PR добавить не получилось (использованная интеграция
+   умеет коммитить только текстовые файлы), поэтому по умолчанию работает
+   стек дисплейных системных гарнитур (Windows / macOS / Linux — без сети).
+
+   Чтобы подключить свой шрифт:
+     1. положите файл в public/static/fonts/vl-display.woff2;
+     2. раскомментируйте @font-face ниже;
+     3. раскомментируйте 'VL Display' в начале --font-display.
+   Никаких Google Fonts и других CDN — только локальный файл. */
+
+/*
+@font-face {
+  font-family: 'VL Display';
+  src: url('/static/fonts/vl-display.woff2') format('woff2');
+  font-weight: 600 700;
+  font-style: normal;
+  font-display: swap;
+}
+*/
+
+:root {
+  /* Дисплейные нарезки системных шрифтов: у них плотнее рисунок и короче
+     апроши, чем у текстовых, — заголовки сразу смотрятся иначе. */
+  --font-display:
+    /* 'VL Display', */
+    'Segoe UI Variable Display', 'Segoe UI Semibold', 'SF Pro Display',
+    -apple-system, BlinkMacSystemFont, 'Inter', 'Manrope', 'Golos Text',
+    'Noto Sans Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    var(--font, system-ui), sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+.solo-invite__title,
+.panel h3,
+.ank-brandline__name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-synthesis-weight: none; /* не дорисовываем жирность, если нарезки нет */
+}
+
+h1 {
+  font-size: clamp(30px, 3.4vw, 44px);
+  letter-spacing: -0.028em;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+h2 {
+  font-size: clamp(24px, 2.6vw, 32px);
+  letter-spacing: -0.024em;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+h3 {
+  font-size: clamp(19px, 2vw, 23px);
+  letter-spacing: -0.018em;
+  line-height: 1.14;
+}
+
+h4 {
+  font-size: clamp(16px, 1.6vw, 18px);
+  letter-spacing: -0.014em;
+  line-height: 1.2;
+}
+
+/* Заголовок карточки лобби и формы входа — главные акценты экрана. */
+.auth-form-panel h1,
+.lobby-card h1,
+.ank-brand__tx h1 {
+  font-size: clamp(32px, 3.6vw, 46px);
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+}
+
+.auth-overlay-panel h1,
+.auth-overlay-left h1,
+.auth-overlay-right h1 {
+  font-size: clamp(26px, 2.8vw, 36px);
+  letter-spacing: -0.026em;
+}
+
+.solo-invite__title {
+  font-size: clamp(21px, 2.4vw, 28px);
+  letter-spacing: -0.022em;
+}
+
+.panel h3 {
+  font-size: 20px;
+}
+
+/* Название продукта рядом со знаком в шапке звонка. */
+.ank-brandline__name {
+  font-size: 17px;
+  letter-spacing: -0.015em;
+}

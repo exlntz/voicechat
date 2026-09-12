@@ -1,0 +1,146 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   layout-fit.css — один экран без скролла страницы. issue #22, п.2
+
+   Подключается ПОСЛЕ style.css: здесь только правила высоты и переполнения,
+   остальной дизайн не трогаем. Правила одинаковы для сайта и для .exe —
+   Electron открывает тот же самый сайт.
+
+   Принцип: скроллится только внутренняя панель (форма входа, лобби, список
+   участников, чат). Сама страница не скроллится никогда.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─────────── 1. Высота окна ─────────── */
+
+/* Каскад поддержки: старые браузеры — 100vh, затем svh/dvh, сверху — --app-vh,
+   которую app.js считает по visualViewport (самый точный вариант на iOS). */
+html,
+body {
+  height: 100vh;
+  height: 100svh;
+  height: var(--app-vh, 100dvh);
+  max-height: var(--app-vh, 100dvh);
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: none; /* никакого резинового оттягивания документа */
+}
+
+/* iOS Safari: динамическая адресная строка всё равно тянет документ, если боди
+   участвует в прокрутке, — выносим его из потока прокрутки. */
+@supports (-webkit-touch-callout: none) {
+  body {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+}
+
+#app-root {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ─────────── 2. Экраны ─────────── */
+
+/* Вход и лобби: содержимое может быть выше окна — скролл внутри экрана,
+   а не у страницы. */
+.auth-screen,
+.lobby-screen {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.room-screen {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.room-topbar,
+.controls-bar {
+  flex: 0 0 auto; /* шапка и панель кнопок не тянутся и не сжимаются в ноль */
+}
+
+.room-main {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ─────────── 3. Сетка звонка: плитки ужимаются ─────────── */
+
+.stage {
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+  grid-auto-rows: minmax(0, 1fr); /* ряды делят высоту, а не растут по контенту */
+}
+
+.stage > * {
+  min-width: 0;
+  min-height: 0;
+}
+
+.stage .tile {
+  min-height: 0;
+  max-height: 100%;
+}
+
+.tile video,
+.tile .tile-video {
+  min-height: 0;
+}
+
+/* Главная причина переполнения в режиме «один в звонке»:
+   min-height: clamp(220px, 42vh, 520px) у плитки и у блока приглашения. */
+.stage.stage-solo .tile.camera-tile,
+.stage.stage-centered .tile.camera-tile,
+.solo-invite {
+  min-height: 0;
+  max-height: 100%;
+}
+
+.solo-invite {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 860px) {
+  /* Было overflow-y: auto — сетка прокручивалась целиком. Теперь вписываем. */
+  .stage,
+  .stage.stage-solo {
+    overflow: hidden;
+  }
+
+  .stage.stage-solo .tile.camera-tile {
+    min-height: 0;
+    height: 100%;
+  }
+}
+
+/* Полноэкранная плитка всегда ровно в окно (без выхода за край на iOS). */
+.tile.in-app-fullscreen {
+  height: var(--app-vh, 100dvh);
+  max-height: var(--app-vh, 100dvh);
+}
+
+/* ─────────── 4. Внутренние панели ─────────── */
+
+/* Список участников, чат и всплывающие панели — единственные места со скроллом.
+   overscroll-behavior: contain не даёт прокрутке перетекать на документ. */
+.sidebar-participants,
+.participants-list,
+.chat-messages,
+.panel {
+  min-height: 0;
+  max-height: 100%;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
