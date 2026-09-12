@@ -27,6 +27,8 @@ export const renderer = jsxRenderer(({ children, title }) => {
         <script src="/static/app.js"></script>
         {/* Слой микровзаимодействий (кнопки/поля/курсор) — навешивается поверх готового DOM */}
         <script src="/static/anker.js"></script>
+        {/* Раскрытие плитки на весь экран — FLIP из текущего положения */}
+        <script src="/static/fullscreen-flip.js"></script>
       </body>
     </html>
   )
