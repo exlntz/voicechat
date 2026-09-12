@@ -70,6 +70,9 @@
     padding: 0 22px 18px;
     scrollbar-width: thin;
     scrollbar-color: rgba(4, 88, 207, 0.75) transparent;
+    /* Подсказка композитору только про прокрутку - will-change на самих плитках
+       (их десятки) наоборот съел бы память и замедлил окно */
+    will-change: scroll-position;
   }
   .list::-webkit-scrollbar { width: 10px; }
   .list::-webkit-scrollbar-track { background: rgba(242, 245, 249, 0.05); border-radius: 8px; }
@@ -99,6 +102,14 @@
     align-items: start;
   }
 
+  /* Производительность списка (баг "окно выбора сильно лагает при скролле"):
+     - никаких box-shadow/filter/backdrop-filter на плитках: каждая тень на плитке
+       заставляла композитор перерисовывать её при любом сдвиге списка;
+     - transition только по border-color (цвет фона меняется вместе с ним, но без тени);
+     - content-visibility: auto - плитки за пределами видимой области вообще не
+       раскладываются и не растрируются, а contain-intrinsic-size держит правильную
+       высоту, чтобы полоса прокрутки не "дышала";
+     - contain: layout paint - изменения внутри плитки не выходят наружу. */
   .item {
     position: relative;
     min-width: 0;
@@ -107,13 +118,18 @@
     padding: 8px;
     cursor: pointer;
     background: var(--surface);
-    transition: border-color 180ms var(--ease), background 180ms var(--ease), box-shadow 180ms var(--ease);
+    transition: border-color 180ms var(--ease);
+    content-visibility: auto;
+    contain-intrinsic-size: auto 158px;
+    contain: layout paint;
   }
   .item:hover { border-color: var(--rule-strong); background: var(--surface-2); }
   .item.selected {
     border-color: var(--accent);
     background: var(--surface-2);
-    box-shadow: 0 0 0 1px var(--accent), 0 10px 24px rgba(4, 88, 207, 0.22);
+    /* Вместо box-shadow - внутренняя обводка: рисуется в том же слое, без размытия */
+    outline: 1px solid var(--accent);
+    outline-offset: -2px;
   }
   .item .shot {
     width: 100%;
@@ -131,7 +147,12 @@
     max-width: 100%;
     max-height: 100%;
     display: block;
+    /* Превью подставляется лениво (см. IntersectionObserver ниже) - лёгкое проявление,
+       чтобы подстановка src не выглядела как мигание */
+    opacity: 0;
+    transition: opacity 120ms linear;
   }
+  .item .shot img.ready { opacity: 1; }
   /* Фиксированная высота строки с подписью: иначе плитки с иконкой приложения
      оказывались на пару пикселей выше плиток без неё (экраны). */
   .item .row {
@@ -174,7 +195,7 @@
     display: none;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(0, 0, 0, 0.45);
   }
   .item.selected .tick { display: flex; }
 
@@ -323,6 +344,33 @@
       if (selectedId) window.pickerAPI.choose(selectedId, audioCheckbox.checked)
     }
 
+    // ---- Ленивая подстановка превью ----
+    // Раньше все превью присваивались в img.src сразу: браузеру приходилось декодировать
+    // десятки base64-картинок одновременно, из-за чего окно заметно лагало при скролле.
+    // Теперь data-URL висит в data-src, а реальный src подставляется только когда плитка
+    // подходит к видимой области. Один раз загруженное превью больше не сбрасывается -
+    // это и есть кэш: повторная прокрутка не вызывает новых декодирований.
+    // Наблюдаем за самой плиткой, а не за <img>: при content-visibility: auto содержимое
+    // плитки вне экрана не раскладывается, и наблюдатель на картинке мог бы не сработать.
+    const lazyObserver = 'IntersectionObserver' in window
+      ? new IntersectionObserver((entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue
+            loadThumb(entry.target.querySelector('img'))
+            lazyObserver.unobserve(entry.target)
+          }
+        }, { root: document.getElementById('list'), rootMargin: '400px 0px' })
+      : null
+
+    function loadThumb(img) {
+      if (!img) return
+      const src = img.dataset.src
+      if (!src) return
+      img.removeAttribute('data-src')
+      img.src = src
+      if (img.complete) img.classList.add('ready')
+    }
+
     function makeItem(s) {
       const item = document.createElement('div')
       item.className = 'item'
@@ -331,9 +379,13 @@
       const shot = document.createElement('div')
       shot.className = 'shot'
       const img = document.createElement('img')
-      img.src = s.thumbnail
       img.alt = ''
+      img.decoding = 'async'
+      img.dataset.src = s.thumbnail
+      img.addEventListener('load', () => img.classList.add('ready'), { once: true })
       shot.appendChild(img)
+      if (lazyObserver) lazyObserver.observe(item)
+      else loadThumb(img)
 
       const row = document.createElement('div')
       row.className = 'row'
@@ -374,6 +426,7 @@
 
     window.pickerAPI.onSources((sources) => {
       const list = Array.isArray(sources) ? sources : []
+      if (lazyObserver) lazyObserver.disconnect() // старые плитки сейчас будут выброшены
       renderGroup(groupScreens, gridScreens, list.filter((s) => s.type === 'screen'))
       renderGroup(groupWindows, gridWindows, list.filter((s) => s.type === 'window'))
       emptyHint.hidden = list.length > 0

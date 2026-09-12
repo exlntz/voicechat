@@ -127,8 +127,33 @@
   // ---- 3. Кнопка рисования в интерфейсе ----
   // Раньше оверлей вызывался только горячей клавишей - если она занята другой
   // программой, рисование выглядело как «его нет». Теперь есть видимая кнопка.
+  //
+  // Кнопка нужна ТОЛЬКО во время звонка: рисовать поверх экрана имеет смысл, когда идёт
+  // демонстрация, а в лобби и на экране входа она просто висела поверх интерфейса.
+  // Признак звонка - класс in-call на <body>, его ставит сайт (app.js -> setCallActive)
+  // при успешном подключении к комнате и снимает при выходе/разрыве.
+  function isInCall() {
+    try {
+      if (document.body && document.body.classList.contains('in-call')) return true
+      // Фолбэк для случая, когда в .exe открыта старая версия сайта без класса in-call:
+      // экран звонка отрисован и статус подключения не "отключено".
+      var dot = document.querySelector('.room-screen .status-dot')
+      return !!dot && !dot.classList.contains('disconnected')
+    } catch (e) {
+      return false
+    }
+  }
+
+  function syncDrawButton() {
+    var btn = document.getElementById('zvonki-draw-btn')
+    if (!btn) return
+    // Пустая строка снимает inline-display и возвращает кнопке её обычное отображение -
+    // так внешний вид в звонке остаётся ровно таким, каким был.
+    btn.style.display = isInCall() ? '' : 'none'
+  }
+
   function addDrawButton() {
-    if (document.getElementById('zvonki-draw-btn')) return
+    if (document.getElementById('zvonki-draw-btn')) { syncDrawButton(); return }
     if (!document.body) return
 
     var btn = document.createElement('button')
@@ -155,6 +180,16 @@
     })
 
     document.body.appendChild(btn)
+    syncDrawButton()
+
+    // Класс in-call появляется/исчезает без перерисовки <body> - следим за атрибутом,
+    // чтобы кнопка появлялась и пропадала сразу, а не по таймеру ниже.
+    try {
+      new MutationObserver(syncDrawButton).observe(document.body, { attributes: true, attributeFilter: ['class'] })
+    } catch (e) {}
+    try {
+      window.addEventListener('vl-call-state', syncDrawButton)
+    } catch (e) {}
   }
 
   if (document.readyState === 'loading') {
@@ -162,7 +197,8 @@
   } else {
     addDrawButton()
   }
-  // Сайт перерисовывает интерфейс при входе в комнату - проверяем, что кнопка на месте.
+  // Сайт перерисовывает интерфейс при входе в комнату - проверяем, что кнопка на месте
+  // и что её видимость соответствует текущему состоянию звонка.
   setInterval(addDrawButton, 3000)
 
   log('десктопные оптимизации включены')

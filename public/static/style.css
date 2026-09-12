@@ -53,6 +53,9 @@
   --radius-pill: 999px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-io: cubic-bezier(0.76, 0, 0.24, 1);
+  /* Длительность анимации входа/выхода из полного экрана (см. .tile ... :fullscreen).
+     Совпадает с FS_ANIM_MS в app.js - там по ней снимается класс-маркер закрытия. */
+  --fs-anim: 200ms;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28), 0 4px 12px rgba(0, 0, 0, 0.20);
   --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.30), 0 16px 40px rgba(0, 0, 0, 0.38);
@@ -866,6 +869,23 @@ button {
 .test-sound-btn:active { transform: scale(0.98); }
 .lobby-card .lobby-logout-btn { width: auto; margin-top: 0; flex-shrink: 0; }
 
+/* Выход из аккаунта — то же красное оформление, что и у кнопки завершения звонка
+   (.leave-btn), но без иконки трубки: в меню входа в звонок это просто текст «Выйти».
+   Правила идут после базовых .lobby-logout-btn выше, поэтому перекрывают их. */
+.lobby-logout-btn {
+  border-color: var(--danger);
+  background: var(--danger-wash);
+  color: var(--danger-soft);
+  font-weight: 600;
+}
+.lobby-logout-btn:hover,
+.lobby-logout-btn:focus-visible {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(217, 74, 61, 0.28);
+}
+
 /* ---- Превью камеры: постоянное соотношение 16:9, без сплющивания ---- */
 .device-preview {
   background: #05070a;
@@ -1060,6 +1080,22 @@ button {
   min-height: 56px;
 }
 .room-topbar .ank-sigil { --d: 30px; -webkit-app-region: no-drag; }
+
+/* Шапка звонка: знак продукта слева + название рядом с ним (собирает anker.js).
+   Раньше в топбаре была только иконка звонка — без подписи её принимали за кнопку. */
+.room-topbar .ank-brandline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.room-topbar .ank-brandline__name {
+  font: 600 15px/1.15 var(--font);
+  letter-spacing: -0.01em;
+  color: var(--text);
+  white-space: nowrap;
+}
 
 .room-topbar .room-info {
   display: flex;
@@ -1333,6 +1369,50 @@ body.inapp-fullscreen { overflow: hidden; }
 /* В этом режиме кнопка выхода всегда видна — иначе на телефоне из него не выйти */
 .tile.in-app-fullscreen .tile-fullscreen-btn { opacity: 1; bottom: calc(12px + env(safe-area-inset-bottom)); }
 .tile.in-app-fullscreen .tile-label { bottom: calc(12px + env(safe-area-inset-bottom)); }
+
+/* ---- Плавный переход в полный экран и обратно ----
+   Раньше раскладка «прыгала»: и вход, и выход были мгновенными. Теперь оба режима
+   (нативный Fullscreen API — в т.ч. в .exe — и внутренний .in-app-fullscreen) получают
+   короткую анимацию ~200 мс с ease-out. Анимируем ТОЛЬКО transform/opacity: они не
+   вызывают пересчёт раскладки, поэтому картинка не дёргается и видео не перезапускается.
+   Выход из нативного режима нельзя анимировать напрямую (браузер возвращает элемент в
+   сетку мгновенно), поэтому app.js вешает класс-маркер .is-fs-leaving и мы «доводим»
+   тайл на его обычном месте. */
+@keyframes vl-fs-in {
+  from { transform: scale(0.94); opacity: 0.4; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+@keyframes vl-fs-settle {
+  from { transform: scale(1.04); opacity: 0.5; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+@keyframes vl-fs-collapse {
+  from { transform: scale(1);    opacity: 1; }
+  to   { transform: scale(0.95); opacity: 0; }
+}
+
+/* Без animation-fill-mode: конечный кадр совпадает с обычным состоянием, поэтому после
+   анимации на тайле не остаётся «висящего» transform (он создавал бы лишний слой). */
+.tile.screen-tile:fullscreen,
+.tile.camera-tile:fullscreen,
+.tile.in-app-fullscreen {
+  animation: vl-fs-in var(--fs-anim) var(--ease);
+}
+/* Возврат из полного экрана в обычную раскладку */
+.tile.is-fs-leaving { animation: vl-fs-settle var(--fs-anim) var(--ease); }
+/* Внутренний режим ещё развёрнут на весь вьюпорт и сворачивается на месте. Здесь forwards
+   обязателен: класс снимает JS уже после анимации, и без него тайл на кадр «мигнул» бы. */
+.tile.in-app-fullscreen.is-fs-closing { animation: vl-fs-collapse var(--fs-anim) var(--ease) forwards; }
+
+/* Уважаем системную настройку «меньше движения»: переход остаётся мгновенным.
+   app.js в этом режиме и сам не навешивает классы-маркеры анимации. */
+@media (prefers-reduced-motion: reduce) {
+  .tile.screen-tile:fullscreen,
+  .tile.camera-tile:fullscreen,
+  .tile.in-app-fullscreen,
+  .tile.is-fs-leaving,
+  .tile.in-app-fullscreen.is-fs-closing { animation: none !important; }
+}
 
 /* Заглушка «камера выключена»: инициалы участника */
 .tile .no-video-placeholder {
@@ -1840,6 +1920,8 @@ body.inapp-fullscreen { overflow: hidden; }
   .room-topbar .room-info { font-size: 13px; gap: 8px; min-width: 0; overflow: hidden; }
   .room-topbar .room-info > span:nth-child(2) { display: none; } /* текст статуса: точки достаточно */
   .room-topbar .ank-sigil { --d: 26px; }
+  /* На телефоне подпись рядом со знаком не влезает вместе с кодом комнаты и статусом */
+  .room-topbar .ank-brandline__name { display: none; }
   .room-topbar .host-indicator span { display: none; }
 
   .stage { padding: 10px; gap: 10px; }

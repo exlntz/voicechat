@@ -124,7 +124,6 @@
   <button class="btn" data-tool="rect" title="Прямоугольник (R)">▭</button>
   <button class="btn" data-tool="ellipse" title="Овал (O)">◯</button>
   <button class="btn" data-tool="text" title="Текст (T)">T</button>
-  <button class="btn" data-tool="laser" title="Лазер (K)">🔴</button>
   <button class="btn" data-tool="eraser" title="Ластик (E)">🧽</button>
   <div class="sep"></div>
   <div id="colors"></div>
@@ -153,19 +152,22 @@
 
   var COLORS = ['#ff3b30', '#ffd60a', '#32d74b', '#0a84ff', '#ffffff', '#111111']
   var WIDTHS = [2, 4, 8, 16]
-  var LASER_TTL = 1300
   var EDGE_SNAP = 130   // насколько близко к краю надо подтащить, чтобы панель стала вертикальной
+
+  // Инструмент "Лазер" убран. У тех, кто его выбирал, он лежит в localStorage -
+  // без подмены на 'pen' панель открылась бы вообще без выбранного инструмента.
+  var savedTool = localStorage.getItem('ovTool')
+  if (savedTool === 'laser') { savedTool = 'pen'; localStorage.setItem('ovTool', savedTool) }
 
   var state = {
     active: false,
-    tool: localStorage.getItem('ovTool') || 'pen',
+    tool: savedTool || 'pen',
     color: localStorage.getItem('ovColor') || COLORS[0],
     width: Number(localStorage.getItem('ovWidth')) || 4
   }
 
   var strokes = []       // завершённые фигуры
   var current = null     // фигура, которую рисуем прямо сейчас
-  var laser = []         // точки лазерной указки {x, y, t}
   var dirty = true
 
   // ---------- размер холста с учётом масштабирования Windows ----------
@@ -232,28 +234,11 @@
   }
 
   function render() {
-    var now = Date.now()
-    laser = laser.filter(function (p) { return now - p.t < LASER_TTL })
-
-    if (dirty || laser.length) {
+    if (dirty) {
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       for (var i = 0; i < strokes.length; i++) drawShape(strokes[i])
       if (current) drawShape(current)
-
-      if (laser.length) {
-        ctx.save()
-        ctx.lineCap = 'round'
-        for (var j = 1; j < laser.length; j++) {
-          var p0 = laser[j - 1], p1 = laser[j]
-          var age = (now - p1.t) / LASER_TTL
-          ctx.globalAlpha = Math.max(0, 1 - age)
-          ctx.strokeStyle = '#ff3b30'
-          ctx.lineWidth = 6
-          ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke()
-        }
-        ctx.restore()
-      }
-      dirty = laser.length > 0
+      dirty = false
     }
     requestAnimationFrame(render)
   }
@@ -293,7 +278,6 @@
     var x = e.clientX, y = e.clientY
 
     if (state.tool === 'eraser') { drawingNow = true; eraseAt(x, y); return }
-    if (state.tool === 'laser') { drawingNow = true; laser.push({ x: x, y: y, t: Date.now() }); dirty = true; return }
     if (state.tool === 'text') { openTextInput(x, y); return }
 
     drawingNow = true
@@ -306,7 +290,6 @@
     var x = e.clientX, y = e.clientY
 
     if (state.tool === 'eraser') { eraseAt(x, y); return }
-    if (state.tool === 'laser') { laser.push({ x: x, y: y, t: Date.now() }); dirty = true; return }
     if (!current) return
 
     if (current.tool === 'pen' || current.tool === 'marker') {
@@ -416,7 +399,7 @@
   cursorBtn.addEventListener('click', function () { setCursorMode(!cursorMode) })
 
   function undo() { strokes.pop(); dirty = true }
-  function clearAll() { strokes = []; current = null; laser = []; dirty = true }
+  function clearAll() { strokes = []; current = null; dirty = true }
 
   // ================= Режим мыши =================
   // Самое важное удобство: рисунок и панель остаются на экране, но клики уходят
@@ -563,7 +546,7 @@
   restoreBarPos()
 
   // ---------- клавиатура ----------
-  var HOTKEYS = { p: 'pen', m: 'marker', a: 'arrow', l: 'line', r: 'rect', o: 'ellipse', t: 'text', k: 'laser', e: 'eraser' }
+  var HOTKEYS = { p: 'pen', m: 'marker', a: 'arrow', l: 'line', r: 'rect', o: 'ellipse', t: 'text', e: 'eraser' }
   window.addEventListener('keydown', function (e) {
     if (!state.active) return
     if (e.key === 'Escape') {

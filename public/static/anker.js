@@ -416,8 +416,13 @@
     if (screen.__ankDone) return
     screen.__ankDone = true
     var topbar = $('.room-topbar', screen)
-    if (topbar && !$('.ank-sigil', topbar)) {
-      topbar.insertBefore(makeSigil(30), topbar.firstChild)
+    // Шапка звонка: знак продукта слева и название "Voice Lobby" рядом с ним.
+    // Раньше здесь была только иконка звонка, без подписи.
+    if (topbar && !$('.ank-brandline', topbar)) {
+      var line = make('div', 'ank-brandline')
+      line.appendChild(makeSigil(30))
+      line.appendChild(make('span', 'ank-brandline__name', 'Voice Lobby'))
+      topbar.insertBefore(line, topbar.firstChild)
     }
     reveal([topbar, $('.controls-bar', screen)].filter(Boolean))
   }
