@@ -1936,10 +1936,25 @@ async function enterRoom(joinData) {
   // ---- Панель участников (кнопка в правом верхнем углу) ----
   // Раньше кнопка была декоративной и ничего не делала. Теперь она открывает боковую панель
   // со списком тех, кто сейчас в звонке: имя, инициалы, отметка создателя и состояние микрофона.
+  // Закрываем с той же анимацией, что и при открытии, только в обратную сторону: вешаем
+  // класс .is-closing (вся анимация в CSS) и убираем узел из DOM только после её окончания.
+  // Страховочный таймер нужен на случай, если animationend не придёт вообще (например,
+  // когда панель скрыта вкладкой в фоне и анимации не играются) - иначе оверлей
+  // остался бы висеть над звонком.
   function closeParticipantsPanel() {
     const existing = document.querySelector('.panel-overlay')
     if (!existing) return false
-    existing.remove()
+    if (existing.classList.contains('is-closing')) return true // уже уезжает
+    existing.classList.add('is-closing')
+    const panel = existing.querySelector('.panel')
+    let fallback = 0
+    const drop = () => { clearTimeout(fallback); existing.remove() }
+    if (panel) {
+      panel.addEventListener('animationend', drop, { once: true })
+      fallback = setTimeout(drop, 600)
+    } else {
+      drop()
+    }
     return true
   }
 
@@ -1954,7 +1969,13 @@ async function enterRoom(joinData) {
   }
 
   function openParticipantsPanel() {
-    if (closeParticipantsPanel()) return // повторный клик закрывает панель
+    const existing = document.querySelector('.panel-overlay')
+    if (existing) {
+      // Повторный клик по кнопке закрывает панель. Если она уже уезжает, не ждём конца
+      // анимации, а сразу открываем заново - иначе быстрые клики ощущались как залипание.
+      if (!existing.classList.contains('is-closing')) { closeParticipantsPanel(); return }
+      existing.remove()
+    }
 
     const panel = el('div', { class: 'panel' })
     const closeBtn = el('button', { class: 'panel-close', type: 'button', 'aria-label': 'Закрыть' }, [el('i', { class: 'fas fa-times' })])

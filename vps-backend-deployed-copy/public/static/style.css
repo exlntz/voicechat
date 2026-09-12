@@ -1588,6 +1588,16 @@ body.inapp-fullscreen { overflow: hidden; }
   animation: ank-panel-in .36s var(--ease-io);
 }
 @keyframes ank-panel-in { from { transform: translateX(100%); } to { transform: none; } }
+/* Закрытие - то же движение в обратную сторону: панель уезжает за правый край, затемнение
+   гаснет ровно за то же время, чтобы панель не "вспыхивала" на светлом фоне в конце.
+   Узел убирается из DOM по animationend (см. closeParticipantsPanel в app.js). */
+.panel-overlay.is-closing {
+  animation: ank-fade-out .36s var(--ease-io) forwards;
+  pointer-events: none; /* пока панель уезжает, клики уже уходят в интерфейс звонка */
+}
+.panel-overlay.is-closing .panel { animation: ank-panel-out .36s var(--ease-io) forwards; }
+@keyframes ank-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes ank-panel-out { from { transform: none; } to { transform: translateX(100%); } }
 .panel h3 {
   margin: 0 0 16px;
   font-size: 20px;
