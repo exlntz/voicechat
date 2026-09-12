@@ -5,7 +5,9 @@ export const renderer = jsxRenderer(({ children, title }) => {
     <html lang="ru">
       <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        {/* viewport-fit=cover — интерфейс на всю высоту экрана iPhone,
+            безопасные зоны уже учтены в style.css через env(safe-area-inset-*) */}
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
         <title>{title || 'Voice Lobby'}</title>
         {/* Веб-шрифты не грузим: типографика собрана на системных гарнитурах
             (--font / --mono в style.css) — это и быстрее, и без внешних зависимостей. */}
@@ -14,6 +16,8 @@ export const renderer = jsxRenderer(({ children, title }) => {
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet" />
         <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.1/dist/livekit-client.umd.min.js"></script>
         <link href="/static/style.css" rel="stylesheet" />
+        {/* Высота окна и переполнение: подключается после style.css */}
+        <link href="/static/layout-fit.css" rel="stylesheet" />
       </head>
       <body>
         {children}
