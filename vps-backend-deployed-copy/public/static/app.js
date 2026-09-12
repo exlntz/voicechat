@@ -21,18 +21,22 @@ const state = {
   hostSecret: null, // секрет для управления комнатой (выгон участников), известен только создателю
   // "Поделиться звуком стрима" - по умолчанию ВКЛЮЧЕНО (звук демонстрации должен быть слышен всегда,
   // если явно не выключен пользователем через кастомное контекстное меню на тайле демонстрации)
-  screenShareAudioShared: localStorage.getItem('screenShareAudioShared') !== '0'
+  screenShareAudioShared: localStorage.getItem('screenShareAudioShared') !== '0',
+  // Выбранная частота кадров демонстрации экрана (меняется только в меню ПКМ на своём тайле,
+  // запоминается между звонками)
+  screenShareFps: Number(localStorage.getItem('screenShareFps')) || 60
 }
 
-// ---- Демонстрация экрана: параметры без выбора в интерфейсе ----
-// Раньше рядом с кнопкой демонстрации был селектор 15/30/60 FPS и подменю
-// "Оптимизировать: движение/чёткость". Обычному пользователю эти настройки непонятны, а
-// правильный выбор для звонка всегда один и тот же, поэтому селекторы убраны, а значения
-// зафиксированы: максимальная плавность (60 кадров, высокий битрейт, contentHint = motion).
-// Дальше их подхватывают и degradationPreference: 'balanced', и site-boost.js в .exe.
-const SCREEN_SHARE_FPS = 60
-const SCREEN_SHARE_BITRATE = 8_000_000 // 8 Мбит/с - запас для 60 кадров без просадок
-const SCREEN_SHARE_CONTENT_HINT = 'motion' // плавность важнее резкости текста в звонке
+// ---- Демонстрация экрана: параметры передачи ----
+// Частота кадров выбирается ТОЛЬКО в контекстном меню своего тайла демонстрации
+// (ПКМ -> "Качество передачи" -> 15/30/60 FPS). Отдельного селектора/кнопки рядом с кнопкой
+// демонстрации намеренно нет - в панели управления должны оставаться только основные действия.
+// Выбор запоминается в localStorage и применяется к уже идущей демонстрации "живьём"
+// (applyScreenShareFps), без перезапуска стрима.
+const SCREEN_SHARE_FPS_OPTIONS = [15, 30, 60]
+// Оптимизация картинки фиксирована: подменю "Движение/чёткость" убрано - в звонке всегда
+// нужна плавность (motion), а не резкость статичного текста.
+const SCREEN_SHARE_CONTENT_HINT = 'motion'
 
 const root = document.getElementById('app-root')
 
@@ -1173,8 +1177,11 @@ async function enterRoom(joinData) {
   let activeCtxMenu = null
   let activeCtxSubmenu = null
 
-  function closeScreenContextMenu() {
+  function closeScreenContextSubmenu() {
     if (activeCtxSubmenu) { activeCtxSubmenu.remove(); activeCtxSubmenu = null }
+  }
+  function closeScreenContextMenu() {
+    closeScreenContextSubmenu()
     if (activeCtxMenu) { activeCtxMenu.remove(); activeCtxMenu = null }
   }
   document.addEventListener('click', closeScreenContextMenu)
@@ -1256,7 +1263,7 @@ async function enterRoom(joinData) {
   }
 
   function openSubmenu(anchorEl, buildItems) {
-    if (activeCtxSubmenu) { activeCtxSubmenu.remove(); activeCtxSubmenu = null }
+    closeScreenContextSubmenu()
     const submenu = el('div', { class: 'screen-ctx-submenu' }, buildItems())
     const rect = anchorEl.getBoundingClientRect()
     positionFloating(submenu, rect.right + 4, rect.top)
@@ -1280,6 +1287,20 @@ async function enterRoom(joinData) {
         icon: 'fas fa-arrows-rotate', label: 'Изменить источник',
         onClick: () => { closeScreenContextMenu(); changeScreenSource() }
       }))
+      // Выбор частоты кадров живёт только здесь - в меню ПКМ на своём тайле демонстрации.
+      // Подменю открывается по наведению (как в нативных меню) и по клику - на тач-экранах
+      // mouseenter не приходит, и без клика пункт был бы недоступен.
+      const qualityItem = ctxItem({
+        icon: 'fas fa-gauge-high', label: 'Качество передачи', chevron: true
+      })
+      const openFpsSubmenu = () => openSubmenu(qualityItem, () => SCREEN_SHARE_FPS_OPTIONS.map((fps) => ctxItem({
+        label: `${fps} FPS`,
+        selected: fps === state.screenShareFps,
+        onClick: () => { setScreenShareFps(fps); closeScreenContextMenu() }
+      })))
+      qualityItem.addEventListener('mouseenter', openFpsSubmenu)
+      qualityItem.addEventListener('click', openFpsSubmenu)
+      items.push(qualityItem)
       items.push(el('div', { class: 'screen-ctx-divider' }))
       items.push(ctxItem({
         label: 'Поделиться звуком стрима',
@@ -1334,6 +1355,14 @@ async function enterRoom(joinData) {
         }
       }))
     }
+
+    // Наведение на любой другой пункт закрывает открытое подменю - иначе оно бы висело
+    // поверх меню до самого закрытия и перекрывало соседние пункты.
+    items.forEach((it) => {
+      if (!it || !it.classList || !it.classList.contains('screen-ctx-item')) return
+      if (it.querySelector('.ctx-chevron')) return
+      it.addEventListener('mouseenter', closeScreenContextSubmenu)
+    })
 
     const menu = el('div', { class: 'screen-ctx-menu' }, items)
     menu.addEventListener('click', (e) => e.stopPropagation())
@@ -1648,6 +1677,49 @@ async function enterRoom(joinData) {
   let screenShareBusy = false // защита от повторного/двойного клика во время async старта - вторая причина "раздвоения" демки
   let currentScreenTrackSid = null
 
+  // Битрейт подбираем под выбранную частоту кадров: чем больше кадров в секунду, тем
+  // больше данных нужно, чтобы картинка не рассыпалась; на 15 кадрах 8 Мбит/с - излишество.
+  function bitrateForFps(fps) {
+    if (fps <= 15) return 4_000_000
+    if (fps <= 30) return 6_000_000
+    return 8_000_000 // 8 Мбит/с - запас для 60 кадров без просадок
+  }
+
+  // ---- Применить выбранный FPS к уже идущей демонстрации "живьём" ----
+  // Меняем и реальные constraints захвата (applyConstraints), и предел кодировщика
+  // (RTCRtpSender encodings[].maxFramerate) - иначе повышение FPS не даст эффекта, если сендер
+  // уже был ограничен более низким значением на старте публикации.
+  function applyScreenShareFps(fps) {
+    if (!isScreenSharing) return
+    const pub = room.localParticipant.getTrackPublication(LK.Track.Source.ScreenShare)
+    const track = pub && pub.track
+    if (!track) return
+    const msTrack = track.mediaStreamTrack
+    if (msTrack && typeof msTrack.applyConstraints === 'function') {
+      msTrack.applyConstraints({ frameRate: { ideal: fps, min: Math.min(fps, 30) } }).catch(() => {})
+    }
+    const sender = track.sender
+    if (sender && typeof sender.getParameters === 'function') {
+      try {
+        const params = sender.getParameters()
+        if (params.encodings && params.encodings.length) {
+          params.encodings.forEach((enc) => { enc.maxFramerate = fps; enc.maxBitrate = bitrateForFps(fps) })
+          Promise.resolve(sender.setParameters(params)).catch(() => {})
+        }
+      } catch {}
+    }
+  }
+
+  // Вызывается из подменю "Качество передачи" (ПКМ на своём тайле демонстрации):
+  // запоминаем выбор и сразу применяем его к текущему стриму.
+  function setScreenShareFps(fps) {
+    if (state.screenShareFps === fps) return
+    state.screenShareFps = fps
+    try { localStorage.setItem('screenShareFps', String(fps)) } catch {}
+    applyScreenShareFps(fps)
+    showToast(`Качество передачи: ${fps} FPS`)
+  }
+
   // ===================== Демонстрация экрана: start/stop/change-source отдельными функциями =====================
   // Вынесено из единого screenBtn-обработчика, чтобы этими же действиями можно было управлять
   // и из кастомного контекстного меню (ПКМ на тайле демонстрации): "Прекратить стрим", "Изменить источник".
@@ -1682,9 +1754,9 @@ async function enterRoom(joinData) {
     try {
       // ВАЖНО про кадры: пресеты LiveKit (например LK.ScreenSharePresets.h1080fps30) жёстко
       // ограничивают frameRate 30 кадрами ещё на уровне getDisplayMedia(), независимо от
-      // videoEncoding.maxFramerate ниже. Поэтому resolution задаём вручную с целевыми 60 кадрами.
-      // Выбора FPS в интерфейсе больше нет - значение фиксировано (см. SCREEN_SHARE_FPS).
-      const fps = SCREEN_SHARE_FPS
+      // videoEncoding.maxFramerate ниже. Поэтому resolution задаём вручную с выбранной частотой кадров.
+      // Значение берём из выбора в меню ПКМ (state.screenShareFps, по умолчанию 60).
+      const fps = state.screenShareFps
       const hint = SCREEN_SHARE_CONTENT_HINT
       const pub = await room.localParticipant.setScreenShareEnabled(true, {
         video: { displaySurface: 'monitor' },
@@ -1701,7 +1773,7 @@ async function enterRoom(joinData) {
         resolution: { width: 1920, height: 1080, frameRate: fps },
         contentHint: hint
       }, {
-        videoEncoding: { maxBitrate: SCREEN_SHARE_BITRATE, maxFramerate: fps },
+        videoEncoding: { maxBitrate: bitrateForFps(fps), maxFramerate: fps },
         // degradationPreference по умолчанию для ScreenShare = "maintain-resolution" - при перегрузке
         // CPU/сети WebRTC-энкодер режет именно FPS, сохраняя разрешение, отсюда и проседание до 40-50
         // на 60 FPS. Для плавности важнее стабильный FPS, чем максимальная резкость - переключаем на

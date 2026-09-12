@@ -232,18 +232,75 @@ ipcMain.on('overlay-focus', () => {
   if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.focus()
 })
 
+// ---- Свои собственные окна в списке источников не нужны ----
+// Оверлей рисования (overlay.html, заголовок "Аннотации") и сам пикер физически существуют
+// в системе, поэтому desktopCapturer отдаёт их как обычные окна: в списке появлялись пустые
+// чёрные плитки "Аннотации", выбрать которые бессмысленно (оверлей прозрачный, показывать
+// в нём нечего). Отсекаем их двумя способами: по нативному хэндлу окна (надёжно) и по
+// заголовку наших внутренних страниц (страховка, если формат source.id изменится).
+const INTERNAL_WINDOW_TITLES = new Set(['Аннотации', 'Выберите экран или окно'])
+
+function nativeHandleKeys(win) {
+  const keys = []
+  try {
+    const buf = win.getNativeWindowHandle()
+    if (buf && buf.length >= 4) keys.push(String(buf.readUInt32LE(0)))
+    if (buf && buf.length >= 8) keys.push(String(buf.readBigUInt64LE(0)))
+  } catch (e) { /* платформа без нативного хэндла - остаётся фильтр по заголовку */ }
+  return keys
+}
+
+function internalWindowHandles() {
+  const handles = new Set()
+  for (const win of [overlayWindow, pickerWindow]) {
+    if (win && !win.isDestroyed()) nativeHandleKeys(win).forEach((k) => handles.add(k))
+  }
+  return handles
+}
+
+// Оставляем в списке только то, что пользователь реально может показать.
+function isPickableSource(source, internalHandles) {
+  if (!source || !source.id) return false
+  if (source.id.startsWith('screen')) return true
+  const name = String(source.name || '').trim()
+  if (!name) return false // безымянные служебные окна ОС: в списке это чёрная плитка без подписи
+  if (INTERNAL_WINDOW_TITLES.has(name)) return false
+  // source.id окна выглядит как "window:<хэндл>:<индекс>"
+  const handle = source.id.split(':')[1]
+  if (handle && internalHandles.has(handle)) return false
+  return true
+}
+
 // ---- Обработчик системного выбора источника экрана/окна ----
 // Electron сам не показывает системный диалог выбора экрана как в браузере - рисуем свой,
 // и отдаём выбранный источник через setDisplayMediaRequestHandler.
 // Возвращает { source, shareAudio } (или null при отмене).
 function openPickerWindow() {
   return new Promise((resolve) => {
-    desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 300, height: 200 } })
-      .then((sources) => {
+    // 16:9 и покрупнее - ровно под рамку плитки в picker.html (раньше 300x200 заметно мылило).
+    // fetchWindowIcons даёт иконку приложения - с ней окно опознаётся быстрее, чем по превью.
+    desktopCapturer
+      .getSources({
+        types: ['screen', 'window'],
+        thumbnailSize: { width: 480, height: 270 },
+        fetchWindowIcons: true
+      })
+      .then((allSources) => {
+        const internalHandles = internalWindowHandles()
+        const sources = allSources.filter((s) => isPickableSource(s, internalHandles))
+
+        // Размер подбираем под рабочую область экрана: на ноутбуках с 768px по высоте
+        // фиксированные 620px + рамка + панель задач не влезали, и окно само уезжало в прокрутку.
+        const workArea = screen.getPrimaryDisplay().workAreaSize
+        const pickerWidth = Math.max(600, Math.min(900, workArea.width - 120))
+        const pickerHeight = Math.max(460, Math.min(680, workArea.height - 120))
+
         pickerWindow = new BrowserWindow({
-          width: 760,
-          height: 620,
-          resizable: false,
+          width: pickerWidth,
+          height: pickerHeight,
+          minWidth: 560,
+          minHeight: 420,
+          resizable: true,
           minimizable: false,
           maximizable: false,
           parent: mainWindow,
@@ -267,7 +324,9 @@ function openPickerWindow() {
             // s.id обычно вида "screen:0:0" или "window:1234:0" - используем это как надёжный
             // признак типа источника, т.к. поле s.display_id не всегда присутствует
             type: s.id.startsWith('screen') ? 'screen' : 'window',
-            thumbnail: s.thumbnail.toDataURL()
+            thumbnail: s.thumbnail.toDataURL(),
+            // appIcon есть не у всех окон и никогда нет у экранов - передаём null, рендерер его просто пропустит
+            icon: s.appIcon && !s.appIcon.isEmpty() ? s.appIcon.toDataURL() : null
           })))
         }
 

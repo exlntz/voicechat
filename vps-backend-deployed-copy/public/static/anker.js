@@ -76,7 +76,7 @@
     }
 
     // Подпись изменилась (app.js подставил «Вход...») — пересобираем внутренности
-    $$('.btn__x, .btn__dot', btn).forEach(function (n) { n.remove() })
+    $$('.btn__x', btn).forEach(function (n) { n.remove() })
     drop.forEach(function (n) { n.remove() })
 
     var roll = make('span', 'btn__x')
@@ -88,7 +88,6 @@
     roll.appendChild(a)
     roll.appendChild(b)
     btn.appendChild(roll)
-    btn.appendChild(make('span', 'btn__dot'))
     btn.classList.add('ank-btn')
     attachMagnet(btn)
   }

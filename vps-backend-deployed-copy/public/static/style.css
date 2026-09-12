@@ -137,7 +137,7 @@ h1, h2, h3, h4 { font-family: var(--font); font-weight: 650; letter-spacing: -0.
 
 /* ═══════════════ АТОМЫ: кнопки ═══════════════
    Один визуальный язык: скруглённые плашки, синяя заливка у главного действия,
-   hairline у второстепенных. Внутренности (.btn__x с двойным лейблом и .btn__dot)
+   hairline у второстепенных. Внутренности (.btn__x с двойным лейблом)
    навешивает anker.js; без него кнопка остаётся статичной, но полностью рабочей. */
 
 button {
@@ -169,23 +169,6 @@ button {
 .ank-btn:hover .btn__x b,
 .ank-btn:focus-visible .btn__x b { transform: translateY(calc(-1 * var(--roll))); }
 
-/* Точка-маркер справа от лейбла: раздувается при наведении */
-.btn__dot {
-  position: absolute;
-  top: 50%;
-  right: 16px;
-  width: 4px;
-  height: 4px;
-  margin-top: -2px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.32;
-  flex: 0 0 auto;
-  transition: transform 0.4s var(--ease), opacity 0.4s var(--ease);
-  pointer-events: none;
-}
-.ank-btn:hover .btn__dot { transform: scale(1.7); opacity: 0.6; }
-
 .ank-btn {
   position: relative;
   will-change: transform;
@@ -195,13 +178,6 @@ button {
 .lobby-logout-btn .btn__x,
 .btn-secondary .btn__x,
 .test-sound-btn .btn__x { --roll: 18px; }
-/* В компактных кнопках точка вплотную к подписи — убираем */
-.leave-btn .btn__dot,
-.join-toggle-btn .btn__dot,
-.lobby-logout-btn .btn__dot,
-.btn-secondary .btn__dot,
-.test-sound-btn .btn__dot,
-.solo-copy-btn .btn__dot { display: none; }
 
 /* ═══════════════ АТОМЫ: поля ввода ═══════════════
    Поле — подчёркнутая строка: подпись всплывает над ней, при фокусе

@@ -6,11 +6,18 @@
 <style>
   /* Voice Lobby · выбор источника демонстрации.
      Тот же язык, что и в вебе: тёмные поверхности, синий акцент #0458cf,
-     умеренные радиусы, системный шрифт. */
+     умеренные радиусы, системный шрифт.
+
+     Раскладка окна: шапка и низ (звук + кнопки) закреплены, прокручивается ТОЛЬКО
+     список источников и только по вертикали. Раньше окно прокручивалось целиком
+     (вторая полоса у рамки), а у списка появлялась ещё и горизонтальная полоса:
+     треки grid были minmax(auto, 1fr), и длинные заголовки окон растягивали колонки
+     за границу окна - плитки получались разного размера и уезжали вправо. */
   :root {
     --bg: #0f1115;
     --surface: #15181e;
     --surface-2: #1b1f27;
+    --shot-bg: #0a0c10;
     --text: #f2f5f9;
     --text-dim: rgba(242, 245, 249, 0.66);
     --accent: #0458cf;
@@ -22,100 +29,166 @@
     --ease: cubic-bezier(0.16, 0.84, 0.24, 1);
   }
   * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
     font-family: var(--sans);
-    padding: 20px 20px 18px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* прокрутка живёт только внутри .list */
     user-select: none;
     -webkit-user-select: none;
   }
+
+  /* ---- Шапка ---- */
+  .head {
+    flex: 0 0 auto;
+    padding: 20px 22px 14px;
+    border-bottom: 1px solid var(--rule);
+  }
   h1 {
-    font-family: var(--sans);
     font-size: 19px;
     font-weight: 650;
     line-height: 1.25;
     letter-spacing: -0.01em;
-    margin: 0 0 4px;
+    margin: 0 0 6px;
     color: var(--text);
   }
-  h1::after {
-    content: "Выберите источник — двойной клик сразу начнёт демонстрацию";
-    display: block;
-    margin-top: 6px;
-    padding-bottom: 14px;
-    border-bottom: 1px solid var(--rule);
+  .head .sub {
     font: 400 13px/1.45 var(--sans);
-    letter-spacing: 0;
     color: var(--text-dim);
   }
-  h2.group-title {
-    font-family: var(--sans);
+
+  /* ---- Список источников: единственная область прокрутки ---- */
+  .list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0 22px 18px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(4, 88, 207, 0.75) transparent;
+  }
+  .list::-webkit-scrollbar { width: 10px; }
+  .list::-webkit-scrollbar-track { background: rgba(242, 245, 249, 0.05); border-radius: 8px; }
+  .list::-webkit-scrollbar-thumb { background: rgba(4, 88, 207, 0.7); border-radius: 8px; }
+  .list::-webkit-scrollbar-thumb:hover { background: var(--accent-hover); }
+
+  .group[hidden] { display: none; }
+  .group-title {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: 0;
+    padding: 14px 0 9px;
+    background: var(--bg);
     font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.01em;
     color: var(--text-dim);
-    margin: 16px 0 9px;
   }
+
+  /* Все плитки одного размера: колонки minmax(0, ...) не растягиваются под длинные
+     заголовки, картинка всегда в рамке 16:9, подпись - одна строка с многоточием. */
   .grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    padding-right: 4px;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 12px;
+    align-items: start;
   }
-  .grids-wrap {
-    max-height: 300px;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(4, 88, 207, 0.75) transparent;
-  }
-  .grids-wrap::-webkit-scrollbar { width: 9px; }
-  .grids-wrap::-webkit-scrollbar-track { background: rgba(242, 245, 249, 0.05); border-radius: 8px; }
-  .grids-wrap::-webkit-scrollbar-thumb { background: rgba(4, 88, 207, 0.7); border-radius: 8px; }
-  .grids-wrap::-webkit-scrollbar-thumb:hover { background: var(--accent-hover); }
 
-  /* Плитка источника */
   .item {
     position: relative;
+    min-width: 0;
     border: 1px solid var(--rule);
     border-radius: 12px;
-    padding: 7px;
+    padding: 8px;
     cursor: pointer;
     background: var(--surface);
-    transition: border-color 180ms var(--ease), transform 180ms var(--ease), background 180ms var(--ease), box-shadow 180ms var(--ease);
+    transition: border-color 180ms var(--ease), background 180ms var(--ease), box-shadow 180ms var(--ease);
   }
-  .item:hover { border-color: var(--rule-strong); transform: translateY(-2px); background: var(--surface-2); }
+  .item:hover { border-color: var(--rule-strong); background: var(--surface-2); }
   .item.selected {
     border-color: var(--accent);
     background: var(--surface-2);
     box-shadow: 0 0 0 1px var(--accent), 0 10px 24px rgba(4, 88, 207, 0.22);
   }
-  .item img {
+  .item .shot {
     width: 100%;
-    height: 90px;
-    object-fit: cover;
-    border-radius: 8px;
-    background: #000;
+    aspect-ratio: 16 / 9;
+    border-radius: 9px;
+    background: var(--shot-bg);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* object-fit не подходит: окна бывают вертикальными, и cover обрезал бы половину.
+     Вписываем превью целиком - размер плитки при этом остаётся одинаковым. */
+  .item .shot img {
+    max-width: 100%;
+    max-height: 100%;
     display: block;
   }
+  /* Фиксированная высота строки с подписью: иначе плитки с иконкой приложения
+     оказывались на пару пикселей выше плиток без неё (экраны). */
+  .item .row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 9px;
+    min-width: 0;
+    height: 18px;
+  }
+  .item .row .icon {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    border-radius: 3px;
+    object-fit: contain;
+  }
   .item .name {
-    font-family: var(--sans);
-    font-size: 12px;
-    letter-spacing: 0;
-    margin-top: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 12.5px;
+    line-height: 18px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     color: var(--text-dim);
   }
   .item.selected .name { color: var(--text); }
+  .item .tick {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  }
+  .item.selected .tick { display: flex; }
 
+  /* ---- Низ окна: звук + действия ---- */
+  .foot {
+    flex: 0 0 auto;
+    padding: 14px 22px 18px;
+    border-top: 1px solid var(--rule);
+    background: var(--bg);
+  }
   .audio-row {
     display: flex;
     align-items: flex-start;
     gap: 10px;
-    margin-top: 16px;
     padding: 12px 14px;
     border-radius: 12px;
     border: 1px solid var(--rule);
@@ -130,10 +203,8 @@
     flex-shrink: 0;
   }
   .audio-row label {
-    font-family: var(--sans);
     font-size: 13.5px;
     font-weight: 600;
-    letter-spacing: 0;
     color: var(--text);
     cursor: pointer;
     display: block;
@@ -148,12 +219,9 @@
     justify-content: flex-end;
     align-items: center;
     gap: 10px;
-    margin-top: 18px;
-    padding-top: 16px;
-    border-top: 1px solid var(--rule);
+    margin-top: 14px;
   }
   button {
-    position: relative;
     border: 1px solid var(--rule-strong);
     border-radius: 12px;
     padding: 12px 22px;
@@ -161,7 +229,7 @@
     font-family: var(--sans);
     font-size: 14px;
     font-weight: 600;
-    letter-spacing: 0;
+    color: inherit;
     cursor: pointer;
     transition: color 180ms var(--ease), background 180ms var(--ease), border-color 180ms var(--ease), transform 140ms var(--ease);
   }
@@ -186,89 +254,137 @@
   .empty-hint {
     font: 400 13px/1.45 var(--sans);
     color: var(--text-dim);
-    padding: 10px 0;
+    padding: 18px 0;
   }
   @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition-duration: 1ms !important; }
-    .item:hover { transform: none; }
   }
 </style>
 </head>
 <body>
-  <h1>Выберите, что демонстрировать</h1>
-  <div class="grids-wrap">
-    <h2 class="group-title">Экраны</h2>
-    <div class="grid" id="gridScreens"></div>
-    <h2 class="group-title">Окна</h2>
-    <div class="grid" id="gridWindows"></div>
+  <div class="head">
+    <h1>Выберите, что демонстрировать</h1>
+    <div class="sub">Двойной клик по плитке сразу начнёт демонстрацию</div>
   </div>
 
-  <div class="audio-row">
-    <input type="checkbox" id="audioCheckbox" checked />
-    <div>
-      <label for="audioCheckbox">Поделиться звуком стрима</label>
-      <div class="audio-hint" id="audioHint">Звук всегда захватывается вместе с демонстрацией — можно включать/выключать в любой момент прямо во время звонка.</div>
+  <div class="list" id="list">
+    <div class="group" id="groupScreens">
+      <h2 class="group-title">Экраны</h2>
+      <div class="grid" id="gridScreens"></div>
     </div>
+    <div class="group" id="groupWindows">
+      <h2 class="group-title">Окна</h2>
+      <div class="grid" id="gridWindows"></div>
+    </div>
+    <div class="empty-hint" id="emptyHint" hidden>Не удалось найти ни один экран или окно</div>
   </div>
 
-  <div class="actions">
-    <button class="btn-cancel" id="cancelBtn">Отмена</button>
-    <button class="btn-share" id="shareBtn" disabled>Демонстрировать</button>
+  <div class="foot">
+    <div class="audio-row">
+      <input type="checkbox" id="audioCheckbox" checked />
+      <div>
+        <label for="audioCheckbox">Поделиться звуком стрима</label>
+        <div class="audio-hint" id="audioHint">Звук всегда захватывается вместе с демонстрацией — можно включать/выключать в любой момент прямо во время звонка.</div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn-cancel" id="cancelBtn">Отмена</button>
+      <button class="btn-share" id="shareBtn" disabled>Демонстрировать</button>
+    </div>
   </div>
 
   <script>
     let selectedId = null
-    let selectedType = null
     const gridScreens = document.getElementById('gridScreens')
     const gridWindows = document.getElementById('gridWindows')
+    const groupScreens = document.getElementById('groupScreens')
+    const groupWindows = document.getElementById('groupWindows')
+    const emptyHint = document.getElementById('emptyHint')
     const shareBtn = document.getElementById('shareBtn')
     const cancelBtn = document.getElementById('cancelBtn')
     const audioCheckbox = document.getElementById('audioCheckbox')
     const audioHint = document.getElementById('audioHint')
 
+    const AUDIO_HINT_DEFAULT = 'Звук всегда захватывается вместе с демонстрацией — можно включать/выключать в любой момент прямо во время звонка.'
+    const AUDIO_HINT_WINDOW = 'При демонстрации отдельного окна захватывается звук всей системы (ограничение Windows) — выбирайте «Экраны» выше, если нужен точечный захват звука приложения.'
+
     function selectItem(item, s) {
-      document.querySelectorAll('.item').forEach((el) => el.classList.remove('selected'))
+      document.querySelectorAll('.item.selected').forEach((el) => el.classList.remove('selected'))
       item.classList.add('selected')
       selectedId = s.id
-      selectedType = s.type
       shareBtn.disabled = false
       // Захват системного звука на Windows не изолируется по конкретному окну - при выборе окна
       // всё равно будет слышен звук всей системы, а не только этого приложения. Предупреждаем,
       // но НЕ блокируем чекбокс - звук демонстрации должен быть доступен всегда, по требованию.
-      audioHint.textContent = s.type === 'window'
-        ? 'При демонстрации отдельного окна захватывается звук всей системы (ограничение Windows) - выбирайте "Экраны" выше, если нужен точечный захват звука приложения.'
-        : 'Звук всегда захватывается вместе с демонстрацией — можно включать/выключать в любой момент прямо во время звонка.'
+      audioHint.textContent = s.type === 'window' ? AUDIO_HINT_WINDOW : AUDIO_HINT_DEFAULT
     }
 
-    function renderGroup(container, sources) {
-      container.innerHTML = ''
-      if (!sources.length) {
-        container.appendChild(Object.assign(document.createElement('div'), { className: 'empty-hint', textContent: 'Ничего не найдено' }))
-        return
+    function choose() {
+      if (selectedId) window.pickerAPI.choose(selectedId, audioCheckbox.checked)
+    }
+
+    function makeItem(s) {
+      const item = document.createElement('div')
+      item.className = 'item'
+      item.tabIndex = 0
+
+      const shot = document.createElement('div')
+      shot.className = 'shot'
+      const img = document.createElement('img')
+      img.src = s.thumbnail
+      img.alt = ''
+      shot.appendChild(img)
+
+      const row = document.createElement('div')
+      row.className = 'row'
+      if (s.icon) {
+        const icon = document.createElement('img')
+        icon.className = 'icon'
+        icon.src = s.icon
+        icon.alt = ''
+        row.appendChild(icon)
       }
-      sources.forEach((s) => {
-        const item = document.createElement('div')
-        item.className = 'item'
-        item.innerHTML = `<img src="${s.thumbnail}" /><div class="name">${s.name}</div>`
-        item.addEventListener('click', () => selectItem(item, s))
-        item.addEventListener('dblclick', () => {
-          selectItem(item, s)
-          window.pickerAPI.choose(s.id, audioCheckbox.checked)
-        })
-        container.appendChild(item)
-      })
+      const name = document.createElement('div')
+      name.className = 'name'
+      // Именно textContent, а не innerHTML: заголовок чужого окна - это внешние данные,
+      // и через innerHTML он попадал бы в разметку как есть.
+      name.textContent = s.name
+      name.title = s.name
+      row.appendChild(name)
+
+      const tick = document.createElement('div')
+      tick.className = 'tick'
+      tick.textContent = '✓'
+
+      item.appendChild(shot)
+      item.appendChild(row)
+      item.appendChild(tick)
+
+      item.addEventListener('click', () => selectItem(item, s))
+      item.addEventListener('dblclick', () => { selectItem(item, s); choose() })
+      item.addEventListener('focus', () => selectItem(item, s))
+      return item
+    }
+
+    function renderGroup(group, container, sources) {
+      container.innerHTML = ''
+      group.hidden = !sources.length
+      sources.forEach((s) => container.appendChild(makeItem(s)))
     }
 
     window.pickerAPI.onSources((sources) => {
-      renderGroup(gridScreens, sources.filter((s) => s.type === 'screen'))
-      renderGroup(gridWindows, sources.filter((s) => s.type === 'window'))
+      const list = Array.isArray(sources) ? sources : []
+      renderGroup(groupScreens, gridScreens, list.filter((s) => s.type === 'screen'))
+      renderGroup(groupWindows, gridWindows, list.filter((s) => s.type === 'window'))
+      emptyHint.hidden = list.length > 0
     })
 
-    shareBtn.addEventListener('click', () => {
-      if (selectedId) window.pickerAPI.choose(selectedId, audioCheckbox.checked)
-    })
+    shareBtn.addEventListener('click', choose)
     cancelBtn.addEventListener('click', () => window.pickerAPI.cancel())
-    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.pickerAPI.cancel() })
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') window.pickerAPI.cancel()
+      if (e.key === 'Enter' && selectedId) { e.preventDefault(); choose() }
+    })
   </script>
 </body>
 </html>

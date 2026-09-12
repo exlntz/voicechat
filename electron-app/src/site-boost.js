@@ -18,6 +18,28 @@
   var TARGET_FPS = 60
   var MAX_BITRATE = 8000000 // 8 Мбит/с - запас для 60 кадров без просадок
 
+  // Сайт умеет выбирать частоту кадров сам (меню ПКМ на тайле демонстрации -> "Качество
+  // передачи"). Если значение пришло явно - уважаем его, иначе выбор 15/30 FPS в .exe был бы
+  // молча затёрт нашими 60. Когда сайт ничего не просит - остаётся наш максимум.
+  function num(v) {
+    var n = Number(v)
+    return isFinite(n) && n > 0 ? n : 0
+  }
+
+  function wantedFps(constraint) {
+    if (!constraint) return TARGET_FPS
+    if (typeof constraint === 'object') {
+      return num(constraint.ideal) || num(constraint.exact) || num(constraint.max) || TARGET_FPS
+    }
+    return num(constraint) || TARGET_FPS
+  }
+
+  function bitrateFor(fps) {
+    if (fps <= 15) return 4000000
+    if (fps <= 30) return 6000000
+    return MAX_BITRATE
+  }
+
   function log() {
     try { console.log.apply(console, ['[zvonki-boost]'].concat([].slice.call(arguments))) } catch (e) {}
   }
@@ -32,14 +54,15 @@
       md.getDisplayMedia = function (constraints) {
         var c = Object.assign({}, constraints || {})
         var v = (c.video && typeof c.video === 'object') ? Object.assign({}, c.video) : {}
-        v.frameRate = { ideal: TARGET_FPS, max: TARGET_FPS }
+        var fps = wantedFps(v.frameRate)
+        v.frameRate = { ideal: fps, max: fps }
         c.video = v
         return origGDM(c).then(function (stream) {
           stream.getVideoTracks().forEach(function (t) {
             try { t.contentHint = 'motion' } catch (e) {}
-            try { t.applyConstraints({ frameRate: { ideal: TARGET_FPS, max: TARGET_FPS } }) } catch (e) {}
+            try { t.applyConstraints({ frameRate: { ideal: fps, max: fps } }) } catch (e) {}
           })
-          log('захват экрана: запрошено', TARGET_FPS, 'FPS')
+          log('захват экрана: запрошено', fps, 'FPS')
           return stream
         })
       }
@@ -70,12 +93,19 @@
         /screen|window|monitor|экран/i.test(label)
 
       if (isScreen) {
+        var askedFps = 0
+        try {
+          askedFps = num(opts.screenShareEncoding && opts.screenShareEncoding.maxFramerate) ||
+                     num(opts.videoEncoding && opts.videoEncoding.maxFramerate)
+        } catch (e) { askedFps = 0 }
+        var fps = askedFps || TARGET_FPS
+        var bitrate = bitrateFor(fps)
         opts.simulcast = false
         opts.degradationPreference = 'maintain-framerate'
-        opts.screenShareEncoding = { maxFramerate: TARGET_FPS, maxBitrate: MAX_BITRATE, priority: 'high' }
-        opts.videoEncoding = { maxFramerate: TARGET_FPS, maxBitrate: MAX_BITRATE, priority: 'high' }
+        opts.screenShareEncoding = { maxFramerate: fps, maxBitrate: bitrate, priority: 'high' }
+        opts.videoEncoding = { maxFramerate: fps, maxBitrate: bitrate, priority: 'high' }
         try { if (track && track.mediaStreamTrack) track.mediaStreamTrack.contentHint = 'motion' } catch (e) {}
-        log('публикуем демонстрацию:', TARGET_FPS, 'FPS,', MAX_BITRATE / 1000000, 'Мбит/с')
+        log('публикуем демонстрацию:', fps, 'FPS,', bitrate / 1000000, 'Мбит/с')
       }
       return origPublish.call(this, track, opts)
     }
