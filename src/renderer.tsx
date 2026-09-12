@@ -17,6 +17,9 @@ export const renderer = jsxRenderer(({ children, title }) => {
       </head>
       <body>
         {children}
+        {/* Качество демонстрации экрана: строго ДО app.js, чтобы обёртка над
+            getDisplayMedia и патч публикации LiveKit были готовы к первому запуску */}
+        <script src="/static/media-quality.js"></script>
         <script src="/static/app.js"></script>
         {/* Слой микровзаимодействий (кнопки/поля/курсор) — навешивается поверх готового DOM */}
         <script src="/static/anker.js"></script>
