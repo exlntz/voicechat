@@ -11,6 +11,7 @@ import { randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { totalmem, freemem, loadavg, cpus } from 'node:os'
 
 const scrypt = promisify(scryptCb)
 
@@ -23,6 +24,10 @@ const LIVEKIT_HTTP_URL = process.env.LIVEKIT_HTTP_URL // https://livekit.185.199
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET
 const DB_PATH = process.env.DB_PATH || join(__dirname, '..', 'data', 'rooms.sqlite')
+// Необязательный токен для эндпоинта метрик (GET /api/metrics?token=...). Нужен, чтобы можно
+// было снимать потребление памяти curl'ом/мониторингом без cookie-сессии. Если переменная не
+// задана - эндпоинт доступен только авторизованному пользователю, как и остальные /api/*.
+const METRICS_TOKEN = process.env.METRICS_TOKEN || ''
 
 if (!LIVEKIT_URL || !LIVEKIT_HTTP_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
   console.error('Missing required env vars: LIVEKIT_URL, LIVEKIT_HTTP_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET')
@@ -128,6 +133,8 @@ app.use('/api/*', cors())
 // Все /api/* маршруты требуют авторизации, КРОМЕ /api/auth/* (иначе войти было бы невозможно)
 app.use('/api/*', (c, next) => {
   if (c.req.path.startsWith('/api/auth/')) return next()
+  // Метрики: либо обычная сессия, либо служебный токен (мониторинг/curl с самого VPS)
+  if (c.req.path === '/api/metrics' && METRICS_TOKEN && c.req.query('token') === METRICS_TOKEN) return next()
   return requireAuth(c, next)
 })
 // Статика фронтенда (HTML отдаём вручную ниже, а /static/* — файлы напрямую)
@@ -437,6 +444,85 @@ app.get('/api/rooms/:code', async (c) => {
   } catch {
     return c.json({ exists: false, participantCount: 0, maxParticipants: MAX_PARTICIPANTS, participants: [] })
   }
+})
+
+// ---------- API: метрики потребления ресурсов ----------
+// Зачем: нужно было понять, оправдан ли текущий тариф VPS (4 vCPU / 8 ГБ) - то есть
+// используется ли вся ОЗУ. Эндпоинт максимально лёгкий: одна синхронная выборка из
+// process.memoryUsage()/os + один вызов LiveKit listRooms(). listRooms() отдаёт сразу
+// numParticipants/numPublishers по каждой комнате, поэтому дополнительных запросов
+// на каждую комнату (N+1) здесь нет.
+//
+// Доступ: авторизованный пользователь ИЛИ ?token=$METRICS_TOKEN (см. middleware выше).
+// Замер так: watch -n5 'curl -s "http://127.0.0.1:3001/api/metrics?token=..." | jq .memory'
+const MB = (bytes) => Math.round((bytes / 1048576) * 10) / 10
+
+app.get('/api/metrics', async (c) => {
+  const mem = process.memoryUsage()
+  const total = totalmem()
+  const free = freemem()
+
+  let livekit = { reachable: false, rooms: 0, participants: 0, publishers: 0, byRoom: [] }
+  try {
+    // Таймаут обязателен: если LiveKit жив по DNS, но не отвечает (congestion/фаервол),
+    // запрос без ограничения висел бы минутами, а эндпоинт метрик должен отвечать всегда.
+    const rooms = await Promise.race([
+      svc.listRooms(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('livekit_timeout')), 2500))
+    ])
+    livekit = {
+      reachable: true,
+      rooms: rooms.length,
+      participants: rooms.reduce((sum, r) => sum + (r.numParticipants || 0), 0),
+      publishers: rooms.reduce((sum, r) => sum + (r.numPublishers || 0), 0),
+      byRoom: rooms.map((r) => ({
+        name: r.name,
+        participants: r.numParticipants || 0,
+        publishers: r.numPublishers || 0
+      }))
+    }
+  } catch {
+    // LiveKit недоступен - метрики процесса всё равно отдаём, иначе эндпоинт бесполезен
+    // именно тогда, когда он нужнее всего.
+  }
+
+  let storage = { rooms: 0, users: 0, sessions: 0 }
+  try {
+    storage = {
+      rooms: db.prepare('SELECT COUNT(*) AS n FROM rooms').get().n,
+      users: db.prepare('SELECT COUNT(*) AS n FROM users').get().n,
+      sessions: db.prepare('SELECT COUNT(*) AS n FROM sessions').get().n
+    }
+  } catch {}
+
+  return c.json({
+    // Память самого control-plane процесса (Node + Hono + SQLite)
+    memory: {
+      rssMb: MB(mem.rss),
+      heapUsedMb: MB(mem.heapUsed),
+      heapTotalMb: MB(mem.heapTotal),
+      externalMb: MB(mem.external),
+      arrayBuffersMb: MB(mem.arrayBuffers)
+    },
+    // Память всей машины: сюда входит и LiveKit SFU в Docker, и nginx, и система
+    system: {
+      totalMb: MB(total),
+      freeMb: MB(free),
+      usedMb: MB(total - free),
+      usedPercent: Math.round(((total - free) / total) * 1000) / 10,
+      cpuCount: cpus().length,
+      loadAvg: loadavg().map((v) => Math.round(v * 100) / 100)
+    },
+    process: {
+      uptimeSec: Math.round(process.uptime()),
+      nodeVersion: process.version,
+      pid: process.pid
+    },
+    livekit,
+    storage,
+    limits: { maxParticipants: MAX_PARTICIPANTS, maxScreenShares: MAX_SCREEN_SHARES },
+    takenAt: new Date().toISOString()
+  })
 })
 
 // ---------- HTML страницы ----------
