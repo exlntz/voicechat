@@ -70,6 +70,63 @@ function initials(name) {
   return (name || '?').trim().slice(0, 2).toUpperCase()
 }
 
+// ---- Копирование в буфер обмена: сайт + .exe ----
+// В Electron navigator.clipboard.writeText() молча отклоняется (разрешение
+// clipboard-sanitized-write у окна не выдано), из-за чего клик по бейджу "Комната: xxx"
+// в приложении ничего не копировал, хотя на сайте всё работало. Порядок попыток:
+//   1) системный буфер Electron через preload/IPC (только в .exe);
+//   2) стандартный Async Clipboard API (сайт в браузере);
+//   3) скрытая textarea + document.execCommand('copy') - универсальный фолбэк.
+// Выделение текста в интерфейсе отключено через CSS, но у input/textarea оно сохранено
+// (user-select: text), поэтому execCommand('copy') здесь работает.
+function copyTextFallback(text) {
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.setAttribute('readonly', '')
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none'
+    document.body.appendChild(ta)
+    ta.select()
+    ta.setSelectionRange(0, text.length)
+    const ok = document.execCommand('copy')
+    ta.remove()
+    return ok
+  } catch {
+    return false
+  }
+}
+
+async function copyToClipboard(text) {
+  const value = String(text == null ? '' : text)
+  if (!value) return false
+
+  try {
+    if (window.electronAPI && typeof window.electronAPI.writeClipboard === 'function') {
+      if (await window.electronAPI.writeClipboard(value)) return true
+    }
+  } catch {}
+
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(value)
+      return true
+    }
+  } catch {}
+
+  return copyTextFallback(value)
+}
+
+// ---- Признак "пользователь сейчас в звонке" ----
+// Нужен не только для CSS: в .exe этот класс читает site-boost.js, чтобы показывать кнопку
+// "Рисовать" только при активном подключении (вне звонка рисовать поверх экрана незачем).
+function setCallActive(active) {
+  if (!document.body) return
+  document.body.classList.toggle('in-call', !!active)
+  try {
+    window.dispatchEvent(new CustomEvent('vl-call-state', { detail: { active: !!active } }))
+  } catch {}
+}
+
 // Поле пароля с кнопкой-глазиком, переключающей видимость введённого текста (type: password <-> text).
 // Возвращает { wrapper, input } - wrapper вставляется в форму, input используется как обычное поле
 // (value, addEventListener и т.д.), логика клика по глазику инкапсулирована здесь.
@@ -109,6 +166,7 @@ async function fetchMe() {
 // На узких экранах (телефон) 2-колоночная механика физически не влезает - там просто
 // показываем текущую форму + текстовую подсказку-переключатель под ней (без анимации сдвига).
 function renderAuthScreen(afterLoginRoomCode = '') {
+  setCallActive(false)
   root.innerHTML = ''
 
   let mode = 'login' // 'login' | 'register'
@@ -279,6 +337,7 @@ function renderAuthScreen(afterLoginRoomCode = '') {
 // ===================== ЛОББИ (экран входа) =====================
 
 async function renderLobby(prefillRoomCode = '') {
+  setCallActive(false)
   // Требуем авторизацию перед лобби - если нет активной сессии, показываем экран входа/регистрации.
   if (!state.currentUser) {
     state.currentUser = await fetchMe()
@@ -666,8 +725,9 @@ async function enterRoom(joinData) {
   roomInfo.appendChild(statusDot)
   roomInfo.appendChild(el('span', {}, 'Подключение...'))
   const codeBadge = el('span', { class: 'room-code-badge', title: 'Нажмите, чтобы скопировать код' }, `Комната: ${roomCode}`)
-  codeBadge.addEventListener('click', () => {
-    navigator.clipboard.writeText(roomCode).then(() => showToast('Код комнаты скопирован'))
+  codeBadge.addEventListener('click', async () => {
+    const ok = await copyToClipboard(roomCode)
+    showToast(ok ? 'Скопировано' : 'Не удалось скопировать код комнаты', ok ? 'success' : 'error')
   })
   roomInfo.appendChild(codeBadge)
   if (state.isHost) {
@@ -761,26 +821,6 @@ async function enterRoom(joinData) {
   let soloInviteCard = null
   let soloCopyTimer = null
 
-  function copyTextFallback(text) {
-    // Clipboard API недоступен (нет https/разрешения) - копируем через скрытое textarea.
-    // Выделение текста в интерфейсе отключено через CSS, но у input/textarea оно
-    // сохранено (user-select: text), поэтому execCommand('copy') здесь работает.
-    try {
-      const ta = document.createElement('textarea')
-      ta.value = text
-      ta.setAttribute('readonly', '')
-      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none'
-      document.body.appendChild(ta)
-      ta.select()
-      ta.setSelectionRange(0, text.length)
-      const ok = document.execCommand('copy')
-      ta.remove()
-      return ok
-    } catch {
-      return false
-    }
-  }
-
   function getSoloInviteCard() {
     if (soloInviteCard) return soloInviteCard
 
@@ -791,16 +831,7 @@ async function enterRoom(joinData) {
     copyBtn.addEventListener('click', async () => {
       // Реальный адрес комнаты - ровно то, что открыто в адресной строке
       const link = location.href
-      let ok = false
-      try {
-        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-          await navigator.clipboard.writeText(link)
-          ok = true
-        }
-      } catch {
-        ok = false
-      }
-      if (!ok) ok = copyTextFallback(link)
+      const ok = await copyToClipboard(link)
 
       if (!ok) {
         showToast('Не удалось скопировать ссылку', 'error')
@@ -1072,30 +1103,65 @@ async function enterRoom(joinData) {
     typeof Element.prototype.requestFullscreen === 'function'
   )
 
+  // ---- Плавность перехода в полный экран и обратно ----
+  // Раньше и вход, и выход были мгновенными "прыжками" раскладки. Теперь у обоих режимов
+  // (нативный Fullscreen API и внутренний .in-app-fullscreen) есть короткая анимация: вход
+  // анимируется целиком в CSS, а на выход нужен класс-маркер, потому что от position: fixed
+  // к обычной сетке CSS-переход сделать нельзя - узел убирают из потока мгновенно.
+  // Анимируем только transform/opacity (без layout), при prefers-reduced-motion - без анимации.
+  const FS_ANIM_MS = 200
+  const prefersReducedMotion = () => {
+    try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) } catch { return false }
+  }
+
+  // Тайл, который был в нативном fullscreen: при выходе (кнопкой, Esc или системно) даём ему
+  // ту же анимацию "сворачивания" обратно в раскладку, что и у внутреннего режима.
+  let lastNativeFsTile = null
+  function animateFullscreenLeave(tile) {
+    if (!tile || prefersReducedMotion()) return
+    tile.classList.add('is-fs-leaving')
+    setTimeout(() => tile.classList.remove('is-fs-leaving'), FS_ANIM_MS + 60)
+  }
+
   function syncFullscreenButtons() {
     document.querySelectorAll('.screen-tile, .camera-tile').forEach((t) => {
-      const on = document.fullscreenElement === t || t.classList.contains('in-app-fullscreen')
+      const on = document.fullscreenElement === t ||
+        (t.classList.contains('in-app-fullscreen') && !t.classList.contains('is-fs-closing'))
       t.classList.toggle('is-fullscreen', on)
       const icon = t.querySelector('.tile-fullscreen-btn i')
       if (icon) icon.className = on ? 'fas fa-compress' : 'fas fa-expand'
     })
   }
 
-  function exitInAppFullscreen() {
+  // immediate: убрать режим без анимации (нужно, когда мы тут же открываем другой тайл)
+  function exitInAppFullscreen(immediate = false) {
     const tile = document.querySelector('.tile.in-app-fullscreen')
     if (!tile) return false
-    tile.classList.remove('in-app-fullscreen')
-    document.body.classList.remove('inapp-fullscreen')
+
+    const finish = () => {
+      tile.classList.remove('in-app-fullscreen', 'is-fs-closing')
+      document.body.classList.remove('inapp-fullscreen')
+      syncFullscreenButtons()
+      // Тайл остаётся тем же DOM-узлом (его никто не вынимал из документа), поэтому видео
+      // продолжает играть; play() - только страховка.
+      const video = tile.querySelector('video')
+      if (video && (video.srcObject || video.src) && video.paused) video.play().catch(() => {})
+    }
+
+    if (immediate || prefersReducedMotion()) {
+      finish()
+      return true
+    }
+    // Кнопки переключаются сразу, а сам тайл уезжает за FS_ANIM_MS - иначе иконка "свернуть"
+    // висела бы уже во время анимации закрытия.
+    tile.classList.add('is-fs-closing')
     syncFullscreenButtons()
-    // Тайл остаётся тем же DOM-узлом (его никто не вынимал из документа), поэтому видео
-    // продолжает играть; play() - только страховка.
-    const video = tile.querySelector('video')
-    if (video && (video.srcObject || video.src) && video.paused) video.play().catch(() => {})
+    setTimeout(finish, FS_ANIM_MS)
     return true
   }
 
   function enterInAppFullscreen(tile) {
-    exitInAppFullscreen()
+    exitInAppFullscreen(true)
     syncViewportHeight()
     tile.classList.add('in-app-fullscreen')
     document.body.classList.add('inapp-fullscreen')
@@ -1105,6 +1171,8 @@ async function enterRoom(joinData) {
   }
 
   function toggleTileFullscreen(tile) {
+    // Клик, пока играет анимация закрытия - игнорируем, иначе состояние разъедется
+    if (tile.classList.contains('is-fs-closing')) return
     if (document.fullscreenElement === tile) {
       document.exitFullscreen().catch(() => {})
       return
@@ -1388,9 +1456,21 @@ async function enterRoom(joinData) {
     if (pub && typeof pub.setVideoQuality === 'function') pub.setVideoQuality(LK.VideoQuality.HIGH)
   }
 
-  document.addEventListener('fullscreenchange', syncFullscreenButtons)
+  // Выход из нативного fullscreen мог произойти не только по нашей кнопке (Esc, системный жест,
+  // F11) - поэтому анимацию "сворачивания" вешаем именно на событие, а не на обработчик клика.
+  function onFullscreenChange() {
+    const current = document.fullscreenElement
+    if (current) lastNativeFsTile = current
+    else if (lastNativeFsTile) {
+      animateFullscreenLeave(lastNativeFsTile)
+      lastNativeFsTile = null
+    }
+    syncFullscreenButtons()
+  }
+
+  document.addEventListener('fullscreenchange', onFullscreenChange)
   // webkit-префикс: старые версии iOS/Safari шлют только это событие
-  document.addEventListener('webkitfullscreenchange', syncFullscreenButtons)
+  document.addEventListener('webkitfullscreenchange', onFullscreenChange)
 
   const cameraTilesMap = new Map() // identity -> {tile, video, placeholder, label}
   const screenTilesMap = new Map() // trackSid -> {tile, video, label, fsBtn, volumeCtl}
@@ -1576,6 +1656,7 @@ async function enterRoom(joinData) {
 
   room.on(LK.RoomEvent.Disconnected, (reason) => {
     setStatus('Отключено', 'disconnected')
+    setCallActive(false)
     if (reason === LK.DisconnectReason.PARTICIPANT_REMOVED) {
       showToast('Вас выгнал из звонка создатель комнаты', 'error')
     } else {
@@ -1597,6 +1678,7 @@ async function enterRoom(joinData) {
   try {
     await room.connect(url, token)
     setStatus('Подключено', '')
+    setCallActive(true)
 
     // Публикуем камеру/микрофон согласно выбору пользователя в лобби (можно войти с выключенными)
     await room.localParticipant.setCameraEnabled(state.cameraEnabled)
@@ -2009,6 +2091,7 @@ async function enterRoom(joinData) {
 
   function cleanupAndGoLobby() {
     clearInterval(screenTilesReconcileInterval)
+    setCallActive(false)
     try { room.disconnect() } catch {}
     document.querySelectorAll('audio').forEach((a) => a.remove())
     history.pushState({}, '', '/')
