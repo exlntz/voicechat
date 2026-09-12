@@ -1,5 +1,5 @@
 // ===================== Электрон: главный процесс =====================
-const { app, BrowserWindow, ipcMain, desktopCapturer, session, screen, Menu, globalShortcut } = require('electron')
+const { app, BrowserWindow, ipcMain, desktopCapturer, session, screen, Menu, globalShortcut, clipboard } = require('electron')
 const path = require('path')
 const fs = require('fs')
 
@@ -31,6 +31,13 @@ app.commandLine.appendSwitch('force_high_performance_gpu')
 app.commandLine.appendSwitch('disable-background-timer-throttling')
 app.commandLine.appendSwitch('disable-renderer-backgrounding')
 
+// Разрешения, которые окно получает без вопросов. clipboard-* нужны, чтобы работало
+// копирование кода комнаты/ссылки прямо со страницы (см. setPermission*Handler ниже).
+const ALLOWED_PERMISSIONS = [
+  'media', 'audioCapture', 'videoCapture', 'display-capture', 'fullscreen',
+  'clipboard-read', 'clipboard-sanitized-write'
+]
+
 let mainWindow = null
 let pickerWindow = null
 
@@ -60,14 +67,15 @@ function createMainWindow() {
 
   Menu.setApplicationMenu(null)
 
-  // Автоматически разрешаем доступ к камере/микрофону и fullscreen.
+  // Автоматически разрешаем доступ к камере/микрофону, fullscreen и буферу обмена.
+  // ВАЖНО ("баг: в приложении не копируется код комнаты"): без clipboard-sanitized-write
+  // navigator.clipboard.writeText() внутри .exe отклонялся молча, и клик по бейджу
+  // "Комната: xxx" ничего не делал, хотя на сайте всё работало.
   mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
-    const allowed = ['media', 'audioCapture', 'videoCapture', 'display-capture', 'fullscreen']
-    callback(allowed.includes(permission))
+    callback(ALLOWED_PERMISSIONS.includes(permission))
   })
   mainWindow.webContents.session.setPermissionCheckHandler((webContents, permission) => {
-    const allowed = ['media', 'audioCapture', 'videoCapture', 'display-capture', 'fullscreen']
-    return allowed.includes(permission)
+    return ALLOWED_PERMISSIONS.includes(permission)
   })
 
   mainWindow.loadURL(SERVER_URL)
@@ -240,6 +248,14 @@ ipcMain.on('overlay-focus', () => {
 // заголовку наших внутренних страниц (страховка, если формат source.id изменится).
 const INTERNAL_WINDOW_TITLES = new Set(['Аннотации', 'Выберите экран или окно'])
 
+// ВАЖНО ("баг: в списке источников пустые плитки about:blank"): служебные окна Chromium/Electron
+// (в т.ч. невидимые вспомогательные окна нашего же приложения) попадают в desktopCapturer с
+// заголовком about:blank. Показывать их нельзя - это пустые чёрные плитки, которые пользователь
+// принимает за сломанные превью. Сравниваем заголовок в нижнем регистре.
+// Список намеренно узкий: "untitled"/"blank" бывают настоящими именами документов,
+// и отсекать их было бы уже вредно.
+const BLANK_WINDOW_TITLES = new Set(['about:blank', 'about:blank#blocked'])
+
 function nativeHandleKeys(win) {
   const keys = []
   try {
@@ -250,9 +266,14 @@ function nativeHandleKeys(win) {
   return keys
 }
 
+// Раньше проверялись только overlayWindow и pickerWindow, поэтому любое другое окно самого
+// приложения (главное окно, служебные окна Chromium) оставалось в списке. Берём ВСЕ окна
+// процесса - тогда "свои" окна отсекаются независимо от того, кто их создал.
 function internalWindowHandles() {
   const handles = new Set()
-  for (const win of [overlayWindow, pickerWindow]) {
+  let windows = []
+  try { windows = BrowserWindow.getAllWindows() } catch (e) { windows = [] }
+  for (const win of windows) {
     if (win && !win.isDestroyed()) nativeHandleKeys(win).forEach((k) => handles.add(k))
   }
   return handles
@@ -264,6 +285,7 @@ function isPickableSource(source, internalHandles) {
   if (source.id.startsWith('screen')) return true
   const name = String(source.name || '').trim()
   if (!name) return false // безымянные служебные окна ОС: в списке это чёрная плитка без подписи
+  if (BLANK_WINDOW_TITLES.has(name.toLowerCase())) return false
   if (INTERNAL_WINDOW_TITLES.has(name)) return false
   // source.id окна выглядит как "window:<хэндл>:<индекс>"
   const handle = source.id.split(':')[1]
@@ -277,12 +299,16 @@ function isPickableSource(source, internalHandles) {
 // Возвращает { source, shareAudio } (или null при отмене).
 function openPickerWindow() {
   return new Promise((resolve) => {
-    // 16:9 и покрупнее - ровно под рамку плитки в picker.html (раньше 300x200 заметно мылило).
+    // 16:9 под рамку плитки в picker.html. Размер снижен с 480x270 до 320x180: плитка в списке
+    // занимает ~175 CSS-px, так что 320px хватает даже при масштабе 150%, а вот цена больших
+    // превью была высокой - каждое уезжает в рендерер как base64-строка (toDataURL), и на
+    // машине с десятком открытых окон это давало многомегабайтный IPC-пакет и заметные
+    // подлагивания при скролле списка.
     // fetchWindowIcons даёт иконку приложения - с ней окно опознаётся быстрее, чем по превью.
     desktopCapturer
       .getSources({
         types: ['screen', 'window'],
-        thumbnailSize: { width: 480, height: 270 },
+        thumbnailSize: { width: 320, height: 180 },
         fetchWindowIcons: true
       })
       .then((allSources) => {
@@ -368,6 +394,19 @@ function openPickerWindow() {
 ipcMain.handle('choose-screen-source', async () => {
   const picked = await openPickerWindow()
   return picked ? picked.source.id : null
+})
+
+// ---- Буфер обмена ----
+// Самый надёжный путь для .exe: пишем через нативный clipboard главного процесса, минуя
+// разрешения и требования к "жесту пользователя" у navigator.clipboard в рендерере.
+// На сайте этот мост отсутствует, и app.js сам падает обратно на navigator.clipboard.
+ipcMain.handle('clipboard-write', (_e, text) => {
+  try {
+    clipboard.writeText(String(text == null ? '' : text))
+    return true
+  } catch (e) {
+    return false
+  }
 })
 
 // ---- Регистрация горячих клавиш с запасными вариантами ----
