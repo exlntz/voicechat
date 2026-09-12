@@ -31,6 +31,8 @@ export const renderer = jsxRenderer(({ children, title }) => {
         <script src="/static/anker.js"></script>
         {/* Раскрытие плитки на весь экран — FLIP из текущего положения */}
         <script src="/static/fullscreen-flip.js"></script>
+        {/* Зеркало своего превью только для фронтальной камеры */}
+        <script src="/static/camera-mirror.js"></script>
       </body>
     </html>
   )
