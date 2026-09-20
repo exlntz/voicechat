@@ -1083,12 +1083,10 @@ button {
 .room-topbar .ank-sigil { display: none !important; }
 
 /* Шапка звонка: plain-название продукта без иконки (собирает anker.js).
-   Тот же шрифт, что у заголовка-приглашения (.solo-invite__title):
-   дисплейная гарнитура var(--font-display), жирное начертание.
-   Без градиентов и без лишних обёрток: никаких паддингов, псевдоэлементов
-   и фиксированных высот — низ букв («y») нечему обрезать, везде явный
-   overflow: visible. При наведении — лёгкая анимация: мягкий синий
-   оттенок, небольшая разрядка и подъём. */
+   Сниппет пользователя: Inter / 700 / плотная разрядка. line-height 1.1
+   вместо 0.89 — иначе хвост «y» в «Lobby» обрезается. Без градиентов
+   и без лишних обёрток, везде явный overflow: visible. При наведении —
+   лёгкая анимация: мягкий синий оттенок, небольшая разрядка и подъём. */
 .room-topbar .ank-brandline {
   display: flex;
   align-items: center;
@@ -1098,8 +1096,11 @@ button {
   overflow: visible;
 }
 .room-topbar .ank-brandline__name {
-  font: 600 20px/1.3 var(--font-display, var(--font));
-  letter-spacing: -0.01em;
+  font-family: "Inter", "Segoe UI", system-ui, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: -0.075em;
+  line-height: 1.1;
   color: var(--text);
   white-space: nowrap;
   cursor: default;
