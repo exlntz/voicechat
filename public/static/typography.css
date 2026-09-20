@@ -104,9 +104,8 @@ h4 {
   font-size: 20px;
 }
 
-/* Название продукта в шапке звонка — двухтонный логотип без иконки
-   («Voice» тонкое + «Lobby» жирное, размеры задаёт style.css). */
+/* Название продукта рядом со знаком в шапке звонка. */
 .ank-brandline__name {
-  font-size: 27px;
-  letter-spacing: 0;
+  font-size: 17px;
+  letter-spacing: -0.015em;
 }
