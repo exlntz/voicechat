@@ -2016,20 +2016,37 @@ async function enterRoom(joinData) {
   })
 
   // ---- Настройки устройств прямо в звонке (шестерёнка справа от демонстрации) ----
-  // Всплывающее меню «Настройки»: выбор устройства ввода (микрофон)
-  // и вывода (динамики). Применяется мгновенно без переподключения:
-  // вход — через room.switchActiveDevice() LiveKit (с фолбэком на выкл/вкл
-  // с deviceId), выход — через setSinkId() на всех уже играющих <audio>
-  // (новые подписки подхватывают state.selectedSpeakerId сами в TrackSubscribed).
-  // Всё запоминается в localStorage и переживает перезаход в звонок.
+  // Нижняя шторка «Настройки» на ~3/4 высоты экрана с блюром фона — та же механика,
+  // что у боковой панели участников (.panel-overlay/.panel), только выезжает снизу.
+  // Внутри: микрофон, камера, динамики. Выбор применяется мгновенно без переподключения:
+  // входы — через room.switchActiveDevice() LiveKit (с фолбэком на выкл/вкл с deviceId),
+  // выход — через setSinkId() на всех уже играющих <audio> (новые подписки подхватывают
+  // state.selectedSpeakerId сами в TrackSubscribed). Всё запоминается в localStorage
+  // и переживает перезаход в звонок.
   // В .exe-приложении работает без изменений кода: media/audioCapture/videoCapture
-  // авторазрешены в main.js, setSinkId/enumerateDevices — обычные Chromium API.
+  // авторазрешены в main.js, enumerateDevices/setSinkId/backdrop-filter — обычные
+  // Chromium API рендерера.
   let devicePopup = null
   let inCallMicSelect = null
+  let inCallCamSelect = null
   let inCallSpkSelect = null
 
+  // Закрытие — той же анимацией в обратную сторону (см. closeParticipantsPanel):
+  // вешаем .is-closing и убираем узел только после окончания анимации.
   function closeDevicePopup() {
-    if (devicePopup) { devicePopup.remove(); devicePopup = null }
+    const existing = document.querySelector('.settings-overlay')
+    if (!existing) return
+    if (existing.classList.contains('is-closing')) return // уже уезжает
+    existing.classList.add('is-closing')
+    const sheet = existing.querySelector('.settings-sheet')
+    let fallback = 0
+    const drop = () => { clearTimeout(fallback); existing.remove(); if (devicePopup === existing) devicePopup = null }
+    if (sheet) {
+      sheet.addEventListener('animationend', drop, { once: true })
+      fallback = setTimeout(drop, 600)
+    } else {
+      drop()
+    }
   }
 
   function fillInCallSelect(select, list, fallbackName, currentId) {
@@ -2064,6 +2081,28 @@ async function enterRoom(joinData) {
     }
   }
 
+  async function applyCamDevice(deviceId) {
+    state.selectedCamId = deviceId || null
+    try { if (deviceId) localStorage.setItem('camDeviceId', deviceId) } catch {}
+    try { room.options.videoCaptureDefaults = { ...(room.options.videoCaptureDefaults || {}), ...(deviceId ? { deviceId } : {}) } } catch {}
+    if (!state.cameraEnabled) return
+    try {
+      if (typeof room.switchActiveDevice === 'function') {
+        await room.switchActiveDevice('videoinput', deviceId)
+      } else {
+        await room.localParticipant.setCameraEnabled(false)
+        await room.localParticipant.setCameraEnabled(true, deviceId ? { deviceId } : undefined)
+      }
+      // Страховка: локальное превью должно показывать новый трек
+      const camPub = room.localParticipant.getTrackPublication(LK.Track.Source.Camera)
+      const t = cameraTilesMap.get(room.localParticipant.identity)
+      if (camPub && camPub.track && t) camPub.track.attach(t.video)
+      showToast('Камера переключена', 'success')
+    } catch (e) {
+      showToast('Не удалось переключить камеру', 'error')
+    }
+  }
+
   function applySpeakerDevice(deviceId) {
     state.selectedSpeakerId = deviceId || null
     try { if (deviceId) localStorage.setItem('speakerDeviceId', deviceId) } catch {}
@@ -2084,60 +2123,58 @@ async function enterRoom(joinData) {
       return
     }
     const currentMic = fillInCallSelect(inCallMicSelect, devices.filter((d) => d.kind === 'audioinput'), 'Микрофон', state.selectedMicId)
+    const currentCam = fillInCallSelect(inCallCamSelect, devices.filter((d) => d.kind === 'videoinput'), 'Камера', state.selectedCamId)
     const currentSpk = fillInCallSelect(inCallSpkSelect, devices.filter((d) => d.kind === 'audiooutput'), 'Динамики', state.selectedSpeakerId)
     // Устройство могли выдернуть прямо во время звонка: если текущего уже нет
     // в списке — бесшумно переезжаем на первое доступное, чтобы не было тишины.
     if (currentMic !== state.selectedMicId) await applyMicDevice(currentMic)
+    if (currentCam !== state.selectedCamId) await applyCamDevice(currentCam)
     if (currentSpk && currentSpk !== state.selectedSpeakerId) applySpeakerDevice(currentSpk)
   }
 
   function openDevicePopup() {
-    if (devicePopup) {
-      closeDevicePopup()
-      return
+    const existing = document.querySelector('.settings-overlay')
+    if (existing) {
+      // Повторный клик по шестерёнке закрывает шторку (как у панели участников)
+      if (!existing.classList.contains('is-closing')) { closeDevicePopup(); return }
+      existing.remove()
+      devicePopup = null
     }
     closeScreenContextMenu()
-    const popup = el('div', { class: 'screen-ctx-menu device-settings-popup' })
-    popup.addEventListener('click', (e) => e.stopPropagation())
-    popup.addEventListener('contextmenu', (e) => e.preventDefault())
-    popup.appendChild(el('div', { class: 'device-popup-title' }, [el('i', { class: 'fas fa-cog' }), ' Настройки']))
+
+    const sheet = el('div', { class: 'settings-sheet' })
+    const closeBtn = el('button', { class: 'panel-close', type: 'button', 'aria-label': 'Закрыть настройки' }, [el('i', { class: 'fas fa-times' })])
+    closeBtn.addEventListener('click', closeDevicePopup)
+    sheet.appendChild(closeBtn)
+    sheet.appendChild(el('h3', {}, 'Настройки'))
 
     inCallMicSelect = el('select', {})
+    inCallCamSelect = el('select', {})
     inCallSpkSelect = el('select', {})
     inCallMicSelect.addEventListener('change', () => applyMicDevice(inCallMicSelect.value || null))
+    inCallCamSelect.addEventListener('change', () => applyCamDevice(inCallCamSelect.value || null))
     inCallSpkSelect.addEventListener('change', () => applySpeakerDevice(inCallSpkSelect.value || null))
 
     const micRow = el('div', { class: 'device-row' })
     micRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-microphone' }), ' Микрофон']))
     micRow.appendChild(inCallMicSelect)
+    const camRow = el('div', { class: 'device-row' })
+    camRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-video' }), ' Камера']))
+    camRow.appendChild(inCallCamSelect)
     const spkRow = el('div', { class: 'device-row' })
     spkRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-volume-up' }), ' Динамики']))
     spkRow.appendChild(inCallSpkSelect)
     if (!(typeof HTMLMediaElement !== 'undefined' && typeof HTMLMediaElement.prototype.setSinkId === 'function')) {
       spkRow.style.display = 'none'
     }
-    popup.appendChild(micRow)
-    popup.appendChild(spkRow)
+    sheet.appendChild(micRow)
+    sheet.appendChild(camRow)
+    sheet.appendChild(spkRow)
 
-    // Позиция — над кнопкой-шестерёнкой, с клампом к краям вьюпорта.
-    // Хостер тот же, что у контекстных меню: в fullscreen попадаем внутрь
-    // fullscreen-элемента, иначе меню было бы невидимым (см. getFloatingHost).
-    getFloatingHost().appendChild(popup)
-    const btnRect = settingsBtn.getBoundingClientRect()
-    const pw = popup.offsetWidth
-    const ph = popup.offsetHeight
-    const vw = window.innerWidth
-    const vh = window.innerHeight
-    let left = Math.round(btnRect.left + btnRect.width / 2 - pw / 2)
-    let top = Math.round(btnRect.top - ph - 12)
-    if (left + pw > vw - 8) left = Math.max(8, vw - pw - 8)
-    if (left < 8) left = 8
-    if (top + ph > vh - 8) top = Math.max(8, vh - ph - 8)
-    if (top < 8) top = 8
-    popup.style.left = left + 'px'
-    popup.style.top = top + 'px'
-
-    devicePopup = popup
+    const overlay = el('div', { class: 'settings-overlay' }, [sheet])
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDevicePopup() })
+    document.body.appendChild(overlay)
+    devicePopup = overlay
     refreshInCallDeviceLists()
   }
 
@@ -2145,10 +2182,7 @@ async function enterRoom(joinData) {
     e.stopPropagation()
     openDevicePopup()
   })
-  document.addEventListener('click', closeDevicePopup)
-  window.addEventListener('resize', closeDevicePopup)
-  window.addEventListener('blur', closeDevicePopup)
-  document.addEventListener('fullscreenchange', closeDevicePopup)
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDevicePopup() })
   // Гарнитуру могут воткнуть/выдернуть прямо во время звонка — обновляем списки
   const onInCallDeviceChange = () => refreshInCallDeviceLists()
   navigator.mediaDevices.addEventListener('devicechange', onInCallDeviceChange)

@@ -1794,28 +1794,46 @@ body.inapp-fullscreen { overflow: hidden; }
 .screen-ctx-submenu .screen-ctx-item.selected .ctx-icon { color: var(--accent-soft); }
 .screen-ctx-submenu .screen-ctx-item.selected:hover { color: #fff; }
 
-/* ---- Попап настроек устройств в звонке (шестерёнка в controls-bar) ----
-   База (position: fixed, фон, тень, анимация) — от .screen-ctx-menu выше.
-   Строки выбора переиспользуют .device-row из лобби. */
-.device-settings-popup {
-  min-width: 300px;
-  max-width: calc(100vw - 16px);
-  padding: 10px;
+/* ---- Нижняя шторка настроек устройств (шестерёнка в controls-bar) ----
+   Та же механика, что у боковой панели участников (.panel-overlay/.panel):
+   оверлей с блюром + прямоугольная шторка снизу на ~3/4 высоты экрана,
+   въезд/выезд анимацией. Строки выбора переиспользуют .device-row из лобби. */
+.settings-overlay {
+  position: fixed; inset: 0;
+  z-index: 1100;
+  display: flex; justify-content: center; align-items: flex-end;
+  background: rgba(5, 7, 10, 0.55);
+  -webkit-backdrop-filter: blur(10px) saturate(1.15);
+  backdrop-filter: blur(10px) saturate(1.15);
+  animation: ank-fade-in .25s var(--ease);
 }
-.device-popup-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 6px 10px;
-  font: 600 12.5px/1.2 var(--font);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-faint);
+.settings-overlay.is-closing {
+  animation: ank-fade-out .36s var(--ease-io) forwards;
+  pointer-events: none; /* пока шторка уезжает, клики уже уходят в звонок */
 }
-.device-popup-title i { color: var(--accent-soft); font-size: 13px; }
-.device-settings-popup .device-row { padding: 5px 2px; }
-.device-settings-popup .device-row label { width: 92px; font-size: 13px; }
-.device-settings-popup .device-row select { font-size: 13.5px; min-height: 42px; }
+.settings-sheet {
+  width: min(600px, calc(100vw - 24px));
+  height: 76%;
+  max-height: calc(100% - 32px);
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 20px 20px 0 0;
+  padding: 20px 22px calc(22px + env(safe-area-inset-bottom));
+  box-shadow: var(--shadow-md);
+  animation: ank-sheet-in .38s var(--ease-io);
+}
+@keyframes ank-sheet-in { from { transform: translateY(100%); } to { transform: none; } }
+.settings-overlay.is-closing .settings-sheet { animation: ank-sheet-out .36s var(--ease-io) forwards; }
+@keyframes ank-sheet-out { from { transform: none; } to { transform: translateY(100%); } }
+.settings-sheet h3 {
+  margin: 0 0 16px;
+  font-size: 20px;
+  font-weight: 650;
+  color: var(--text);
+}
+.settings-sheet .device-row { padding: 8px 0; }
 
 /* ---- Центрированная раскладка сцены ---- */
 .stage.stage-centered {
