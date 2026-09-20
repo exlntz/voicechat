@@ -397,13 +397,12 @@
     if (!card || card.__ankDone) return
     card.__ankDone = true
 
-    // Шапка: знак продукта + название
+    // Шапка: только название тем же шрифтом, что шапка звонка, без иконки.
     var h1 = $('h1', card)
     if (h1 && !$('.ank-brand', card)) {
       var brand = make('div', 'ank-brand')
       var tx = make('div', 'ank-brand__tx')
       card.insertBefore(brand, h1)
-      brand.appendChild(makeSigil(44))
       brand.appendChild(tx)
       tx.appendChild(h1)
     }
