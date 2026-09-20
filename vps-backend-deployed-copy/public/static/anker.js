@@ -412,20 +412,34 @@
     reveal($$(':scope > *', card))
   }
 
+  // Текстовый логотип шапки звонка: «Voice» (тонкое светлое) + «Lobby»
+  // (жирный градиент, буквы разбиты для волны при наведении). Иконки нет.
+  function buildBrandline() {
+    var line = make('div', 'ank-brandline')
+    var name = make('span', 'ank-brandline__name')
+    name.appendChild(make('span', 'vl-voice', 'Voice'))
+    var lobby = make('span', 'vl-lobby')
+    var word = 'Lobby'
+    for (var i = 0; i < word.length; i++) {
+      var ch = make('span', 'vl-ch', word.charAt(i))
+      ch.style.setProperty('--i', String(i))
+      lobby.appendChild(ch)
+    }
+    name.appendChild(lobby)
+    line.appendChild(name)
+    return line
+  }
+
   function decorateRoom(screen) {
     if (screen.__ankDone) return
     screen.__ankDone = true
     var topbar = $('.room-topbar', screen)
-    // Шапка звонка: только крупное название "Voice Lobby" без иконки —
-    // иконка мешала, теперь акцент на типографике (стили в style.css).
-    if (topbar && !$('.ank-brandline', topbar)) {
-      var line = make('div', 'ank-brandline')
-      line.appendChild(make('span', 'ank-brandline__name', 'Voice Lobby'))
-      topbar.insertBefore(line, topbar.firstChild)
-    } else if (topbar) {
-      // Чистим иконку от старых сборок, если она уже вставлена в DOM.
-      var oldSigil = $('.ank-brandline .ank-sigil', topbar)
-      if (oldSigil && oldSigil.parentNode) oldSigil.parentNode.removeChild(oldSigil)
+    if (topbar) {
+      // Сносим старую шапку (прошлые версии с иконкой/плоским текстом),
+      // чтобы не было двух логотипов и обрезанного текста.
+      var old = $('.ank-brandline', topbar)
+      if (old && old.parentNode) old.parentNode.removeChild(old)
+      topbar.insertBefore(buildBrandline(), topbar.firstChild)
     }
     reveal([topbar, $('.controls-bar', screen)].filter(Boolean))
   }
