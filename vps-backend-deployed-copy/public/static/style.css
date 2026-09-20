@@ -1083,10 +1083,10 @@ button {
 .room-topbar .ank-sigil { display: none !important; }
 
 /* Шапка звонка: plain-название продукта без иконки (собирает anker.js).
-   Сниппет пользователя: Inter / 700 / плотная разрядка. line-height 1.1
-   вместо 0.89 — иначе хвост «y» в «Lobby» обрезается. Без градиентов
-   и без лишних обёрток, везде явный overflow: visible. При наведении —
-   лёгкая анимация: мягкий синий оттенок, небольшая разрядка и подъём. */
+   Сниппет пользователя (.intro-title): Rubik / 700 / плотная разрядка /
+   line-height 0.94. Без градиентов и без лишних обёрток, везде явный
+   overflow: visible. При наведении — лёгкая анимация: мягкий синий
+   оттенок, небольшая разрядка и подъём. */
 .room-topbar .ank-brandline {
   display: flex;
   align-items: center;
@@ -1096,11 +1096,11 @@ button {
   overflow: visible;
 }
 .room-topbar .ank-brandline__name {
-  font-family: "Inter", "Segoe UI", system-ui, Arial, sans-serif;
+  font-family: "Rubik", "Segoe UI", system-ui, Arial, sans-serif;
   font-weight: 700;
   font-size: 20px;
   letter-spacing: -0.075em;
-  line-height: 1.1;
+  line-height: 0.94;
   color: var(--text);
   white-space: nowrap;
   cursor: default;
