@@ -424,32 +424,30 @@ async function renderLobby(prefillRoomCode = '') {
     }
   })
 
-  // ---- Выбор устройств ввода/вывода (карточки как в шторке настроек звонка) ----
+  // ---- Выбор устройств ввода/вывода ----
   const deviceSettings = el('div', { class: 'device-settings' })
 
-  const lobbyMicDots = el('div', { class: 'lvl-dots' })
-  for (let i = 0; i < 8; i++) lobbyMicDots.appendChild(el('span', {}))
+  const camRow = el('div', { class: 'device-row' })
+  camRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-video' }), ' Камера']))
   const camSelect = el('select', {})
-  const lobbyCamCard = el('div', { class: 'settings-card' }, [
-    el('div', { class: 'settings-card-head' }, [el('span', {}, 'Камера')]),
-    camSelect
-  ])
-  deviceSettings.appendChild(lobbyCamCard)
+  camRow.appendChild(camSelect)
+  deviceSettings.appendChild(camRow)
 
+  const micRow = el('div', { class: 'device-row' })
+  micRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-microphone' }), ' Микрофон']))
   const micSelect = el('select', {})
-  const lobbyMicCard = el('div', { class: 'settings-card' }, [
-    el('div', { class: 'settings-card-head' }, [el('span', {}, 'Микрофон'), lobbyMicDots]),
-    micSelect
-  ])
-  deviceSettings.appendChild(lobbyMicCard)
+  micRow.appendChild(micSelect)
+  const micMeter = el('div', { class: 'mic-meter' }, [el('div', { class: 'mic-meter-bar' })])
+  micRow.appendChild(micMeter)
+  deviceSettings.appendChild(micRow)
 
+  const spkRow = el('div', { class: 'device-row' })
+  spkRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-volume-up' }), ' Динамики']))
   const spkSelect = el('select', {})
-  const testBtn = el('button', { class: 'check-btn test-sound-btn', type: 'button', title: 'Проверить звук' }, [el('i', { class: 'fas fa-play' }), ' Проверить'])
-  const lobbySpkCard = el('div', { class: 'settings-card' }, [
-    el('div', { class: 'settings-card-head' }, [el('span', {}, 'Динамики')]),
-    el('div', { class: 'settings-card-row' }, [spkSelect, testBtn])
-  ])
-  deviceSettings.appendChild(lobbySpkCard)
+  spkRow.appendChild(spkSelect)
+  const testBtn = el('button', { class: 'btn-secondary test-sound-btn', type: 'button', title: 'Проверить звук' }, 'Тест')
+  spkRow.appendChild(testBtn)
+  deviceSettings.appendChild(spkRow)
 
   card.appendChild(deviceSettings)
 
@@ -512,12 +510,11 @@ async function renderLobby(prefillRoomCode = '') {
       analyser.fftSize = 256
       source.connect(analyser)
       const data = new Uint8Array(analyser.frequencyBinCount)
-      const dots = Array.from(lobbyMicDots.children)
+      const bar = micMeter.querySelector('.mic-meter-bar')
       const loop = () => {
         analyser.getByteFrequencyData(data)
         const avg = data.reduce((a, b) => a + b, 0) / data.length
-        const lit = Math.round(Math.min(1, avg / 90) * dots.length)
-        dots.forEach((d, i) => d.classList.toggle('on', i < lit))
+        bar.style.width = Math.min(100, (avg / 100) * 100) + '%'
         meterRAF = requestAnimationFrame(loop)
       }
       loop()
@@ -556,7 +553,7 @@ async function renderLobby(prefillRoomCode = '') {
 
   // ---- Заполнение списков устройств ----
   const speakerSupported = typeof HTMLMediaElement !== 'undefined' && typeof HTMLMediaElement.prototype.setSinkId === 'function'
-  if (!speakerSupported) lobbySpkCard.style.display = 'none'
+  if (!speakerSupported) spkRow.style.display = 'none'
 
   async function populateDeviceLists() {
     let devices = []

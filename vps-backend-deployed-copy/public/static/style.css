@@ -1853,7 +1853,7 @@ body.inapp-fullscreen { overflow: hidden; }
 }
 .settings-card-row { display: flex; gap: 10px; align-items: stretch; }
 .settings-card-row select { flex: 1; min-width: 0; }
-.settings-card select {
+.settings-sheet select {
   width: 100%;
   appearance: none;
   -webkit-appearance: none;
@@ -1872,9 +1872,9 @@ body.inapp-fullscreen { overflow: hidden; }
   min-height: 44px;
   transition: border-color 0.25s var(--ease), background-color 0.25s var(--ease);
 }
-.settings-card select:hover { border-color: var(--border-strong); }
-.settings-card select:focus { border-color: var(--accent-soft); background-color: var(--accent-wash); }
-.settings-card select option { background: var(--surface-2); color: var(--text); }
+.settings-sheet select:hover { border-color: var(--border-strong); }
+.settings-sheet select:focus { border-color: var(--accent-soft); background-color: var(--accent-wash); }
+.settings-sheet select option { background: var(--surface-2); color: var(--text); }
 /* Живой индикатор уровня микрофона */
 .lvl-dots { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
 .lvl-dots span {
