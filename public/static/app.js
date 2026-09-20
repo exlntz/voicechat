@@ -2034,6 +2034,7 @@ async function enterRoom(joinData) {
   // Закрытие — той же анимацией в обратную сторону (см. closeParticipantsPanel):
   // вешаем .is-closing и убираем узел только после окончания анимации.
   function closeDevicePopup() {
+    stopInCallMeter()
     const existing = document.querySelector('.settings-overlay')
     if (!existing) return
     if (existing.classList.contains('is-closing')) return // уже уезжает
@@ -2114,6 +2115,73 @@ async function enterRoom(joinData) {
     showToast('Динамики переключены', 'success')
   }
 
+  // Живой индикатор уровня микрофона (точки как в Telegram) и тестовый
+  // звук для проверки динамиков — оба строго в пределах открытой шторки.
+  let inCallMicDots = null
+  let meterStream = null
+  let meterCtx = null
+  let meterRAF = 0
+
+  function stopInCallMeter() {
+    if (meterRAF) cancelAnimationFrame(meterRAF)
+    meterRAF = 0
+    if (meterCtx) { try { meterCtx.close() } catch {} meterCtx = null }
+    if (meterStream) { meterStream.getTracks().forEach((t) => t.stop()); meterStream = null }
+  }
+
+  async function startInCallMeter() {
+    stopInCallMeter()
+    if (!inCallMicDots) return
+    try {
+      meterStream = await navigator.mediaDevices.getUserMedia({
+        audio: state.selectedMicId ? { deviceId: { exact: state.selectedMicId } } : true
+      })
+      meterCtx = new (window.AudioContext || window.webkitAudioContext)()
+      const src = meterCtx.createMediaStreamSource(meterStream)
+      const analyser = meterCtx.createAnalyser()
+      analyser.fftSize = 256
+      src.connect(analyser)
+      const data = new Uint8Array(analyser.frequencyBinCount)
+      const dots = Array.from(inCallMicDots.children)
+      const loop = () => {
+        if (!document.body.contains(inCallMicDots)) { stopInCallMeter(); return }
+        analyser.getByteFrequencyData(data)
+        const avg = data.reduce((a, b) => a + b, 0) / data.length
+        const lit = Math.round(Math.min(1, avg / 90) * dots.length)
+        dots.forEach((d, i) => d.classList.toggle('on', i < lit))
+        meterRAF = requestAnimationFrame(loop)
+      }
+      loop()
+    } catch (e) { /* нет доступа к микрофону — точки просто не горят */ }
+  }
+
+  function playInCallTestSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      const osc = ctx.createOscillator()
+      osc.frequency.value = 880
+      const gain = ctx.createGain()
+      gain.gain.value = 0.18
+      const dest = ctx.createMediaStreamDestination()
+      osc.connect(gain).connect(dest)
+      const audioEl = document.createElement('audio')
+      audioEl.srcObject = dest.stream
+      audioEl.autoplay = true
+      if (state.selectedSpeakerId && typeof audioEl.setSinkId === 'function') {
+        audioEl.setSinkId(state.selectedSpeakerId).catch(() => {})
+      }
+      document.body.appendChild(audioEl)
+      osc.start()
+      setTimeout(() => {
+        try { osc.stop() } catch {}
+        try { ctx.close() } catch {}
+        audioEl.remove()
+      }, 600)
+    } catch (e) {
+      showToast('Не удалось воспроизвести тестовый звук', 'error')
+    }
+  }
+
   async function refreshInCallDeviceLists() {
     if (!devicePopup) return
     let devices = []
@@ -2151,35 +2219,49 @@ async function enterRoom(joinData) {
     inCallMicSelect = el('select', {})
     inCallCamSelect = el('select', {})
     inCallSpkSelect = el('select', {})
-    inCallMicSelect.addEventListener('change', () => applyMicDevice(inCallMicSelect.value || null))
+    inCallMicSelect.addEventListener('change', () => { applyMicDevice(inCallMicSelect.value || null); startInCallMeter() })
     inCallCamSelect.addEventListener('change', () => applyCamDevice(inCallCamSelect.value || null))
     inCallSpkSelect.addEventListener('change', () => applySpeakerDevice(inCallSpkSelect.value || null))
 
-    const micRow = el('div', { class: 'device-row' })
-    micRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-microphone' }), ' Микрофон']))
-    micRow.appendChild(inCallMicSelect)
-    const camRow = el('div', { class: 'device-row' })
-    camRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-video' }), ' Камера']))
-    camRow.appendChild(inCallCamSelect)
-    const spkRow = el('div', { class: 'device-row' })
-    spkRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-volume-up' }), ' Динамики']))
-    spkRow.appendChild(inCallSpkSelect)
+    // Карточка микрофона: выбор + живой индикатор уровня (точки как в Telegram)
+    inCallMicDots = el('div', { class: 'lvl-dots' })
+    for (let i = 0; i < 8; i++) inCallMicDots.appendChild(el('span', {}))
+    const micCard = el('div', { class: 'settings-card' }, [
+      el('div', { class: 'settings-card-head' }, [el('span', {}, 'Микрофон'), inCallMicDots]),
+      inCallMicSelect
+    ])
+    // Карточка динамиков: выбор + кнопка проверки звука
+    const spkTestBtn = el('button', { class: 'check-btn', type: 'button' }, [el('i', { class: 'fas fa-play' }), ' Проверить'])
+    spkTestBtn.addEventListener('click', (e) => { e.stopPropagation(); playInCallTestSound() })
+    const spkCard = el('div', { class: 'settings-card' }, [
+      el('div', { class: 'settings-card-head' }, [el('span', {}, 'Динамик')]),
+      el('div', { class: 'settings-card-row' }, [inCallSpkSelect, spkTestBtn])
+    ])
+    // Карточка камеры: только выбор
+    const camCard = el('div', { class: 'settings-card' }, [
+      el('div', { class: 'settings-card-head' }, [el('span', {}, 'Камера')]),
+      inCallCamSelect
+    ])
     if (!(typeof HTMLMediaElement !== 'undefined' && typeof HTMLMediaElement.prototype.setSinkId === 'function')) {
-      spkRow.style.display = 'none'
+      spkCard.style.display = 'none'
     }
-    sheet.appendChild(micRow)
-    sheet.appendChild(camRow)
-    sheet.appendChild(spkRow)
+    sheet.appendChild(micCard)
+    sheet.appendChild(spkCard)
+    sheet.appendChild(camCard)
 
     const overlay = el('div', { class: 'settings-overlay' }, [sheet])
     overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDevicePopup() })
     document.body.appendChild(overlay)
     devicePopup = overlay
     refreshInCallDeviceLists()
+    startInCallMeter()
   }
 
   settingsBtn.addEventListener('click', (e) => {
     e.stopPropagation()
+    // Сразу снимаем фокус: иначе на кнопке остаётся синий outline
+    // (:focus-visible) и шестерёнка выглядит «выделенной» после клика.
+    try { settingsBtn.blur() } catch {}
     openDevicePopup()
   })
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDevicePopup() })
