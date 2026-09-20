@@ -88,6 +88,6 @@ h4 {
    который грузится раньше и выигрывает по специфичности). */
 .ank-brandline__name {
   font-size: 20px;
-  letter-spacing: -0.075em;
-  line-height: 1.1;
+  letter-spacing: -0.015em;
+  line-height: 1.07;
 }

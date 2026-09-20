@@ -1096,11 +1096,11 @@ button {
   overflow: visible;
 }
 .room-topbar .ank-brandline__name {
-  font-family: "Rubik", "Segoe UI", system-ui, Arial, sans-serif;
-  font-weight: 600;
+  font-family: "Golos Text", "Segoe UI", system-ui, Arial, sans-serif;
+  font-weight: 700;
   font-size: 20px;
-  letter-spacing: -0.02em;
-  line-height: 0.94;
+  letter-spacing: -0.015em;
+  line-height: 1.07;
   color: var(--text);
   white-space: nowrap;
   cursor: default;
