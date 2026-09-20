@@ -1079,22 +1079,82 @@ button {
   flex-shrink: 0;
   min-height: 56px;
 }
-.room-topbar .ank-sigil { --d: 30px; -webkit-app-region: no-drag; }
+.room-topbar .ank-sigil { display: none !important; }
 
-/* Шапка звонка: знак продукта слева + название рядом с ним (собирает anker.js).
-   Раньше в топбаре была только иконка звонка — без подписи её принимали за кнопку. */
+/* Шапка звонка: только крупное название продукта без иконки (собирает anker.js).
+   Дисплейная типографика с градиентом + hover-анимация: перелив, разрядка,
+   свечение, подчёркивание и блик-проезд. */
 .room-topbar .ank-brandline {
   display: flex;
   align-items: center;
-  gap: 10px;
   flex-shrink: 0;
   min-width: 0;
+  -webkit-app-region: no-drag;
 }
 .room-topbar .ank-brandline__name {
-  font: 600 15px/1.15 var(--font);
-  letter-spacing: -0.01em;
-  color: var(--text);
+  position: relative;
+  display: inline-block;
+  font-family: var(--font-display, var(--font));
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
   white-space: nowrap;
+  cursor: default;
+  background: linear-gradient(100deg, #ffffff 10%, #6ea8f5 38%, #2a7ff0 50%, #9cc4ff 62%, #ffffff 90%);
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 12px rgba(42, 127, 240, 0.35));
+  transition: letter-spacing 0.35s var(--ease), filter 0.35s var(--ease), transform 0.35s var(--ease), background-position 0.8s var(--ease);
+}
+.room-topbar .ank-brandline__name::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, #2a7ff0, #6ea8f5, transparent);
+  transform: scaleX(0.25);
+  opacity: 0.35;
+  transform-origin: left;
+  transition: transform 0.45s var(--ease), opacity 0.35s var(--ease);
+}
+.room-topbar .ank-brandline__name::before {
+  content: "";
+  position: absolute;
+  inset: -4px -10px;
+  border-radius: 10px;
+  background: linear-gradient(110deg, transparent 30%, rgba(110, 168, 245, 0.22) 48%, rgba(255, 255, 255, 0.28) 50%, rgba(110, 168, 245, 0.22) 52%, transparent 70%);
+  background-size: 250% 100%;
+  background-position: 120% 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s var(--ease);
+}
+@media (hover: hover) {
+  .room-topbar .ank-brandline__name:hover {
+    background-position: 0% center;
+    letter-spacing: 0.04em;
+    transform: translateY(-1px);
+    filter: drop-shadow(0 4px 18px rgba(42, 127, 240, 0.55));
+  }
+  .room-topbar .ank-brandline__name:hover::after {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  .room-topbar .ank-brandline__name:hover::before {
+    opacity: 1;
+    animation: ank-brand-shine 1.1s var(--ease);
+  }
+}
+@keyframes ank-brand-shine {
+  from { background-position: 120% 0; }
+  to { background-position: -40% 0; }
 }
 
 .room-topbar .room-info {

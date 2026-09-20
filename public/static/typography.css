@@ -104,8 +104,8 @@ h4 {
   font-size: 20px;
 }
 
-/* Название продукта рядом со знаком в шапке звонка. */
+/* Название продукта в шапке звонка — крупный дисплейный заголовок без иконки. */
 .ank-brandline__name {
-  font-size: 17px;
-  letter-spacing: -0.015em;
+  font-size: 24px;
+  letter-spacing: -0.02em;
 }

@@ -530,13 +530,16 @@
     if (screen.__ankDone) return
     screen.__ankDone = true
     var topbar = $('.room-topbar', screen)
-    // Шапка звонка: знак продукта слева и название "Voice Lobby" рядом с ним.
-    // Раньше здесь была только иконка звонка, без подписи.
+    // Шапка звонка: только крупное название "Voice Lobby" без иконки —
+    // иконка мешала, теперь акцент на типографике (стили в style.css).
     if (topbar && !$('.ank-brandline', topbar)) {
       var line = make('div', 'ank-brandline')
-      line.appendChild(makeSigil(30))
       line.appendChild(make('span', 'ank-brandline__name', 'Voice Lobby'))
       topbar.insertBefore(line, topbar.firstChild)
+    } else if (topbar) {
+      // Чистим иконку от старых сборок, если она уже вставлена в DOM.
+      var oldSigil = $('.ank-brandline .ank-sigil', topbar)
+      if (oldSigil && oldSigil.parentNode) oldSigil.parentNode.removeChild(oldSigil)
     }
     reveal([topbar, $('.controls-bar', screen)].filter(Boolean))
   }
