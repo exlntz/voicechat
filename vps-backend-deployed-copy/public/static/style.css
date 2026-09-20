@@ -1794,6 +1794,29 @@ body.inapp-fullscreen { overflow: hidden; }
 .screen-ctx-submenu .screen-ctx-item.selected .ctx-icon { color: var(--accent-soft); }
 .screen-ctx-submenu .screen-ctx-item.selected:hover { color: #fff; }
 
+/* ---- Попап настроек устройств в звонке (шестерёнка в controls-bar) ----
+   База (position: fixed, фон, тень, анимация) — от .screen-ctx-menu выше.
+   Строки выбора переиспользуют .device-row из лобби. */
+.device-settings-popup {
+  min-width: 300px;
+  max-width: calc(100vw - 16px);
+  padding: 10px;
+}
+.device-popup-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 10px;
+  font: 600 12.5px/1.2 var(--font);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.device-popup-title i { color: var(--accent-soft); font-size: 13px; }
+.device-settings-popup .device-row { padding: 5px 2px; }
+.device-settings-popup .device-row label { width: 92px; font-size: 13px; }
+.device-settings-popup .device-row select { font-size: 13.5px; min-height: 42px; }
+
 /* ---- Центрированная раскладка сцены ---- */
 .stage.stage-centered {
   /* Сетка, а не flex-wrap: число колонок задано явно для каждого числа

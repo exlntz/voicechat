@@ -765,6 +765,9 @@ async function enterRoom(joinData) {
   const screenBtn = el('button', { class: 'ctrl-btn', title: 'Демонстрация экрана' }, [el('i', { class: 'fas fa-desktop' })])
   const screenCountBadge = el('span', { class: 'badge-count', style: 'display:none' }, '0')
   screenBtn.appendChild(screenCountBadge)
+  // Кнопка настроек устройств — сразу справа от демонстрации: микрофон, камера
+  // и динамики переключаются прямо во время звонка через всплывающую панель ниже.
+  const settingsBtn = el('button', { class: 'ctrl-btn', title: 'Настройки устройств' }, [el('i', { class: 'fas fa-cog' })])
 
   // Демонстрация экрана через getDisplayMedia() не поддерживается в большинстве мобильных
   // браузеров (iOS Safari/Chrome, Android Chrome вне десктоп-режима) - без проверки пользователь
@@ -778,6 +781,7 @@ async function enterRoom(joinData) {
   controls.appendChild(micBtn)
   controls.appendChild(camBtn)
   if (canScreenShare) controls.appendChild(screenBtn)
+  controls.appendChild(settingsBtn)
   controls.appendChild(divider1)
   controls.appendChild(leaveBtn)
   screen.appendChild(controls)
@@ -2011,7 +2015,209 @@ async function enterRoom(joinData) {
     else await startScreenShare()
   })
 
+  // ---- Настройки устройств прямо в звонке (шестерёнка справа от демонстрации) ----
+  // Всплывающая панель с тремя списками: микрофон, камера, динамики.
+  // Выбор применяется мгновенно без переподключения: входы — через
+  // room.switchActiveDevice() LiveKit (с фолбэком на выкл/вкл с deviceId),
+  // выход — через setSinkId() на всех уже играющих <audio> (новые подписки
+  // подхватывают state.selectedSpeakerId сами в TrackSubscribed).
+  // Всё запоминается в localStorage и переживает перезаход в звонок.
+  // В .exe-приложении работает без изменений кода: media/audioCapture/videoCapture
+  // авторазрешены в main.js, setSinkId/enumerateDevices — обычные Chromium API.
+  let devicePopup = null
+  let inCallMicSelect = null
+  let inCallCamSelect = null
+  let inCallSpkSelect = null
+
+  function closeDevicePopup() {
+    if (devicePopup) { devicePopup.remove(); devicePopup = null }
+  }
+
+  function fillInCallSelect(select, list, fallbackName, currentId) {
+    select.innerHTML = ''
+    if (list.length === 0) {
+      select.appendChild(el('option', { value: '' }, 'Не найдено'))
+      return ''
+    }
+    list.forEach((d, i) => select.appendChild(el('option', { value: d.deviceId }, d.label || `${fallbackName} ${i + 1}`)))
+    const ok = currentId && list.some((d) => d.deviceId === currentId)
+    select.value = ok ? currentId : list[0].deviceId
+    return select.value
+  }
+
+  async function applyMicDevice(deviceId) {
+    state.selectedMicId = deviceId || null
+    try { if (deviceId) localStorage.setItem('micDeviceId', deviceId) } catch {}
+    // Выбор должен действовать и при повторном включении выключенного микрофона:
+    // setMicrophoneEnabled(true) берёт устройство из audioCaptureDefaults.
+    try { room.options.audioCaptureDefaults = { ...(room.options.audioCaptureDefaults || {}), ...(deviceId ? { deviceId } : {}) } } catch {}
+    if (!state.micEnabled) return
+    try {
+      if (typeof room.switchActiveDevice === 'function') {
+        await room.switchActiveDevice('audioinput', deviceId)
+      } else {
+        await room.localParticipant.setMicrophoneEnabled(false)
+        await room.localParticipant.setMicrophoneEnabled(true, deviceId ? { deviceId } : undefined)
+      }
+      showToast('Микрофон переключён', 'success')
+    } catch (e) {
+      showToast('Не удалось переключить микрофон', 'error')
+    }
+  }
+
+  async function applyCamDevice(deviceId) {
+    state.selectedCamId = deviceId || null
+    try { if (deviceId) localStorage.setItem('camDeviceId', deviceId) } catch {}
+    try { room.options.videoCaptureDefaults = { ...(room.options.videoCaptureDefaults || {}), ...(deviceId ? { deviceId } : {}) } } catch {}
+    if (!state.cameraEnabled) return
+    try {
+      if (typeof room.switchActiveDevice === 'function') {
+        await room.switchActiveDevice('videoinput', deviceId)
+      } else {
+        await room.localParticipant.setCameraEnabled(false)
+        await room.localParticipant.setCameraEnabled(true, deviceId ? { deviceId } : undefined)
+      }
+      // Страховка: локальное превью должно показывать новый трек
+      const camPub = room.localParticipant.getTrackPublication(LK.Track.Source.Camera)
+      const t = cameraTilesMap.get(room.localParticipant.identity)
+      if (camPub && camPub.track && t) camPub.track.attach(t.video)
+      showToast('Камера переключена', 'success')
+    } catch (e) {
+      showToast('Не удалось переключить камеру', 'error')
+    }
+  }
+
+  function applySpeakerDevice(deviceId) {
+    state.selectedSpeakerId = deviceId || null
+    try { if (deviceId) localStorage.setItem('speakerDeviceId', deviceId) } catch {}
+    try { room.options.audioOutput = deviceId ? { deviceId } : undefined } catch {}
+    if (!deviceId) return
+    document.querySelectorAll('audio').forEach((a) => {
+      if (typeof a.setSinkId === 'function') a.setSinkId(deviceId).catch(() => {})
+    })
+    showToast('Динамики переключены', 'success')
+  }
+
+  // Короткий тестовый писк в выбранные динамики — проверка вывода в один клик
+  function playInCallTestSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      const osc = ctx.createOscillator()
+      osc.frequency.value = 880
+      const gain = ctx.createGain()
+      gain.gain.value = 0.18
+      const dest = ctx.createMediaStreamDestination()
+      osc.connect(gain).connect(dest)
+      const audioEl = document.createElement('audio')
+      audioEl.srcObject = dest.stream
+      audioEl.autoplay = true
+      if (state.selectedSpeakerId && typeof audioEl.setSinkId === 'function') {
+        audioEl.setSinkId(state.selectedSpeakerId).catch(() => {})
+      }
+      document.body.appendChild(audioEl)
+      osc.start()
+      setTimeout(() => {
+        try { osc.stop() } catch {}
+        try { ctx.close() } catch {}
+        audioEl.remove()
+      }, 600)
+    } catch (e) {
+      showToast('Не удалось воспроизвести тестовый звук', 'error')
+    }
+  }
+
+  async function refreshInCallDeviceLists() {
+    if (!devicePopup) return
+    let devices = []
+    try {
+      devices = await navigator.mediaDevices.enumerateDevices()
+    } catch (e) {
+      return
+    }
+    const currentMic = fillInCallSelect(inCallMicSelect, devices.filter((d) => d.kind === 'audioinput'), 'Микрофон', state.selectedMicId)
+    const currentCam = fillInCallSelect(inCallCamSelect, devices.filter((d) => d.kind === 'videoinput'), 'Камера', state.selectedCamId)
+    const currentSpk = fillInCallSelect(inCallSpkSelect, devices.filter((d) => d.kind === 'audiooutput'), 'Динамики', state.selectedSpeakerId)
+    // Устройство могли выдернуть прямо во время звонка: если текущего уже нет
+    // в списке — бесшумно переезжаем на первое доступное, чтобы не было тишины.
+    if (currentMic !== state.selectedMicId) await applyMicDevice(currentMic)
+    if (currentCam !== state.selectedCamId) await applyCamDevice(currentCam)
+    if (currentSpk && currentSpk !== state.selectedSpeakerId) applySpeakerDevice(currentSpk)
+  }
+
+  function openDevicePopup() {
+    if (devicePopup) {
+      closeDevicePopup()
+      return
+    }
+    closeScreenContextMenu()
+    const popup = el('div', { class: 'screen-ctx-menu device-settings-popup' })
+    popup.addEventListener('click', (e) => e.stopPropagation())
+    popup.addEventListener('contextmenu', (e) => e.preventDefault())
+    popup.appendChild(el('div', { class: 'device-popup-title' }, [el('i', { class: 'fas fa-cog' }), ' Устройства']))
+
+    inCallMicSelect = el('select', {})
+    inCallCamSelect = el('select', {})
+    inCallSpkSelect = el('select', {})
+    inCallMicSelect.addEventListener('change', () => applyMicDevice(inCallMicSelect.value || null))
+    inCallCamSelect.addEventListener('change', () => applyCamDevice(inCallCamSelect.value || null))
+    inCallSpkSelect.addEventListener('change', () => applySpeakerDevice(inCallSpkSelect.value || null))
+
+    const micRow = el('div', { class: 'device-row' })
+    micRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-microphone' }), ' Микрофон']))
+    micRow.appendChild(inCallMicSelect)
+    const camRow = el('div', { class: 'device-row' })
+    camRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-video' }), ' Камера']))
+    camRow.appendChild(inCallCamSelect)
+    const spkRow = el('div', { class: 'device-row' })
+    spkRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-volume-up' }), ' Динамики']))
+    spkRow.appendChild(inCallSpkSelect)
+    const testBtn = el('button', { class: 'btn-secondary test-sound-btn', type: 'button', title: 'Проверить звук' }, 'Тест')
+    testBtn.addEventListener('click', (e) => { e.stopPropagation(); playInCallTestSound() })
+    spkRow.appendChild(testBtn)
+    if (!(typeof HTMLMediaElement !== 'undefined' && typeof HTMLMediaElement.prototype.setSinkId === 'function')) {
+      spkRow.style.display = 'none'
+    }
+    popup.appendChild(micRow)
+    popup.appendChild(camRow)
+    popup.appendChild(spkRow)
+
+    // Позиция — над кнопкой-шестерёнкой, с клампом к краям вьюпорта.
+    // Хостер тот же, что у контекстных меню: в fullscreen попадаем внутрь
+    // fullscreen-элемента, иначе меню было бы невидимым (см. getFloatingHost).
+    getFloatingHost().appendChild(popup)
+    const btnRect = settingsBtn.getBoundingClientRect()
+    const pw = popup.offsetWidth
+    const ph = popup.offsetHeight
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    let left = Math.round(btnRect.left + btnRect.width / 2 - pw / 2)
+    let top = Math.round(btnRect.top - ph - 12)
+    if (left + pw > vw - 8) left = Math.max(8, vw - pw - 8)
+    if (left < 8) left = 8
+    if (top + ph > vh - 8) top = Math.max(8, vh - ph - 8)
+    if (top < 8) top = 8
+    popup.style.left = left + 'px'
+    popup.style.top = top + 'px'
+
+    devicePopup = popup
+    refreshInCallDeviceLists()
+  }
+
+  settingsBtn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    openDevicePopup()
+  })
+  document.addEventListener('click', closeDevicePopup)
+  window.addEventListener('resize', closeDevicePopup)
+  window.addEventListener('blur', closeDevicePopup)
+  document.addEventListener('fullscreenchange', closeDevicePopup)
+  // Гарнитуру могут воткнуть/выдернуть прямо во время звонка — обновляем списки
+  const onInCallDeviceChange = () => refreshInCallDeviceLists()
+  navigator.mediaDevices.addEventListener('devicechange', onInCallDeviceChange)
+
   leaveBtn.addEventListener('click', () => {
+    closeDevicePopup()
+    try { navigator.mediaDevices.removeEventListener('devicechange', onInCallDeviceChange) } catch {}
     cleanupAndGoLobby()
   })
 
