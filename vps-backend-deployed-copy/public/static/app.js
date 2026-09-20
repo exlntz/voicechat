@@ -2016,17 +2016,16 @@ async function enterRoom(joinData) {
   })
 
   // ---- Настройки устройств прямо в звонке (шестерёнка справа от демонстрации) ----
-  // Всплывающая панель с тремя списками: микрофон, камера, динамики.
-  // Выбор применяется мгновенно без переподключения: входы — через
-  // room.switchActiveDevice() LiveKit (с фолбэком на выкл/вкл с deviceId),
-  // выход — через setSinkId() на всех уже играющих <audio> (новые подписки
-  // подхватывают state.selectedSpeakerId сами в TrackSubscribed).
+  // Всплывающее меню «Настройки»: выбор устройства ввода (микрофон)
+  // и вывода (динамики). Применяется мгновенно без переподключения:
+  // вход — через room.switchActiveDevice() LiveKit (с фолбэком на выкл/вкл
+  // с deviceId), выход — через setSinkId() на всех уже играющих <audio>
+  // (новые подписки подхватывают state.selectedSpeakerId сами в TrackSubscribed).
   // Всё запоминается в localStorage и переживает перезаход в звонок.
   // В .exe-приложении работает без изменений кода: media/audioCapture/videoCapture
   // авторазрешены в main.js, setSinkId/enumerateDevices — обычные Chromium API.
   let devicePopup = null
   let inCallMicSelect = null
-  let inCallCamSelect = null
   let inCallSpkSelect = null
 
   function closeDevicePopup() {
@@ -2065,28 +2064,6 @@ async function enterRoom(joinData) {
     }
   }
 
-  async function applyCamDevice(deviceId) {
-    state.selectedCamId = deviceId || null
-    try { if (deviceId) localStorage.setItem('camDeviceId', deviceId) } catch {}
-    try { room.options.videoCaptureDefaults = { ...(room.options.videoCaptureDefaults || {}), ...(deviceId ? { deviceId } : {}) } } catch {}
-    if (!state.cameraEnabled) return
-    try {
-      if (typeof room.switchActiveDevice === 'function') {
-        await room.switchActiveDevice('videoinput', deviceId)
-      } else {
-        await room.localParticipant.setCameraEnabled(false)
-        await room.localParticipant.setCameraEnabled(true, deviceId ? { deviceId } : undefined)
-      }
-      // Страховка: локальное превью должно показывать новый трек
-      const camPub = room.localParticipant.getTrackPublication(LK.Track.Source.Camera)
-      const t = cameraTilesMap.get(room.localParticipant.identity)
-      if (camPub && camPub.track && t) camPub.track.attach(t.video)
-      showToast('Камера переключена', 'success')
-    } catch (e) {
-      showToast('Не удалось переключить камеру', 'error')
-    }
-  }
-
   function applySpeakerDevice(deviceId) {
     state.selectedSpeakerId = deviceId || null
     try { if (deviceId) localStorage.setItem('speakerDeviceId', deviceId) } catch {}
@@ -2098,34 +2075,6 @@ async function enterRoom(joinData) {
     showToast('Динамики переключены', 'success')
   }
 
-  // Короткий тестовый писк в выбранные динамики — проверка вывода в один клик
-  function playInCallTestSound() {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)()
-      const osc = ctx.createOscillator()
-      osc.frequency.value = 880
-      const gain = ctx.createGain()
-      gain.gain.value = 0.18
-      const dest = ctx.createMediaStreamDestination()
-      osc.connect(gain).connect(dest)
-      const audioEl = document.createElement('audio')
-      audioEl.srcObject = dest.stream
-      audioEl.autoplay = true
-      if (state.selectedSpeakerId && typeof audioEl.setSinkId === 'function') {
-        audioEl.setSinkId(state.selectedSpeakerId).catch(() => {})
-      }
-      document.body.appendChild(audioEl)
-      osc.start()
-      setTimeout(() => {
-        try { osc.stop() } catch {}
-        try { ctx.close() } catch {}
-        audioEl.remove()
-      }, 600)
-    } catch (e) {
-      showToast('Не удалось воспроизвести тестовый звук', 'error')
-    }
-  }
-
   async function refreshInCallDeviceLists() {
     if (!devicePopup) return
     let devices = []
@@ -2135,12 +2084,10 @@ async function enterRoom(joinData) {
       return
     }
     const currentMic = fillInCallSelect(inCallMicSelect, devices.filter((d) => d.kind === 'audioinput'), 'Микрофон', state.selectedMicId)
-    const currentCam = fillInCallSelect(inCallCamSelect, devices.filter((d) => d.kind === 'videoinput'), 'Камера', state.selectedCamId)
     const currentSpk = fillInCallSelect(inCallSpkSelect, devices.filter((d) => d.kind === 'audiooutput'), 'Динамики', state.selectedSpeakerId)
     // Устройство могли выдернуть прямо во время звонка: если текущего уже нет
     // в списке — бесшумно переезжаем на первое доступное, чтобы не было тишины.
     if (currentMic !== state.selectedMicId) await applyMicDevice(currentMic)
-    if (currentCam !== state.selectedCamId) await applyCamDevice(currentCam)
     if (currentSpk && currentSpk !== state.selectedSpeakerId) applySpeakerDevice(currentSpk)
   }
 
@@ -2153,32 +2100,23 @@ async function enterRoom(joinData) {
     const popup = el('div', { class: 'screen-ctx-menu device-settings-popup' })
     popup.addEventListener('click', (e) => e.stopPropagation())
     popup.addEventListener('contextmenu', (e) => e.preventDefault())
-    popup.appendChild(el('div', { class: 'device-popup-title' }, [el('i', { class: 'fas fa-cog' }), ' Устройства']))
+    popup.appendChild(el('div', { class: 'device-popup-title' }, [el('i', { class: 'fas fa-cog' }), ' Настройки']))
 
     inCallMicSelect = el('select', {})
-    inCallCamSelect = el('select', {})
     inCallSpkSelect = el('select', {})
     inCallMicSelect.addEventListener('change', () => applyMicDevice(inCallMicSelect.value || null))
-    inCallCamSelect.addEventListener('change', () => applyCamDevice(inCallCamSelect.value || null))
     inCallSpkSelect.addEventListener('change', () => applySpeakerDevice(inCallSpkSelect.value || null))
 
     const micRow = el('div', { class: 'device-row' })
     micRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-microphone' }), ' Микрофон']))
     micRow.appendChild(inCallMicSelect)
-    const camRow = el('div', { class: 'device-row' })
-    camRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-video' }), ' Камера']))
-    camRow.appendChild(inCallCamSelect)
     const spkRow = el('div', { class: 'device-row' })
     spkRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-volume-up' }), ' Динамики']))
     spkRow.appendChild(inCallSpkSelect)
-    const testBtn = el('button', { class: 'btn-secondary test-sound-btn', type: 'button', title: 'Проверить звук' }, 'Тест')
-    testBtn.addEventListener('click', (e) => { e.stopPropagation(); playInCallTestSound() })
-    spkRow.appendChild(testBtn)
     if (!(typeof HTMLMediaElement !== 'undefined' && typeof HTMLMediaElement.prototype.setSinkId === 'function')) {
       spkRow.style.display = 'none'
     }
     popup.appendChild(micRow)
-    popup.appendChild(camRow)
     popup.appendChild(spkRow)
 
     // Позиция — над кнопкой-шестерёнкой, с клампом к краям вьюпорта.
