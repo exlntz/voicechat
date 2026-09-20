@@ -397,12 +397,13 @@
     if (!card || card.__ankDone) return
     card.__ankDone = true
 
-    // Шапка: только название тем же шрифтом, что шапка звонка, без иконки.
+    // Шапка: знак продукта + название
     var h1 = $('h1', card)
     if (h1 && !$('.ank-brand', card)) {
       var brand = make('div', 'ank-brand')
       var tx = make('div', 'ank-brand__tx')
       card.insertBefore(brand, h1)
+      brand.appendChild(makeSigil(44))
       brand.appendChild(tx)
       tx.appendChild(h1)
     }
@@ -415,11 +416,11 @@
     if (screen.__ankDone) return
     screen.__ankDone = true
     var topbar = $('.room-topbar', screen)
-    // Шапка звонка: plain-название "Voice Lobby" без иконки.
-    if (topbar) {
-      var old = $('.ank-brandline', topbar)
-      if (old && old.parentNode) old.parentNode.removeChild(old)
+    // Шапка звонка: знак продукта слева и название "Voice Lobby" рядом с ним.
+    // Раньше здесь была только иконка звонка, без подписи.
+    if (topbar && !$('.ank-brandline', topbar)) {
       var line = make('div', 'ank-brandline')
+      line.appendChild(makeSigil(30))
       line.appendChild(make('span', 'ank-brandline__name', 'Voice Lobby'))
       topbar.insertBefore(line, topbar.firstChild)
     }

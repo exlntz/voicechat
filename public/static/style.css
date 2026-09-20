@@ -808,25 +808,6 @@ button {
   color: var(--text);
 }
 
-/* Заголовок страницы входа в звонок — тот же шрифт, что шапка звонка
-   (.room-topbar .ank-brandline__name): Rubik, без иконки (см. anker.js).
-   Размер и высота строки остаются от шкалы typography.css. */
-.lobby-card .ank-brand h1,
-.ank-brand__tx h1 {
-  font-family: "Rubik", "Segoe UI", system-ui, Arial, sans-serif;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  cursor: default;
-  transition: color 0.3s var(--ease), letter-spacing 0.3s var(--ease);
-}
-@media (hover: hover) {
-  .lobby-card .ank-brand h1:hover,
-  .ank-brand__tx h1:hover {
-    color: var(--accent-soft);
-    letter-spacing: 0.02em;
-  }
-}
-
 /* ---- Строка пользователя ---- */
 .lobby-userbar {
   display: flex;
@@ -1097,41 +1078,23 @@ button {
   -webkit-app-region: drag;
   flex-shrink: 0;
   min-height: 56px;
-  overflow: visible;
 }
-.room-topbar .ank-sigil { display: none !important; }
+.room-topbar .ank-sigil { --d: 30px; -webkit-app-region: no-drag; }
 
-/* Шапка звонка: plain-название продукта без иконки (собирает anker.js).
-   Сниппет пользователя (.intro-title): Rubik / 700 / плотная разрядка /
-   line-height 0.94. Без градиентов и без лишних обёрток, везде явный
-   overflow: visible. При наведении — лёгкая анимация: мягкий синий
-   оттенок, небольшая разрядка и подъём. */
+/* Шапка звонка: знак продукта слева + название рядом с ним (собирает anker.js).
+   Раньше в топбаре была только иконка звонка — без подписи её принимали за кнопку. */
 .room-topbar .ank-brandline {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
   min-width: 0;
-  overflow: visible;
 }
 .room-topbar .ank-brandline__name {
-  font-family: "Rubik", "Segoe UI", system-ui, Arial, sans-serif;
-  font-weight: 600;
-  font-size: 20px;
-  letter-spacing: -0.02em;
-  line-height: 0.94;
+  font: 600 15px/1.15 var(--font);
+  letter-spacing: -0.01em;
   color: var(--text);
   white-space: nowrap;
-  cursor: default;
-  overflow: visible;
-  transition: color 0.3s var(--ease), letter-spacing 0.3s var(--ease), transform 0.3s var(--ease);
-}
-@media (hover: hover) {
-  .room-topbar .ank-brandline__name:hover {
-    color: var(--accent-soft);
-    letter-spacing: 0.02em;
-    transform: translateY(-1px);
-  }
 }
 
 .room-topbar .room-info {
