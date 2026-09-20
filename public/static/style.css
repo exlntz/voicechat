@@ -1097,9 +1097,9 @@ button {
 }
 .room-topbar .ank-brandline__name {
   font-family: "Rubik", "Segoe UI", system-ui, Arial, sans-serif;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 20px;
-  letter-spacing: -0.075em;
+  letter-spacing: -0.02em;
   line-height: 0.94;
   color: var(--text);
   white-space: nowrap;
