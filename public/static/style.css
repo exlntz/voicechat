@@ -1981,9 +1981,10 @@ body.inapp-fullscreen { overflow: hidden; }
 }
 .settings-sheet {
   position: relative;
-  width: 80vw;
-  height: 80vh;
-  height: 80dvh;
+  /* Компактное окно: не больше 880×700, на маленьких экранах — с отступом от краёв */
+  width: min(880px, calc(100vw - 48px));
+  height: min(700px, calc(100vh - 48px));
+  height: min(700px, calc(100dvh - 48px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2015,7 +2016,7 @@ body.inapp-fullscreen { overflow: hidden; }
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 232px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
 }
 .settings-nav {
   display: flex;
@@ -2059,7 +2060,7 @@ body.inapp-fullscreen { overflow: hidden; }
   flex-direction: column;
   gap: 12px;
 }
-.settings-body > * { width: 100%; max-width: 760px; }
+.settings-body > * { width: 100%; }
 .settings-body .settings-card { margin-bottom: 0; padding: 18px 20px; }
 .settings-section-title {
   margin: 2px 0 6px;
