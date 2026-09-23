@@ -528,13 +528,13 @@
     if (!card || card.__ankDone) return
     card.__ankDone = true
 
-    // Шапка: знак продукта + название
+    // Шапка: знак продукта + название. В лобби знак анимирован всё время
     var h1 = $('h1', card)
     if (h1 && !$('.ank-brand', card)) {
       var brand = make('div', 'ank-brand')
       var tx = make('div', 'ank-brand__tx')
       card.insertBefore(brand, h1)
-      brand.appendChild(makeSigil(48))
+      brand.appendChild(makeSigil(38, true))
       brand.appendChild(tx)
       tx.appendChild(h1)
     }
