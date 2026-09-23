@@ -997,9 +997,8 @@ async function enterRoom(joinData) {
 
   // ---- Верхняя панель ----
   const topbar = el('div', { class: 'room-topbar' })
-  // Статус, код комнаты и отметка создателя — одной строкой и одним стилем текста.
-  // «Подключено» не пишем: когда всё хорошо, достаточно зелёной точки; текст
-  // появляется только при подключении/переподключении/обрыве.
+  // Статус · код комнаты (кнопка копирования) · создатель — в одной рамке,
+  // одним шрифтом: подписи приглушённые, код — основным цветом.
   const roomInfo = el('div', { class: 'room-info' })
   const statusDot = el('span', { class: 'status-dot connecting' })
   const statusText = el('span', { class: 'room-status-text' }, 'Подключение…')
@@ -1012,10 +1011,12 @@ async function enterRoom(joinData) {
     const ok = await copyToClipboard(roomCode)
     showToast(ok ? 'Скопировано' : 'Не удалось скопировать код комнаты', ok ? 'success' : 'error')
   })
+  roomInfo.appendChild(el('span', { class: 'room-sep', 'aria-hidden': 'true' }))
   roomInfo.appendChild(codeBadge)
   if (state.isHost) {
-    roomInfo.appendChild(el('span', { class: 'host-indicator', title: 'Вы создатель комнаты — можете выгонять участников', 'aria-label': 'Вы создатель комнаты' }, [
-      el('i', { class: 'fas fa-crown', 'aria-hidden': 'true' })
+    roomInfo.appendChild(el('span', { class: 'room-sep', 'aria-hidden': 'true' }))
+    roomInfo.appendChild(el('span', { class: 'host-indicator', title: 'Вы создатель комнаты — можете выгонять участников' }, [
+      el('i', { class: 'fas fa-crown', 'aria-hidden': 'true' }), el('span', {}, 'Создатель')
     ]))
   }
   topbar.appendChild(roomInfo)
@@ -1102,7 +1103,6 @@ async function enterRoom(joinData) {
   function setStatus(text, cls) {
     statusDot.className = `status-dot ${cls}`
     statusText.textContent = text
-    roomInfo.classList.toggle('is-live', !cls) // подключено — подпись статуса прячем
     statusDot.title = text
   }
 

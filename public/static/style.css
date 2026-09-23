@@ -1078,40 +1078,51 @@ button {
   white-space: nowrap;
 }
 
-/* Центр шапки: точка статуса · код комнаты · корона создателя.
-   Один шрифт и один размер, без рамок и разделителей. */
+/* Центр шапки: статус · код комнаты · создатель — в одной тонкой рамке.
+   Весь текст одного шрифта и размера: подписи приглушённые, код — основным
+   цветом; из акцентов только точка статуса и корона. */
 .room-topbar .room-info {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   min-width: 0;
+  height: 38px;
+  padding: 0 14px 0 14px;
+  background: rgba(242, 245, 249, 0.035);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
   font: 500 14px/1 var(--font);
   color: var(--text-dim);
+  white-space: nowrap;
   -webkit-app-region: no-drag;
+}
+.room-topbar .room-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+  flex-shrink: 0;
 }
 .room-topbar .room-status {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  white-space: nowrap;
 }
-/* Когда подключено — только точка */
-.room-topbar .room-info.is-live .room-status-text { display: none; }
 
+/* Код комнаты — кнопка копирования: подсветка только при наведении */
 .room-topbar .room-code-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 32px;
-  padding: 0 10px;
+  height: 28px;
+  margin: 0 -8px;
+  padding: 0 8px;
   background: transparent;
   border: 0;
-  border-radius: var(--radius-sm);
-  font: 500 14px/1 var(--font);
+  border-radius: var(--radius-pill);
+  font: inherit;
   font-variant-numeric: tabular-nums;
   color: var(--text);
   cursor: pointer;
-  white-space: nowrap;
   transition: background .2s var(--ease);
 }
 .room-topbar .room-code-badge__icon {
@@ -1119,16 +1130,16 @@ button {
   color: var(--text-faint);
   transition: color .2s var(--ease);
 }
-.room-topbar .room-code-badge:hover { background: rgba(242, 245, 249, 0.07); }
+.room-topbar .room-code-badge:hover { background: rgba(242, 245, 249, 0.08); }
 .room-topbar .room-code-badge:hover .room-code-badge__icon { color: var(--text); }
 
 .room-topbar .host-indicator {
   display: inline-flex;
   align-items: center;
-  color: var(--accent-soft);
-  font-size: 12px;
+  gap: 7px;
   cursor: default;
 }
+.room-topbar .host-indicator i { font-size: 12px; color: var(--accent-soft); }
 
 .room-topbar .status-dot {
   width: 8px; height: 8px; border-radius: 50%;
@@ -2267,10 +2278,9 @@ body.inapp-fullscreen { overflow: hidden; }
 
 @media (max-width: 480px) {
   .room-topbar { gap: 8px; padding: 8px 12px; }
-  /* Телефон: без подписи статуса — только точка */
-  .room-topbar .room-info { overflow: hidden; }
+  /* Телефон: подписи «Подключено»/«Создатель» не влезают — точка, код и корона */
+  .room-topbar .room-info { overflow: hidden; padding: 0 12px; gap: 8px; }
   .room-topbar .room-status-text { display: none; }
-  .room-topbar .room-code-badge { padding: 0 8px; }
   .room-topbar .ank-sigil { --d: 26px; }
   /* На телефоне подпись рядом со знаком не влезает вместе с кодом комнаты и статусом */
   .room-topbar .ank-brandline__name { display: none; }
