@@ -55,15 +55,42 @@ function el(tag, attrs = {}, children = []) {
   return node
 }
 
+// Типы уведомлений: info (синий), success (зелёный), warning (жёлтый), error (красный)
+const TOAST_ICONS = {
+  info: 'fas fa-circle-info',
+  success: 'fas fa-circle-check',
+  warning: 'fas fa-triangle-exclamation',
+  error: 'fas fa-circle-exclamation'
+}
+
 function showToast(message, type = 'info') {
+  if (!TOAST_ICONS[type]) type = 'info'
   let container = document.querySelector('.toast-container')
   if (!container) {
     container = el('div', { class: 'toast-container' })
     document.body.appendChild(container)
   }
-  const toast = el('div', { class: `toast ${type === 'error' ? 'error' : type === 'success' ? 'success' : ''}` }, message)
+  const closeBtn = el('button', { class: 'toast__close', type: 'button', 'aria-label': 'Закрыть уведомление' }, [el('i', { class: 'fas fa-xmark' })])
+  const toast = el('div', { class: `toast ${type}`, role: type === 'error' || type === 'warning' ? 'alert' : 'status' }, [
+    el('i', { class: `${TOAST_ICONS[type]} toast__icon`, 'aria-hidden': 'true' }),
+    el('div', { class: 'toast__text' }, message),
+    closeBtn
+  ])
+  let timer = 0
+  const dismiss = () => {
+    clearTimeout(timer)
+    if (toast.classList.contains('is-leaving')) return
+    toast.classList.add('is-leaving')
+    toast.addEventListener('animationend', () => toast.remove(), { once: true })
+    setTimeout(() => toast.remove(), 400)
+  }
+  closeBtn.addEventListener('click', dismiss)
+  // Пока курсор на уведомлении — не прячем, чтобы успеть дочитать
+  const arm = () => { clearTimeout(timer); timer = setTimeout(dismiss, 4500) }
+  toast.addEventListener('mouseenter', () => clearTimeout(timer))
+  toast.addEventListener('mouseleave', arm)
   container.appendChild(toast)
-  setTimeout(() => toast.remove(), 4500)
+  arm()
 }
 
 function initials(name) {
@@ -1989,7 +2016,7 @@ async function enterRoom(joinData) {
       const res = await fetch(`/api/rooms/${state.roomCode}/screen-shares`)
       const data = await res.json()
       if (data.available <= 0) {
-        showToast(`Достигнут лимит демонстраций экрана (максимум ${state.maxScreenShares} одновременно)`, 'error')
+        showToast(`Достигнут лимит демонстраций экрана (максимум ${state.maxScreenShares} одновременно)`, 'warning')
         return
       }
     } catch {
@@ -2142,7 +2169,7 @@ async function enterRoom(joinData) {
   // независимо от основного окна приложения/вкладки.
   async function openScreenSharePiP(video) {
     if (!('documentPictureInPicture' in window)) {
-      showToast('Режим "отдельное окно" не поддерживается этим браузером', 'error')
+      showToast('Режим "отдельное окно" не поддерживается этим браузером', 'warning')
       return
     }
     try {
