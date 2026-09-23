@@ -997,13 +997,14 @@ async function enterRoom(joinData) {
 
   // ---- Верхняя панель ----
   const topbar = el('div', { class: 'room-topbar' })
-  // Статус, код комнаты и отметка создателя — одна капсула с тонкими разделителями
+  // Статус, код комнаты и отметка создателя — одной строкой и одним стилем текста.
+  // «Подключено» не пишем: когда всё хорошо, достаточно зелёной точки; текст
+  // появляется только при подключении/переподключении/обрыве.
   const roomInfo = el('div', { class: 'room-info' })
   const statusDot = el('span', { class: 'status-dot connecting' })
   const statusText = el('span', { class: 'room-status-text' }, 'Подключение…')
   roomInfo.appendChild(el('span', { class: 'room-status', role: 'status' }, [statusDot, statusText]))
   const codeBadge = el('button', { type: 'button', class: 'room-code-badge', title: 'Скопировать код комнаты' }, [
-    el('span', { class: 'room-code-badge__label' }, 'Комната'),
     el('span', { class: 'room-code-badge__code' }, roomCode),
     el('i', { class: 'fas fa-copy room-code-badge__icon', 'aria-hidden': 'true' })
   ])
@@ -1013,8 +1014,8 @@ async function enterRoom(joinData) {
   })
   roomInfo.appendChild(codeBadge)
   if (state.isHost) {
-    roomInfo.appendChild(el('span', { class: 'host-indicator', title: 'Вы создатель комнаты — можете выгонять участников' }, [
-      el('i', { class: 'fas fa-crown' }), el('span', {}, 'Создатель')
+    roomInfo.appendChild(el('span', { class: 'host-indicator', title: 'Вы создатель комнаты — можете выгонять участников', 'aria-label': 'Вы создатель комнаты' }, [
+      el('i', { class: 'fas fa-crown', 'aria-hidden': 'true' })
     ]))
   }
   topbar.appendChild(roomInfo)
@@ -1101,6 +1102,8 @@ async function enterRoom(joinData) {
   function setStatus(text, cls) {
     statusDot.className = `status-dot ${cls}`
     statusText.textContent = text
+    roomInfo.classList.toggle('is-live', !cls) // подключено — подпись статуса прячем
+    statusDot.title = text
   }
 
   // ---- Приглашение, когда в звонке пока только ты ----
@@ -2465,10 +2468,7 @@ async function enterRoom(joinData) {
     inCallMicSelect.addEventListener('change', () => { applyMicDevice(inCallMicSelect.value || null); startInCallMeter() })
     inCallCamSelect.addEventListener('change', () => applyCamDevice(inCallCamSelect.value || null))
     inCallSpkSelect.addEventListener('change', () => applySpeakerDevice(inCallSpkSelect.value || null))
-    inCallDevices.micCard.appendChild(makeSwitchRow('Подключаться с выключенным микрофоном', getPref('joinMicMuted'), (on) => {
-      setPref('joinMicMuted', on)
-      showToast(on ? 'В следующий звонок войдёте с выключенным микрофоном' : 'В следующий звонок войдёте с включённым микрофоном', 'info')
-    }))
+    inCallDevices.micCard.appendChild(makeSwitchRow('Подключаться с выключенным микрофоном', getPref('joinMicMuted'), (on) => setPref('joinMicMuted', on)))
 
     // Разделы: слева меню, справа содержимое. Пока раздел один — «Звук»;
     // новые добавляются в SECTIONS и сразу появляются в меню.
