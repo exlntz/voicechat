@@ -450,10 +450,13 @@
 
   /* ─────────────── 5. Появление блоков и параллакс ─────────────── */
 
-  function reveal(nodes) {
+  // fadeOnly: только проявление без сдвига — для экрана звонка, где проезд
+  // панелей на 12px при подключении выглядел как подёргивание страницы.
+  function reveal(nodes, fadeOnly) {
     if (calm() || !nodes.length) return
     nodes.forEach(function (n, i) {
       n.classList.add('rv')
+      if (fadeOnly) n.classList.add('rv-fade')
       n.style.setProperty('--i', i)
     })
     requestAnimationFrame(function () {
@@ -463,7 +466,7 @@
     })
     setTimeout(function () {
       nodes.forEach(function (n) {
-        n.classList.remove('rv', 'is-in')
+        n.classList.remove('rv', 'rv-fade', 'is-in')
         n.style.removeProperty('--i')
       })
     }, 1400 + nodes.length * 70)
@@ -538,7 +541,7 @@
       line.appendChild(make('span', 'ank-brandline__name', 'Voice Lobby'))
       topbar.insertBefore(line, topbar.firstChild)
     }
-    reveal([topbar, $('.controls-bar', screen)].filter(Boolean))
+    reveal([topbar, $('.controls-bar', screen)].filter(Boolean), true)
   }
 
   /* ─────────────── 7. Проход по узлам + наблюдатель ─────────────── */

@@ -127,10 +127,22 @@ function setCallActive(active) {
   } catch {}
 }
 
+// Сбросить прокрутку документа (и фокус поля ввода, чтобы закрыть экранную клавиатуру)
+function resetPageScroll(blurInput = false) {
+  if (blurInput) {
+    const a = document.activeElement
+    if (a && a !== document.body && typeof a.blur === 'function') { try { a.blur() } catch {} }
+  }
+  try { window.scrollTo(0, 0) } catch {}
+  document.documentElement.scrollTop = 0
+  document.body.scrollTop = 0
+  if (root) root.scrollTop = 0
+}
+
 // ---- Выбор устройств: один компонент для лобби и для окна «Настройки» в звонке ----
 // Раньше лобби и звонок рисовали одно и то же по-разному (строки vs карточки, полоска vs
 // точки, «Тест» vs «Проверить»). Теперь оба экрана собирают карточки здесь, поэтому
-// иконки, подписи, индикатор уровня и кнопка проверки звука везде одинаковые.
+// иконки, подписи и индикатор уровня микрофона везде одинаковые.
 const DEVICE_META = {
   mic: { icon: 'fas fa-microphone', title: 'Микрофон', fallback: 'Микрофон', empty: 'Микрофоны не найдены' },
   spk: { icon: 'fas fa-volume-high', title: 'Динамики', fallback: 'Динамики', empty: 'Динамики не найдены' },
@@ -154,12 +166,11 @@ function buildDeviceCards() {
   const camSelect = el('select', { 'aria-label': 'Камера' })
   const micDots = el('div', { class: 'lvl-dots', 'aria-hidden': 'true' })
   for (let i = 0; i < 8; i++) micDots.appendChild(el('span', {}))
-  const spkTestBtn = el('button', { class: 'check-btn', type: 'button' }, [el('i', { class: 'fas fa-play' }), 'Проверить'])
   const micCard = card('mic', micDots, micSelect)
-  const spkCard = card('spk', null, el('div', { class: 'settings-card-row' }, [spkSelect, spkTestBtn]))
+  const spkCard = card('spk', null, spkSelect)
   const camCard = card('cam', null, camSelect)
   if (!speakerSelectionSupported()) spkCard.style.display = 'none'
-  return { micCard, spkCard, camCard, micSelect, spkSelect, camSelect, micDots, spkTestBtn }
+  return { micCard, spkCard, camCard, micSelect, spkSelect, camSelect, micDots }
 }
 
 // Заполняет select списком устройств и возвращает выбранный deviceId ('' — если устройств нет)
@@ -205,32 +216,6 @@ async function startLevelDots(dots, deviceId) {
     loop()
   } catch (e) { /* нет доступа к микрофону — точки просто не горят */ }
   return stop
-}
-
-// Короткий тестовый сигнал в выбранные динамики
-function playTestSound(deviceId) {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)()
-    const osc = ctx.createOscillator()
-    osc.frequency.value = 880
-    const gain = ctx.createGain()
-    gain.gain.value = 0.18
-    const dest = ctx.createMediaStreamDestination()
-    osc.connect(gain).connect(dest)
-    const audioEl = document.createElement('audio')
-    audioEl.srcObject = dest.stream
-    audioEl.autoplay = true
-    if (deviceId && typeof audioEl.setSinkId === 'function') audioEl.setSinkId(deviceId).catch(() => {})
-    document.body.appendChild(audioEl)
-    osc.start()
-    setTimeout(() => {
-      try { osc.stop() } catch {}
-      try { ctx.close() } catch {}
-      audioEl.remove()
-    }, 600)
-  } catch (e) {
-    showToast('Не удалось воспроизвести тестовый звук', 'error')
-  }
 }
 
 // Поле пароля с кнопкой-глазиком, переключающей видимость введённого текста (type: password <-> text).
@@ -620,7 +605,6 @@ async function renderLobby(prefillRoomCode = '') {
     if (state.selectedSpeakerId) localStorage.setItem('speakerDeviceId', state.selectedSpeakerId)
   })
 
-  devices.spkTestBtn.addEventListener('click', () => playTestSound(state.selectedSpeakerId))
 
   const onDeviceChange = () => populateDeviceLists()
   navigator.mediaDevices.addEventListener('devicechange', onDeviceChange)
@@ -716,6 +700,10 @@ async function enterRoom(joinData) {
   state.isHost = !!isHost
   state.hostSecret = hostSecret || null
 
+  // На телефоне поле кода комнаты остаётся в фокусе: клавиатура закрывается уже после
+  // перехода, и браузер оставляет страницу чуть прокрученной — экран звонка «ездил»
+  // вверх-вниз. Снимаем фокус и возвращаем прокрутку в ноль до и после отрисовки.
+  resetPageScroll(true)
   root.innerHTML = ''
 
   const screen = el('div', { class: 'room-screen' })
@@ -789,6 +777,9 @@ async function enterRoom(joinData) {
   screen.appendChild(controls)
 
   root.appendChild(screen)
+  resetPageScroll()
+  // Клавиатура на мобильных закрывается с анимацией — добиваем сброс, когда она уехала
+  setTimeout(resetPageScroll, 350)
 
   // ---- LiveKit Room ----
   const room = new LK.Room({
@@ -2162,7 +2153,6 @@ async function enterRoom(joinData) {
     inCallMicSelect.addEventListener('change', () => { applyMicDevice(inCallMicSelect.value || null); startInCallMeter() })
     inCallCamSelect.addEventListener('change', () => applyCamDevice(inCallCamSelect.value || null))
     inCallSpkSelect.addEventListener('change', () => applySpeakerDevice(inCallSpkSelect.value || null))
-    inCallDevices.spkTestBtn.addEventListener('click', (e) => { e.stopPropagation(); playTestSound(state.selectedSpeakerId) })
     sheet.appendChild(el('div', { class: 'settings-body' }, [inCallDevices.micCard, inCallDevices.spkCard, inCallDevices.camCard]))
 
     const overlay = el('div', { class: 'settings-overlay' }, [sheet])
