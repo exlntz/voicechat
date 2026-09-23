@@ -13,7 +13,9 @@ export const renderer = jsxRenderer(({ children, title }) => {
             заголовки — --font-display из typography.css (без CDN). */}
         <meta name="color-scheme" content="dark" />
         <meta name="theme-color" content="#0f1115" />
+        <link rel="icon" href="/static/favicon.ico" sizes="32x32" />
         <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+        <link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet" />
         <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.1/dist/livekit-client.umd.min.js"></script>
         <link href="/static/style.css" rel="stylesheet" />

@@ -139,6 +139,9 @@ app.use('/api/*', (c, next) => {
 })
 // Статика фронтенда (HTML отдаём вручную ниже, а /static/* — файлы напрямую)
 app.use('/static/*', serveStatic({ root: join(__dirname, '..', 'public') }))
+// Иконки сайта: браузеры и iOS запрашивают их из корня, сами файлы лежат в public/static
+app.get('/favicon.ico', serveStatic({ root: join(__dirname, '..', 'public', 'static') }))
+app.get('/apple-touch-icon.png', serveStatic({ root: join(__dirname, '..', 'public', 'static') }))
 
 // ---------- Константы бизнес-правил ----------
 const MAX_PARTICIPANTS = 5
@@ -529,7 +532,7 @@ app.get('/api/metrics', async (c) => {
 // Рисование поверх демонстрации живёт только в десктопном приложении (прозрачный оверлей
 // поверх всех окон), поэтому на сайте скрипт annotate.js больше не подключается.
 function renderPage(title) {
-  return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/><meta name="mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-capable" content="yes"/><meta name="theme-color" content="#0f1115"/><meta name="color-scheme" content="dark"/><title>${title}</title><link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet"/><script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.1/dist/livekit-client.umd.min.js"></script><link href="/static/style.css" rel="stylesheet"/></head><body><div id="app-root"></div><script src="/static/app.js"></script><script src="/static/anker.js"></script></body></html>`
+  return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/><meta name="mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-capable" content="yes"/><meta name="theme-color" content="#0f1115"/><link rel="icon" href="/favicon.ico" sizes="32x32"/><link rel="icon" type="image/svg+xml" href="/static/favicon.svg"/><link rel="apple-touch-icon" href="/apple-touch-icon.png"/><meta name="color-scheme" content="dark"/><title>${title}</title><link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet"/><script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.1/dist/livekit-client.umd.min.js"></script><link href="/static/style.css" rel="stylesheet"/></head><body><div id="app-root"></div><script src="/static/app.js"></script><script src="/static/anker.js"></script></body></html>`
 }
 
 app.get('/', (c) => c.html(renderPage('Voice Lobby')))
