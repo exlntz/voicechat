@@ -999,10 +999,15 @@ button {
 .ank-brand {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
   margin-bottom: 18px;
 }
 .ank-brand__tx { min-width: 0; }
+/* Логотип в строке с названием: у облачка снизу «хвостик», поэтому само облачко
+   (y 12…92 из 120) выше центра рамки на 1/15 её высоты — опускаем, чтобы текст
+   стоял ровно посередине облачка. */
+.ank-brand .ank-pulse,
+.ank-brandline .ank-pulse { transform: translateY(calc(var(--d) / 15)); }
 
 .lobby-card h1 {
   font-size: clamp(24px, 6vw, 30px);
@@ -1233,7 +1238,7 @@ button {
 .room-topbar .ank-brandline {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   flex-shrink: 0;
   min-width: 0;
 }
