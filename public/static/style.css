@@ -981,6 +981,7 @@ button {
   align-items: center;
   gap: 9px;
   color: var(--text);
+  font-weight: 600;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
