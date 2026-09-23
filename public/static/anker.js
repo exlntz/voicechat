@@ -269,17 +269,30 @@
 
   /* ─────────────── 3. Знак продукта ─────────────── */
 
-  // Знак вместо логотипа: эмодзи трубки, которое «звонит» (анимация в CSS).
-  // Эмодзи лежит внутри span, чтобы дрожал только глиф, а волны — вокруг него.
-  function makeSigil(size) {
-    var d = make('span', 'ank-sigil')
+  // Знак — открытый MacBook с видеозвонком на двоих. Вся анимация в CSS (.ank-sigil):
+  // по умолчанию статичный кадр и анимация при наведении, с классом is-live — всё время.
+  // Размер — высота знака в --d; без size берётся из CSS (у экрана и шапки свои значения).
+  var PERSON = '<svg class="lp-pp" viewBox="0 0 60 50" aria-hidden="true">' +
+    '<circle cx="30" cy="20" r="9.5"/><path d="M11 50C11 37 20 31.5 30 31.5S49 37 49 50Z"/></svg>'
+  var CHIP = '<span class="lp-chip"><span class="lp-bar"></span><span class="lp-bar"></span><span class="lp-bar"></span></span>'
+  var LAPTOP =
+    '<span class="lp-lid"><span class="lp-bezel"><span class="lp-notch"></span><span class="lp-screen">' +
+      '<span class="lp-tiles">' +
+        '<span class="lp-tile lp-a">' + PERSON + CHIP + '</span>' +
+        '<span class="lp-tile lp-b">' + PERSON + CHIP + '</span>' +
+      '</span>' +
+      '<span class="lp-ctrl"><span class="lp-btn"></span><span class="lp-btn"></span><span class="lp-btn lp-end"></span></span>' +
+      '<span class="lp-glare"></span><span class="lp-flash"></span>' +
+    '</span></span></span>' +
+    '<span class="lp-base"><span class="lp-scoop"></span></span>'
+
+  function makeSigil(size, live) {
+    var d = make('span', 'ank-sigil' + (live ? ' is-live' : ''))
     d.setAttribute('role', 'img')
-    d.setAttribute('aria-label', 'звонок')
+    d.setAttribute('aria-label', 'Voice Lobby')
     if (size) d.style.setProperty('--d', size + 'px')
-    var g = mark(document.createElement('span'))
-    g.className = 'ank-sigil__g'
-    g.textContent = '\ud83d\udcde'
-    d.appendChild(g)
+    d.innerHTML = LAPTOP
+    $$('*', d).forEach(mark)
     return d
   }
 
@@ -502,8 +515,9 @@
     // сколько живёт сессия, номера разделов) в интерфейсе быть не должно.
     var right = $('.auth-overlay-right', container)
     var left = $('.auth-overlay-left', container)
-    if (right && !$('.ank-sigil', right)) right.insertBefore(makeSigil(60), right.firstChild)
-    if (left && !$('.ank-sigil', left)) left.insertBefore(makeSigil(60), left.firstChild)
+    // На входе и регистрации знак анимирован всё время
+    if (right && !$('.ank-sigil', right)) right.insertBefore(makeSigil(0, true), right.firstChild)
+    if (left && !$('.ank-sigil', left)) left.insertBefore(makeSigil(0, true), left.firstChild)
 
     attachParallax(screen)
     reveal([container])
@@ -520,7 +534,7 @@
       var brand = make('div', 'ank-brand')
       var tx = make('div', 'ank-brand__tx')
       card.insertBefore(brand, h1)
-      brand.appendChild(makeSigil(44))
+      brand.appendChild(makeSigil(48))
       brand.appendChild(tx)
       tx.appendChild(h1)
     }
@@ -537,7 +551,9 @@
     // Раньше здесь была только иконка звонка, без подписи.
     if (topbar && !$('.ank-brandline', topbar)) {
       var line = make('div', 'ank-brandline')
-      line.appendChild(makeSigil(30))
+      // Пока идёт подключение — анимация всё время; в звонке — статично, при наведении
+      // (класс переключает setStatus в app.js)
+      line.appendChild(makeSigil(0, !!$('.status-dot.connecting', screen)))
       line.appendChild(make('span', 'ank-brandline__name', 'Voice Lobby'))
       topbar.insertBefore(line, topbar.firstChild)
     }

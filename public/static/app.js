@@ -1120,6 +1120,9 @@ async function enterRoom(joinData) {
     statusDot.className = `status-dot ${cls}`
     statusText.textContent = text
     statusDot.title = text
+    // Знак в шапке: при подключении/переподключении анимирован всё время, в звонке — статичный
+    const sigil = document.querySelector('.room-topbar .ank-sigil')
+    if (sigil) sigil.classList.toggle('is-live', cls === 'connecting')
   }
 
   // ---- Приглашение, когда в звонке пока только ты ----
