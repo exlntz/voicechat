@@ -173,15 +173,49 @@ function buildDeviceCards() {
   return { micCard, spkCard, camCard, micSelect, spkSelect, camSelect, micDots }
 }
 
+// Chrome на Windows отдаёт, кроме реальных устройств, ещё два ярлыка — deviceId
+// 'default' («Default - X») и 'communications' («Communications - X»), которые указывают
+// на одно из реальных устройств. В списке это выглядело как три одинаковых микрофона.
+// Прячем ярлык, только если нашли реальное устройство, на которое он указывает
+// (по названию, иначе по groupId), и запоминаем, куда он ведёт: сохранённый раньше
+// выбор 'default' переводится на то же физическое устройство, а не на первое в списке.
+const DEVICE_ALIAS_IDS = ['default', 'communications']
+
+function dedupeDevices(list) {
+  const real = list.filter((d) => !DEVICE_ALIAS_IDS.includes(d.deviceId))
+  const aliases = new Map()
+  const devices = []
+  list.forEach((d) => {
+    if (!DEVICE_ALIAS_IDS.includes(d.deviceId)) { devices.push(d); return }
+    const target =
+      real.find((r) => r.label && d.label && d.label.endsWith(r.label)) ||
+      real.find((r) => r.groupId && r.groupId === d.groupId)
+    if (target) aliases.set(d.deviceId, target.deviceId)
+    else devices.push(d) // не на что сослаться — оставляем как есть
+  })
+  return { devices, aliases }
+}
+
+// Реальный deviceId для сохранённого выбора (ярлык 'default' → устройство за ним)
+function resolveDeviceId(list, id) {
+  if (!id) return id
+  return dedupeDevices(list).aliases.get(id) || id
+}
+
 // Заполняет select списком устройств и возвращает выбранный deviceId ('' — если устройств нет)
-function fillDeviceSelect(select, kind, list, currentId) {
+function fillDeviceSelect(select, kind, rawList, currentId) {
+  const { devices: list, aliases } = dedupeDevices(rawList)
   select.innerHTML = ''
   if (list.length === 0) {
     select.appendChild(el('option', { value: '' }, DEVICE_META[kind].empty))
+    if (select._ddSync) select._ddSync()
     return ''
   }
   list.forEach((d, i) => select.appendChild(el('option', { value: d.deviceId }, d.label || `${DEVICE_META[kind].fallback} ${i + 1}`)))
-  select.value = currentId && list.some((d) => d.deviceId === currentId) ? currentId : list[0].deviceId
+  const wanted = aliases.get(currentId) || currentId
+  // Без сохранённого выбора — системное устройство по умолчанию, а не просто первое в списке
+  const fallback = aliases.get('default') || list[0].deviceId
+  select.value = wanted && list.some((d) => d.deviceId === wanted) ? wanted : fallback
   if (select._ddSync) select._ddSync()
   return select.value
 }
@@ -2255,9 +2289,21 @@ async function enterRoom(joinData) {
     } catch (e) {
       return
     }
-    const currentMic = fillDeviceSelect(inCallMicSelect, 'mic', list.filter((d) => d.kind === 'audioinput'), state.selectedMicId)
-    const currentCam = fillDeviceSelect(inCallCamSelect, 'cam', list.filter((d) => d.kind === 'videoinput'), state.selectedCamId)
-    const currentSpk = fillDeviceSelect(inCallSpkSelect, 'spk', list.filter((d) => d.kind === 'audiooutput'), state.selectedSpeakerId)
+    const mics = list.filter((d) => d.kind === 'audioinput')
+    const cams = list.filter((d) => d.kind === 'videoinput')
+    const spks = list.filter((d) => d.kind === 'audiooutput')
+    // Был выбран ярлык 'default' — это то же физическое устройство, что и в списке:
+    // просто запоминаем реальный id, трек не перезапускаем (иначе щелчок в звуке)
+    if (state.selectedMicId) state.selectedMicId = resolveDeviceId(mics, state.selectedMicId)
+    if (state.selectedCamId) state.selectedCamId = resolveDeviceId(cams, state.selectedCamId)
+    if (state.selectedSpeakerId) state.selectedSpeakerId = resolveDeviceId(spks, state.selectedSpeakerId)
+    const currentMic = fillDeviceSelect(inCallMicSelect, 'mic', mics, state.selectedMicId)
+    const currentCam = fillDeviceSelect(inCallCamSelect, 'cam', cams, state.selectedCamId)
+    const currentSpk = fillDeviceSelect(inCallSpkSelect, 'spk', spks, state.selectedSpeakerId)
+    // Выбора ещё не было — LiveKit и так пишет с системного устройства по умолчанию,
+    // а список показывает именно его: запоминаем без перезапуска трека.
+    if (!state.selectedMicId && currentMic) state.selectedMicId = currentMic
+    if (!state.selectedCamId && currentCam) state.selectedCamId = currentCam
     // Устройство могли выдернуть прямо во время звонка: если текущего уже нет
     // в списке — бесшумно переезжаем на первое доступное, чтобы не было тишины.
     if ((currentMic || null) !== state.selectedMicId) await applyMicDevice(currentMic, true)
