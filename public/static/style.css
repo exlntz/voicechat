@@ -797,6 +797,39 @@ button {
   margin: auto;
 }
 
+/* Широкий экран: лобби в две колонки, чтобы вся карточка помещалась в окно
+   без прокрутки (в одну колонку с превью и тремя карточками устройств она
+   была выше экрана ноутбука). Слева превью и переключатели, справа устройства,
+   внизу — код комнаты и кнопка входа в одну строку. Разметку не меняем:
+   раскладка целиком на grid-template-areas. */
+@media (min-width: 900px) {
+  .lobby-card {
+    max-width: 920px;
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    column-gap: 24px;
+    grid-template-areas:
+      "brand   user"
+      "err     err"
+      "preview devices"
+      "toggles devices"
+      "room    join"
+      "hint    hint";
+    align-items: start;
+  }
+  .lobby-card > .ank-brand,
+  .lobby-card > h1 { grid-area: brand; align-self: center; }
+  .lobby-card > .lobby-userbar { grid-area: user; align-self: center; }
+  .lobby-card > .error-box { grid-area: err; }
+  .lobby-card > .device-preview { grid-area: preview; max-height: none; }
+  .lobby-card > .join-toggles { grid-area: toggles; }
+  .lobby-card > .device-settings { grid-area: devices; }
+  .lobby-card > .fld,
+  .lobby-card > input { grid-area: room; }
+  .lobby-card > button { grid-area: join; align-self: end; margin: 0 0 26px; }
+  .lobby-card > .hint-text { grid-area: hint; margin-top: 4px; }
+}
+
 /* Шапка карточки: знак + название продукта (собирает anker.js) */
 .ank-brand {
   display: flex;
