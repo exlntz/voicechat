@@ -179,8 +179,7 @@ button {
 }
 .ank-btn:has(.btn__x) { justify-content: center; }
 .lobby-logout-btn .btn__x,
-.btn-secondary .btn__x,
-.test-sound-btn .btn__x { --roll: 18px; }
+.btn-secondary .btn__x { --roll: 18px; }
 
 /* ═══════════════ АТОМЫ: поля ввода ═══════════════
    Поле — подчёркнутая строка: подпись всплывает над ней, при фокусе
@@ -256,7 +255,7 @@ button {
   right: 0;
   top: 100%;
   margin-top: 7px;
-  font: 400 12.5px/1.35 var(--font);
+  font: 400 12px/1.35 var(--font);
   color: var(--text-faint);
   min-height: 16px;
   transition: color 0.3s var(--ease);
@@ -542,7 +541,7 @@ button {
   border-radius: var(--radius);
   background: var(--accent);
   color: #fff;
-  font: 600 15.5px/1 var(--font);
+  font: 600 15px/1 var(--font);
   letter-spacing: 0.01em;
   cursor: pointer;
   overflow: hidden;
@@ -656,7 +655,7 @@ button {
 
 /* Название продукта на акцентной панели */
 .auth-brand {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 650;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -671,7 +670,7 @@ button {
   color: #fff;
 }
 .auth-overlay-panel p {
-  font-size: 15.5px;
+  font-size: 15px;
   line-height: 1.55;
   margin: 0 0 28px;
   max-width: 28ch;
@@ -718,7 +717,7 @@ button {
 .auth-mobile-switch {
   display: none;
   margin-top: 22px;
-  font-size: 14.5px;
+  font-size: 14px;
   color: var(--text-dim);
   text-align: center;
 }
@@ -819,7 +818,7 @@ button {
   border-radius: var(--radius);
   padding: 10px 12px;
   margin-bottom: 16px;
-  font-size: 14.5px;
+  font-size: 14px;
   color: var(--text);
 }
 .lobby-userbar > span {
@@ -836,8 +835,7 @@ button {
 
 /* Вторичные кнопки: hairline + подложка при наведении */
 .lobby-card .btn-secondary,
-.lobby-logout-btn,
-.test-sound-btn {
+.lobby-logout-btn {
   position: relative;
   z-index: 0;
   display: inline-flex;
@@ -857,16 +855,13 @@ button {
 .lobby-card .btn-secondary:hover,
 .lobby-card .btn-secondary:focus-visible,
 .lobby-logout-btn:hover,
-.lobby-logout-btn:focus-visible,
-.test-sound-btn:hover,
-.test-sound-btn:focus-visible {
+.lobby-logout-btn:focus-visible {
   color: var(--text);
   border-color: var(--border-strong);
   background: rgba(242, 245, 249, 0.06);
 }
 .lobby-card .btn-secondary:active,
-.lobby-logout-btn:active,
-.test-sound-btn:active { transform: scale(0.98); }
+.lobby-logout-btn:active { transform: scale(0.98); }
 .lobby-card .lobby-logout-btn { width: auto; margin-top: 0; flex-shrink: 0; }
 
 /* Выход из аккаунта — то же красное оформление, что и у кнопки завершения звонка
@@ -944,7 +939,7 @@ button {
   border-radius: var(--radius);
   background: transparent;
   color: var(--text-dim);
-  font: 500 14.5px/1 var(--font);
+  font: 500 14px/1 var(--font);
   cursor: pointer;
   overflow: hidden;
   transition: color 0.25s var(--ease), border-color 0.25s var(--ease), background 0.25s var(--ease);
@@ -959,75 +954,21 @@ button {
 .join-toggle-btn.off i { color: var(--danger-soft); }
 .join-toggle-btn i { font-size: 14px; transition: color 0.25s var(--ease); }
 
-/* ---- Выбор устройств ---- */
+/* ---- Выбор устройств ----
+   Те же карточки .settings-card, что и в окне «Настройки» звонка (см. ниже),
+   только стопкой и чуть компактнее — лобби узкое. */
 .device-settings {
   display: flex;
   flex-direction: column;
   gap: 10px;
   margin-bottom: 16px;
-  padding: 16px 0;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
   text-align: left;
 }
-
-.device-row { display: flex; align-items: center; gap: 10px; }
-
-.device-row label {
-  flex-shrink: 0;
-  width: 104px;
-  font-size: 13.5px;
-  color: var(--text-faint);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.device-row label i { color: var(--accent-soft); font-size: 12px; }
-
-.device-row select {
-  flex: 1;
-  min-width: 0;
-  appearance: none;
-  -webkit-appearance: none;
-  padding: 10px 30px 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background-color: rgba(242, 245, 249, 0.04);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236ea8f5' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 11px center;
-  color: var(--text);
-  font-family: var(--font);
-  font-size: 14px;
-  outline: none;
-  cursor: pointer;
-  transition: border-color 0.25s var(--ease), background-color 0.25s var(--ease);
-  min-height: 44px;
-}
-.device-row select:hover { border-color: var(--border-strong); }
-.device-row select:focus { border-color: var(--accent-soft); background-color: var(--accent-wash); }
-.device-row select option { background: var(--surface-2); color: var(--text); }
-.device-row .test-sound-btn { min-height: 44px; flex-shrink: 0; }
-
-/* Индикатор уровня микрофона */
-.mic-meter {
-  width: 46px;
-  height: 8px;
-  border-radius: var(--radius-pill);
-  background: rgba(242, 245, 249, 0.10);
-  overflow: hidden;
-  flex-shrink: 0;
-}
-.mic-meter-bar {
-  height: 100%;
-  width: 0%;
-  border-radius: var(--radius-pill);
-  background: var(--success);
-  transition: width .08s linear;
-}
+.device-settings .settings-card { padding: 12px 14px; margin-bottom: 0; }
+.device-settings .settings-card-head { margin-bottom: 10px; }
 
 .hint-text {
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.5;
   color: var(--text-faint);
   margin-top: 14px;
@@ -1114,7 +1055,7 @@ button {
   border: 1px solid var(--border);
   padding: 6px 12px;
   border-radius: var(--radius-sm);
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--text);
   cursor: pointer;
   white-space: nowrap;
@@ -1128,7 +1069,7 @@ button {
   align-items: center;
   gap: 6px;
   color: var(--accent-soft);
-  font-size: 13.5px;
+  font-size: 13px;
   white-space: nowrap;
 }
 
@@ -1197,7 +1138,7 @@ button {
   border: 1px solid rgba(242, 245, 249, 0.12);
   padding: 6px 11px;
   border-radius: var(--radius-sm);
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.2;
   color: var(--text);
   display: flex;
@@ -1214,7 +1155,8 @@ button {
 
 .tile .tile-label .fa-microphone-slash,
 .tile .tile-label .fa-video-slash { color: var(--danger-soft); flex-shrink: 0; }
-.tile .tile-label .host-crown { color: var(--accent-soft); margin-left: 2px; flex-shrink: 0; }
+.host-crown { color: var(--accent-soft); flex-shrink: 0; }
+.tile .tile-label .host-crown { margin-left: 2px; }
 
 /* Кнопки на тайле */
 .tile-fullscreen-btn,
@@ -1480,7 +1422,7 @@ body.inapp-fullscreen { overflow: hidden; }
   max-width: 26ch;
 }
 .solo-invite__hint {
-  font-size: 14.5px;
+  font-size: 14px;
   line-height: 1.5;
   color: var(--text-faint);
   margin: 0;
@@ -1499,7 +1441,7 @@ body.inapp-fullscreen { overflow: hidden; }
   border-radius: var(--radius);
   background: var(--accent);
   color: #fff;
-  font: 600 15.5px/1 var(--font);
+  font: 600 15px/1 var(--font);
   cursor: pointer;
   transition: background .25s var(--ease), border-color .25s var(--ease), transform .18s var(--ease), box-shadow .25s var(--ease);
 }
@@ -1651,7 +1593,10 @@ body.inapp-fullscreen { overflow: hidden; }
 /* ---- Панель участников ---- */
 .panel-overlay {
   position: fixed; inset: 0;
-  background: rgba(5, 7, 10, .62);
+  /* то же размытое затемнение, что у окна настроек (.settings-overlay) */
+  background: rgba(5, 7, 10, 0.5);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
   display: flex; justify-content: flex-end;
   /* выше уведомлений (z-index 1000), иначе тост ложится на список участников */
   z-index: 1100;
@@ -1678,6 +1623,15 @@ body.inapp-fullscreen { overflow: hidden; }
 .panel-overlay.is-closing .panel { animation: ank-panel-out .36s var(--ease-io) forwards; }
 @keyframes ank-fade-out { from { opacity: 1; } to { opacity: 0; } }
 @keyframes ank-panel-out { from { transform: none; } to { transform: translateX(100%); } }
+/* Шапка панели — как у окна настроек: заголовок слева, крестик справа */
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -4px -8px 8px 0;
+}
+.panel-head .panel-close { float: none; }
 .panel h3 {
   margin: 0 0 16px;
   font-size: 20px;
@@ -1839,6 +1793,7 @@ body.inapp-fullscreen { overflow: hidden; }
   flex-shrink: 0;
 }
 .settings-head .panel-close { float: none; }
+.panel .panel-head h3 { margin: 0; }
 .settings-sheet .settings-head h3 { margin: 0; }
 /* Прокручиваемое тело с карточками */
 .settings-body {
@@ -1868,7 +1823,7 @@ body.inapp-fullscreen { overflow: hidden; }
   font-weight: 650;
   color: var(--text);
 }
-/* Карточки секций (Микрофон / Динамик / Камера) — тёмные плашки как в Telegram */
+/* Карточки устройств (Микрофон / Динамики / Камера) — общие для лобби и окна настроек */
 .settings-card {
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -1886,9 +1841,11 @@ body.inapp-fullscreen { overflow: hidden; }
   color: var(--text);
   margin-bottom: 12px;
 }
+.settings-card-title { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
+.settings-card-title i { width: 16px; text-align: center; color: var(--accent-soft); font-size: 14px; }
 .settings-card-row { display: flex; gap: 10px; align-items: stretch; }
 .settings-card-row select { flex: 1; min-width: 0; }
-.settings-sheet select {
+.settings-card select {
   width: 100%;
   appearance: none;
   -webkit-appearance: none;
@@ -1907,9 +1864,9 @@ body.inapp-fullscreen { overflow: hidden; }
   min-height: 44px;
   transition: border-color 0.25s var(--ease), background-color 0.25s var(--ease);
 }
-.settings-sheet select:hover { border-color: var(--border-strong); }
-.settings-sheet select:focus { border-color: var(--accent-soft); background-color: var(--accent-wash); }
-.settings-sheet select option { background: var(--surface-2); color: var(--text); }
+.settings-card select:hover { border-color: var(--border-strong); }
+.settings-card select:focus { border-color: var(--accent-soft); background-color: var(--accent-wash); }
+.settings-card select option { background: var(--surface-2); color: var(--text); }
 /* Живой индикатор уровня микрофона */
 .lvl-dots { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
 .lvl-dots span {
@@ -2054,9 +2011,6 @@ body.inapp-fullscreen { overflow: hidden; }
 @media (max-width: 560px) {
   .lobby-card { padding: 22px 18px 20px; }
   .lobby-screen, .auth-screen { padding: 16px; }
-  .device-row { flex-wrap: wrap; }
-  .device-row label { width: 100%; }
-  .device-row select { flex: 1 1 auto; }
   .join-toggles { gap: 8px; }
   .toast-container { right: 12px; left: 12px; max-width: none; }
   .toast { max-width: none; }
@@ -2092,7 +2046,7 @@ body.inapp-fullscreen { overflow: hidden; }
   .ctrl-divider { margin: 0 2px; height: 26px; flex-shrink: 0; }
 
   .tile { border-radius: 12px; }
-  .tile .tile-label { font-size: 12.5px; padding: 5px 9px; }
+  .tile .tile-label { font-size: 12px; padding: 5px 9px; }
   .solo-copy-btn { width: 100%; min-width: 0; }
 }
 

@@ -127,6 +127,112 @@ function setCallActive(active) {
   } catch {}
 }
 
+// ---- Выбор устройств: один компонент для лобби и для окна «Настройки» в звонке ----
+// Раньше лобби и звонок рисовали одно и то же по-разному (строки vs карточки, полоска vs
+// точки, «Тест» vs «Проверить»). Теперь оба экрана собирают карточки здесь, поэтому
+// иконки, подписи, индикатор уровня и кнопка проверки звука везде одинаковые.
+const DEVICE_META = {
+  mic: { icon: 'fas fa-microphone', title: 'Микрофон', fallback: 'Микрофон', empty: 'Микрофоны не найдены' },
+  spk: { icon: 'fas fa-volume-high', title: 'Динамики', fallback: 'Динамики', empty: 'Динамики не найдены' },
+  cam: { icon: 'fas fa-video', title: 'Камера', fallback: 'Камера', empty: 'Камеры не найдены' }
+}
+
+function speakerSelectionSupported() {
+  return typeof HTMLMediaElement !== 'undefined' && typeof HTMLMediaElement.prototype.setSinkId === 'function'
+}
+
+function buildDeviceCards() {
+  const card = (kind, headExtra, body) => el('div', { class: 'settings-card' }, [
+    el('div', { class: 'settings-card-head' }, [
+      el('span', { class: 'settings-card-title' }, [el('i', { class: DEVICE_META[kind].icon }), DEVICE_META[kind].title]),
+      headExtra
+    ]),
+    body
+  ])
+  const micSelect = el('select', { 'aria-label': 'Микрофон' })
+  const spkSelect = el('select', { 'aria-label': 'Динамики' })
+  const camSelect = el('select', { 'aria-label': 'Камера' })
+  const micDots = el('div', { class: 'lvl-dots', 'aria-hidden': 'true' })
+  for (let i = 0; i < 8; i++) micDots.appendChild(el('span', {}))
+  const spkTestBtn = el('button', { class: 'check-btn', type: 'button' }, [el('i', { class: 'fas fa-play' }), 'Проверить'])
+  const micCard = card('mic', micDots, micSelect)
+  const spkCard = card('spk', null, el('div', { class: 'settings-card-row' }, [spkSelect, spkTestBtn]))
+  const camCard = card('cam', null, camSelect)
+  if (!speakerSelectionSupported()) spkCard.style.display = 'none'
+  return { micCard, spkCard, camCard, micSelect, spkSelect, camSelect, micDots, spkTestBtn }
+}
+
+// Заполняет select списком устройств и возвращает выбранный deviceId ('' — если устройств нет)
+function fillDeviceSelect(select, kind, list, currentId) {
+  select.innerHTML = ''
+  if (list.length === 0) {
+    select.appendChild(el('option', { value: '' }, DEVICE_META[kind].empty))
+    return ''
+  }
+  list.forEach((d, i) => select.appendChild(el('option', { value: d.deviceId }, d.label || `${DEVICE_META[kind].fallback} ${i + 1}`)))
+  select.value = currentId && list.some((d) => d.deviceId === currentId) ? currentId : list[0].deviceId
+  return select.value
+}
+
+// Живой индикатор уровня микрофона (точки). Возвращает функцию остановки.
+async function startLevelDots(dots, deviceId) {
+  let stream = null
+  let ctx = null
+  let raf = 0
+  const stop = () => {
+    if (raf) cancelAnimationFrame(raf)
+    raf = 0
+    if (ctx) { try { ctx.close() } catch {} ctx = null }
+    if (stream) { stream.getTracks().forEach((t) => t.stop()); stream = null }
+    Array.from(dots.children).forEach((d) => d.classList.remove('on'))
+  }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: deviceId ? { deviceId: { exact: deviceId } } : true })
+    ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const analyser = ctx.createAnalyser()
+    analyser.fftSize = 256
+    ctx.createMediaStreamSource(stream).connect(analyser)
+    const data = new Uint8Array(analyser.frequencyBinCount)
+    const cells = Array.from(dots.children)
+    const loop = () => {
+      if (!document.body.contains(dots)) { stop(); return }
+      analyser.getByteFrequencyData(data)
+      const avg = data.reduce((a, b) => a + b, 0) / data.length
+      const lit = Math.round(Math.min(1, avg / 90) * cells.length)
+      cells.forEach((d, i) => d.classList.toggle('on', i < lit))
+      raf = requestAnimationFrame(loop)
+    }
+    loop()
+  } catch (e) { /* нет доступа к микрофону — точки просто не горят */ }
+  return stop
+}
+
+// Короткий тестовый сигнал в выбранные динамики
+function playTestSound(deviceId) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const osc = ctx.createOscillator()
+    osc.frequency.value = 880
+    const gain = ctx.createGain()
+    gain.gain.value = 0.18
+    const dest = ctx.createMediaStreamDestination()
+    osc.connect(gain).connect(dest)
+    const audioEl = document.createElement('audio')
+    audioEl.srcObject = dest.stream
+    audioEl.autoplay = true
+    if (deviceId && typeof audioEl.setSinkId === 'function') audioEl.setSinkId(deviceId).catch(() => {})
+    document.body.appendChild(audioEl)
+    osc.start()
+    setTimeout(() => {
+      try { osc.stop() } catch {}
+      try { ctx.close() } catch {}
+      audioEl.remove()
+    }, 600)
+  } catch (e) {
+    showToast('Не удалось воспроизвести тестовый звук', 'error')
+  }
+}
+
 // Поле пароля с кнопкой-глазиком, переключающей видимость введённого текста (type: password <-> text).
 // Возвращает { wrapper, input } - wrapper вставляется в форму, input используется как обычное поле
 // (value, addEventListener и т.д.), логика клика по глазику инкапсулирована здесь.
@@ -424,32 +530,10 @@ async function renderLobby(prefillRoomCode = '') {
     }
   })
 
-  // ---- Выбор устройств ввода/вывода ----
-  const deviceSettings = el('div', { class: 'device-settings' })
-
-  const camRow = el('div', { class: 'device-row' })
-  camRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-video' }), ' Камера']))
-  const camSelect = el('select', {})
-  camRow.appendChild(camSelect)
-  deviceSettings.appendChild(camRow)
-
-  const micRow = el('div', { class: 'device-row' })
-  micRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-microphone' }), ' Микрофон']))
-  const micSelect = el('select', {})
-  micRow.appendChild(micSelect)
-  const micMeter = el('div', { class: 'mic-meter' }, [el('div', { class: 'mic-meter-bar' })])
-  micRow.appendChild(micMeter)
-  deviceSettings.appendChild(micRow)
-
-  const spkRow = el('div', { class: 'device-row' })
-  spkRow.appendChild(el('label', {}, [el('i', { class: 'fas fa-volume-up' }), ' Динамики']))
-  const spkSelect = el('select', {})
-  spkRow.appendChild(spkSelect)
-  const testBtn = el('button', { class: 'btn-secondary test-sound-btn', type: 'button', title: 'Проверить звук' }, 'Тест')
-  spkRow.appendChild(testBtn)
-  deviceSettings.appendChild(spkRow)
-
-  card.appendChild(deviceSettings)
+  // ---- Выбор устройств ввода/вывода (те же карточки, что в окне настроек звонка) ----
+  const devices = buildDeviceCards()
+  const { micSelect, spkSelect, camSelect } = devices
+  card.appendChild(el('div', { class: 'device-settings' }, [devices.micCard, devices.spkCard, devices.camCard]))
 
   const roomInput = el('input', {
     type: 'text',
@@ -487,118 +571,36 @@ async function renderLobby(prefillRoomCode = '') {
   }
 
   // ---- Индикатор уровня микрофона ----
-  let micStream = null
-  let audioCtx = null
-  let meterRAF = null
+  let stopLevel = null
 
   function stopMicMonitor() {
-    if (meterRAF) cancelAnimationFrame(meterRAF)
-    meterRAF = null
-    if (audioCtx) { try { audioCtx.close() } catch {} audioCtx = null }
-    if (micStream) { micStream.getTracks().forEach((t) => t.stop()); micStream = null }
+    if (stopLevel) { stopLevel(); stopLevel = null }
   }
 
   async function startMicMonitor(deviceId) {
     stopMicMonitor()
-    try {
-      micStream = await navigator.mediaDevices.getUserMedia({
-        audio: deviceId ? { deviceId: { exact: deviceId } } : true
-      })
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-      const source = audioCtx.createMediaStreamSource(micStream)
-      const analyser = audioCtx.createAnalyser()
-      analyser.fftSize = 256
-      source.connect(analyser)
-      const data = new Uint8Array(analyser.frequencyBinCount)
-      const bar = micMeter.querySelector('.mic-meter-bar')
-      const loop = () => {
-        analyser.getByteFrequencyData(data)
-        const avg = data.reduce((a, b) => a + b, 0) / data.length
-        bar.style.width = Math.min(100, (avg / 100) * 100) + '%'
-        meterRAF = requestAnimationFrame(loop)
-      }
-      loop()
-    } catch (e) {
-      // нет доступа к микрофону - индикатор просто не покажется
-    }
-  }
-
-  // ---- Тест динамиков ----
-  async function playTestSound(deviceId) {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)()
-      const osc = ctx.createOscillator()
-      osc.frequency.value = 880
-      const gain = ctx.createGain()
-      gain.gain.value = 0.18
-      const dest = ctx.createMediaStreamDestination()
-      osc.connect(gain).connect(dest)
-      const audioEl = document.createElement('audio')
-      audioEl.srcObject = dest.stream
-      audioEl.autoplay = true
-      if (deviceId && typeof audioEl.setSinkId === 'function') {
-        await audioEl.setSinkId(deviceId).catch(() => {})
-      }
-      document.body.appendChild(audioEl)
-      osc.start()
-      setTimeout(() => {
-        try { osc.stop() } catch {}
-        try { ctx.close() } catch {}
-        audioEl.remove()
-      }, 600)
-    } catch (e) {
-      showToast('Не удалось воспроизвести тестовый звук', 'error')
-    }
+    stopLevel = await startLevelDots(devices.micDots, deviceId)
   }
 
   // ---- Заполнение списков устройств ----
-  const speakerSupported = typeof HTMLMediaElement !== 'undefined' && typeof HTMLMediaElement.prototype.setSinkId === 'function'
-  if (!speakerSupported) spkRow.style.display = 'none'
+  const speakerSupported = speakerSelectionSupported()
 
   async function populateDeviceLists() {
-    let devices = []
+    let list = []
     try {
-      devices = await navigator.mediaDevices.enumerateDevices()
+      list = await navigator.mediaDevices.enumerateDevices()
     } catch (e) {
       return
     }
-    const cams = devices.filter((d) => d.kind === 'videoinput')
-    const mics = devices.filter((d) => d.kind === 'audioinput')
-    const speakers = devices.filter((d) => d.kind === 'audiooutput')
-
-    const savedCam = localStorage.getItem('camDeviceId')
-    const savedMic = localStorage.getItem('micDeviceId')
-    const savedSpk = localStorage.getItem('speakerDeviceId')
-
-    camSelect.innerHTML = ''
-    if (cams.length === 0) {
-      camSelect.appendChild(el('option', { value: '' }, 'Камеры не найдены'))
-    } else {
-      cams.forEach((d, i) => camSelect.appendChild(el('option', { value: d.deviceId }, d.label || `Камера ${i + 1}`)))
-      if (savedCam && cams.some((d) => d.deviceId === savedCam)) camSelect.value = savedCam
-    }
-
-    micSelect.innerHTML = ''
-    if (mics.length === 0) {
-      micSelect.appendChild(el('option', { value: '' }, 'Микрофоны не найдены'))
-    } else {
-      mics.forEach((d, i) => micSelect.appendChild(el('option', { value: d.deviceId }, d.label || `Микрофон ${i + 1}`)))
-      if (savedMic && mics.some((d) => d.deviceId === savedMic)) micSelect.value = savedMic
-    }
-
-    if (speakerSupported) {
-      spkSelect.innerHTML = ''
-      if (speakers.length === 0) {
-        spkSelect.appendChild(el('option', { value: '' }, 'Не найдено'))
-      } else {
-        speakers.forEach((d, i) => spkSelect.appendChild(el('option', { value: d.deviceId }, d.label || `Динамики ${i + 1}`)))
-        if (savedSpk && speakers.some((d) => d.deviceId === savedSpk)) spkSelect.value = savedSpk
-      }
-    }
-
-    state.selectedCamId = camSelect.value || null
-    state.selectedMicId = micSelect.value || null
-    state.selectedSpeakerId = speakerSupported ? (spkSelect.value || null) : null
+    let saved = {}
+    try {
+      saved = { cam: localStorage.getItem('camDeviceId'), mic: localStorage.getItem('micDeviceId'), spk: localStorage.getItem('speakerDeviceId') }
+    } catch {}
+    state.selectedCamId = fillDeviceSelect(camSelect, 'cam', list.filter((d) => d.kind === 'videoinput'), saved.cam) || null
+    state.selectedMicId = fillDeviceSelect(micSelect, 'mic', list.filter((d) => d.kind === 'audioinput'), saved.mic) || null
+    state.selectedSpeakerId = speakerSupported
+      ? (fillDeviceSelect(spkSelect, 'spk', list.filter((d) => d.kind === 'audiooutput'), saved.spk) || null)
+      : null
   }
 
   camSelect.addEventListener('change', async () => {
@@ -618,7 +620,7 @@ async function renderLobby(prefillRoomCode = '') {
     if (state.selectedSpeakerId) localStorage.setItem('speakerDeviceId', state.selectedSpeakerId)
   })
 
-  testBtn.addEventListener('click', () => playTestSound(state.selectedSpeakerId))
+  devices.spkTestBtn.addEventListener('click', () => playTestSound(state.selectedSpeakerId))
 
   const onDeviceChange = () => populateDeviceLists()
   navigator.mediaDevices.addEventListener('devicechange', onDeviceChange)
@@ -767,7 +769,7 @@ async function enterRoom(joinData) {
   screenBtn.appendChild(screenCountBadge)
   // Кнопка настроек устройств — сразу справа от демонстрации: микрофон, камера
   // и динамики переключаются прямо во время звонка через всплывающую панель ниже.
-  const settingsBtn = el('button', { class: 'ctrl-btn', title: 'Настройки устройств' }, [el('i', { class: 'fas fa-cog' })])
+  const settingsBtn = el('button', { class: 'ctrl-btn', title: 'Настройки устройств' }, [el('i', { class: 'fas fa-gear' })])
 
   // Демонстрация экрана через getDisplayMedia() не поддерживается в большинстве мобильных
   // браузеров (iOS Safari/Chrome, Android Chrome вне десктоп-режима) - без проверки пользователь
@@ -988,14 +990,14 @@ async function enterRoom(joinData) {
   // ---- Регулятор громкости (слайдер + иконка), общий для камеры и демонстрации ----
   function makeVolumeControl(onChange, initial = 1) {
     const wrap = el('div', { class: 'volume-control' })
-    const icon = el('i', { class: 'fas fa-volume-up' })
+    const icon = el('i', { class: 'fas fa-volume-high' })
     const slider = el('input', { type: 'range', min: '0', max: '150', value: String(Math.round(initial * 100)) })
     wrap.appendChild(icon)
     wrap.appendChild(slider)
     slider.addEventListener('input', (e) => {
       e.stopPropagation()
       const v = Number(slider.value) / 100
-      icon.className = v === 0 ? 'fas fa-volume-mute' : v < 0.5 ? 'fas fa-volume-down' : 'fas fa-volume-up'
+      icon.className = v === 0 ? 'fas fa-volume-xmark' : v < 0.5 ? 'fas fa-volume-low' : 'fas fa-volume-high'
       onChange(v)
     })
     wrap.addEventListener('click', (e) => e.stopPropagation())
@@ -1011,7 +1013,7 @@ async function enterRoom(joinData) {
     const slider = wrap.querySelector('input[type="range"]')
     const icon = wrap.querySelector('i')
     if (slider) slider.value = String(Math.round(v * 100))
-    if (icon) icon.className = v === 0 ? 'fas fa-volume-mute' : v < 0.5 ? 'fas fa-volume-down' : 'fas fa-volume-up'
+    if (icon) icon.className = v === 0 ? 'fas fa-volume-xmark' : v < 0.5 ? 'fas fa-volume-low' : 'fas fa-volume-high'
   }
 
   function makeCameraTile(identity, name, isLocal, hostBadge) {
@@ -1351,7 +1353,7 @@ async function enterRoom(joinData) {
 
     if (isLocal) {
       items.push(ctxItem({
-        icon: 'fas fa-stop-circle', label: 'Прекратить стрим', destructive: true,
+        icon: 'fas fa-circle-stop', label: 'Прекратить стрим', destructive: true,
         onClick: () => { closeScreenContextMenu(); stopScreenShare() }
       }))
       items.push(el('div', { class: 'screen-ctx-divider' }))
@@ -2050,19 +2052,9 @@ async function enterRoom(joinData) {
     }
   }
 
-  function fillInCallSelect(select, list, fallbackName, currentId) {
-    select.innerHTML = ''
-    if (list.length === 0) {
-      select.appendChild(el('option', { value: '' }, 'Не найдено'))
-      return ''
-    }
-    list.forEach((d, i) => select.appendChild(el('option', { value: d.deviceId }, d.label || `${fallbackName} ${i + 1}`)))
-    const ok = currentId && list.some((d) => d.deviceId === currentId)
-    select.value = ok ? currentId : list[0].deviceId
-    return select.value
-  }
-
-  async function applyMicDevice(deviceId) {
+  // silent: переключение не по клику пользователя (устройство выдернули, список обновился) —
+  // без тоста, иначе «Микрофон переключён» всплывал при каждом открытии настроек.
+  async function applyMicDevice(deviceId, silent = false) {
     state.selectedMicId = deviceId || null
     try { if (deviceId) localStorage.setItem('micDeviceId', deviceId) } catch {}
     // Выбор должен действовать и при повторном включении выключенного микрофона:
@@ -2076,13 +2068,13 @@ async function enterRoom(joinData) {
         await room.localParticipant.setMicrophoneEnabled(false)
         await room.localParticipant.setMicrophoneEnabled(true, deviceId ? { deviceId } : undefined)
       }
-      showToast('Микрофон переключён', 'success')
+      if (!silent) showToast('Микрофон переключён', 'success')
     } catch (e) {
       showToast('Не удалось переключить микрофон', 'error')
     }
   }
 
-  async function applyCamDevice(deviceId) {
+  async function applyCamDevice(deviceId, silent = false) {
     state.selectedCamId = deviceId || null
     try { if (deviceId) localStorage.setItem('camDeviceId', deviceId) } catch {}
     try { room.options.videoCaptureDefaults = { ...(room.options.videoCaptureDefaults || {}), ...(deviceId ? { deviceId } : {}) } } catch {}
@@ -2098,13 +2090,13 @@ async function enterRoom(joinData) {
       const camPub = room.localParticipant.getTrackPublication(LK.Track.Source.Camera)
       const t = cameraTilesMap.get(room.localParticipant.identity)
       if (camPub && camPub.track && t) camPub.track.attach(t.video)
-      showToast('Камера переключена', 'success')
+      if (!silent) showToast('Камера переключена', 'success')
     } catch (e) {
       showToast('Не удалось переключить камеру', 'error')
     }
   }
 
-  function applySpeakerDevice(deviceId) {
+  function applySpeakerDevice(deviceId, silent = false) {
     state.selectedSpeakerId = deviceId || null
     try { if (deviceId) localStorage.setItem('speakerDeviceId', deviceId) } catch {}
     try { room.options.audioOutput = deviceId ? { deviceId } : undefined } catch {}
@@ -2112,98 +2104,45 @@ async function enterRoom(joinData) {
     document.querySelectorAll('audio').forEach((a) => {
       if (typeof a.setSinkId === 'function') a.setSinkId(deviceId).catch(() => {})
     })
-    showToast('Динамики переключены', 'success')
+    if (!silent) showToast('Динамики переключены', 'success')
   }
 
-  // Живой индикатор уровня микрофона (точки как в Telegram) и тестовый
-  // звук для проверки динамиков — оба строго в пределах открытой шторки.
-  let inCallMicDots = null
-  let meterStream = null
-  let meterCtx = null
-  let meterRAF = 0
+  // Живой индикатор уровня микрофона — строго пока открыто окно настроек
+  let inCallDevices = null
+  let stopInCallLevel = null
 
   function stopInCallMeter() {
-    if (meterRAF) cancelAnimationFrame(meterRAF)
-    meterRAF = 0
-    if (meterCtx) { try { meterCtx.close() } catch {} meterCtx = null }
-    if (meterStream) { meterStream.getTracks().forEach((t) => t.stop()); meterStream = null }
+    if (stopInCallLevel) { stopInCallLevel(); stopInCallLevel = null }
   }
 
   async function startInCallMeter() {
     stopInCallMeter()
-    if (!inCallMicDots) return
-    try {
-      meterStream = await navigator.mediaDevices.getUserMedia({
-        audio: state.selectedMicId ? { deviceId: { exact: state.selectedMicId } } : true
-      })
-      meterCtx = new (window.AudioContext || window.webkitAudioContext)()
-      const src = meterCtx.createMediaStreamSource(meterStream)
-      const analyser = meterCtx.createAnalyser()
-      analyser.fftSize = 256
-      src.connect(analyser)
-      const data = new Uint8Array(analyser.frequencyBinCount)
-      const dots = Array.from(inCallMicDots.children)
-      const loop = () => {
-        if (!document.body.contains(inCallMicDots)) { stopInCallMeter(); return }
-        analyser.getByteFrequencyData(data)
-        const avg = data.reduce((a, b) => a + b, 0) / data.length
-        const lit = Math.round(Math.min(1, avg / 90) * dots.length)
-        dots.forEach((d, i) => d.classList.toggle('on', i < lit))
-        meterRAF = requestAnimationFrame(loop)
-      }
-      loop()
-    } catch (e) { /* нет доступа к микрофону — точки просто не горят */ }
-  }
-
-  function playInCallTestSound() {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)()
-      const osc = ctx.createOscillator()
-      osc.frequency.value = 880
-      const gain = ctx.createGain()
-      gain.gain.value = 0.18
-      const dest = ctx.createMediaStreamDestination()
-      osc.connect(gain).connect(dest)
-      const audioEl = document.createElement('audio')
-      audioEl.srcObject = dest.stream
-      audioEl.autoplay = true
-      if (state.selectedSpeakerId && typeof audioEl.setSinkId === 'function') {
-        audioEl.setSinkId(state.selectedSpeakerId).catch(() => {})
-      }
-      document.body.appendChild(audioEl)
-      osc.start()
-      setTimeout(() => {
-        try { osc.stop() } catch {}
-        try { ctx.close() } catch {}
-        audioEl.remove()
-      }, 600)
-    } catch (e) {
-      showToast('Не удалось воспроизвести тестовый звук', 'error')
-    }
+    if (!inCallDevices) return
+    stopInCallLevel = await startLevelDots(inCallDevices.micDots, state.selectedMicId)
   }
 
   async function refreshInCallDeviceLists() {
-    if (!devicePopup) return
-    let devices = []
+    if (!devicePopup || !inCallDevices) return
+    let list = []
     try {
-      devices = await navigator.mediaDevices.enumerateDevices()
+      list = await navigator.mediaDevices.enumerateDevices()
     } catch (e) {
       return
     }
-    const currentMic = fillInCallSelect(inCallMicSelect, devices.filter((d) => d.kind === 'audioinput'), 'Микрофон', state.selectedMicId)
-    const currentCam = fillInCallSelect(inCallCamSelect, devices.filter((d) => d.kind === 'videoinput'), 'Камера', state.selectedCamId)
-    const currentSpk = fillInCallSelect(inCallSpkSelect, devices.filter((d) => d.kind === 'audiooutput'), 'Динамики', state.selectedSpeakerId)
+    const currentMic = fillDeviceSelect(inCallMicSelect, 'mic', list.filter((d) => d.kind === 'audioinput'), state.selectedMicId)
+    const currentCam = fillDeviceSelect(inCallCamSelect, 'cam', list.filter((d) => d.kind === 'videoinput'), state.selectedCamId)
+    const currentSpk = fillDeviceSelect(inCallSpkSelect, 'spk', list.filter((d) => d.kind === 'audiooutput'), state.selectedSpeakerId)
     // Устройство могли выдернуть прямо во время звонка: если текущего уже нет
     // в списке — бесшумно переезжаем на первое доступное, чтобы не было тишины.
-    if (currentMic !== state.selectedMicId) await applyMicDevice(currentMic)
-    if (currentCam !== state.selectedCamId) await applyCamDevice(currentCam)
-    if (currentSpk && currentSpk !== state.selectedSpeakerId) applySpeakerDevice(currentSpk)
+    if ((currentMic || null) !== state.selectedMicId) await applyMicDevice(currentMic, true)
+    if ((currentCam || null) !== state.selectedCamId) await applyCamDevice(currentCam, true)
+    if (currentSpk && currentSpk !== state.selectedSpeakerId) applySpeakerDevice(currentSpk, true)
   }
 
   function openDevicePopup() {
     const existing = document.querySelector('.settings-overlay')
     if (existing) {
-      // Повторный клик по шестерёнке закрывает шторку (как у панели участников)
+      // Повторный клик по шестерёнке закрывает окно (как у панели участников)
       if (!existing.classList.contains('is-closing')) { closeDevicePopup(); return }
       existing.remove()
       devicePopup = null
@@ -2211,44 +2150,20 @@ async function enterRoom(joinData) {
     closeScreenContextMenu()
 
     const sheet = el('div', { class: 'settings-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Настройки' })
-    const closeBtn = el('button', { class: 'panel-close', type: 'button', 'aria-label': 'Закрыть настройки' }, [el('i', { class: 'fas fa-times' })])
+    const closeBtn = el('button', { class: 'panel-close', type: 'button', 'aria-label': 'Закрыть настройки' }, [el('i', { class: 'fas fa-xmark' })])
     closeBtn.addEventListener('click', closeDevicePopup)
     sheet.appendChild(el('div', { class: 'settings-head' }, [el('h3', {}, 'Настройки'), closeBtn]))
-    const body = el('div', { class: 'settings-body' })
-    sheet.appendChild(body)
 
-    inCallMicSelect = el('select', {})
-    inCallCamSelect = el('select', {})
-    inCallSpkSelect = el('select', {})
+    // Те же карточки, что и в лобби (buildDeviceCards)
+    inCallDevices = buildDeviceCards()
+    inCallMicSelect = inCallDevices.micSelect
+    inCallCamSelect = inCallDevices.camSelect
+    inCallSpkSelect = inCallDevices.spkSelect
     inCallMicSelect.addEventListener('change', () => { applyMicDevice(inCallMicSelect.value || null); startInCallMeter() })
     inCallCamSelect.addEventListener('change', () => applyCamDevice(inCallCamSelect.value || null))
     inCallSpkSelect.addEventListener('change', () => applySpeakerDevice(inCallSpkSelect.value || null))
-
-    // Карточка микрофона: выбор + живой индикатор уровня (точки как в Telegram)
-    inCallMicDots = el('div', { class: 'lvl-dots' })
-    for (let i = 0; i < 8; i++) inCallMicDots.appendChild(el('span', {}))
-    const micCard = el('div', { class: 'settings-card' }, [
-      el('div', { class: 'settings-card-head' }, [el('span', {}, 'Микрофон'), inCallMicDots]),
-      inCallMicSelect
-    ])
-    // Карточка динамиков: выбор + кнопка проверки звука
-    const spkTestBtn = el('button', { class: 'check-btn', type: 'button' }, [el('i', { class: 'fas fa-play' }), ' Проверить'])
-    spkTestBtn.addEventListener('click', (e) => { e.stopPropagation(); playInCallTestSound() })
-    const spkCard = el('div', { class: 'settings-card' }, [
-      el('div', { class: 'settings-card-head' }, [el('span', {}, 'Динамик')]),
-      el('div', { class: 'settings-card-row' }, [inCallSpkSelect, spkTestBtn])
-    ])
-    // Карточка камеры: только выбор
-    const camCard = el('div', { class: 'settings-card' }, [
-      el('div', { class: 'settings-card-head' }, [el('span', {}, 'Камера')]),
-      inCallCamSelect
-    ])
-    if (!(typeof HTMLMediaElement !== 'undefined' && typeof HTMLMediaElement.prototype.setSinkId === 'function')) {
-      spkCard.style.display = 'none'
-    }
-    body.appendChild(micCard)
-    body.appendChild(spkCard)
-    body.appendChild(camCard)
+    inCallDevices.spkTestBtn.addEventListener('click', (e) => { e.stopPropagation(); playTestSound(state.selectedSpeakerId) })
+    sheet.appendChild(el('div', { class: 'settings-body' }, [inCallDevices.micCard, inCallDevices.spkCard, inCallDevices.camCard]))
 
     const overlay = el('div', { class: 'settings-overlay' }, [sheet])
     overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDevicePopup() })
@@ -2321,9 +2236,8 @@ async function enterRoom(joinData) {
     }
 
     const panel = el('div', { class: 'panel' })
-    const closeBtn = el('button', { class: 'panel-close', type: 'button', 'aria-label': 'Закрыть' }, [el('i', { class: 'fas fa-times' })])
-    panel.appendChild(closeBtn)
-    panel.appendChild(el('h3', {}, `Участники · ${room.remoteParticipants.size + 1}`))
+    const closeBtn = el('button', { class: 'panel-close', type: 'button', 'aria-label': 'Закрыть' }, [el('i', { class: 'fas fa-xmark' })])
+    panel.appendChild(el('div', { class: 'panel-head' }, [el('h3', {}, `Участники · ${room.remoteParticipants.size + 1}`), closeBtn]))
     panel.appendChild(participantRow(state.displayName, true, state.isHost, !state.micEnabled))
     room.remoteParticipants.forEach((p) => {
       const micPub = p.getTrackPublication(LK.Track.Source.Microphone)

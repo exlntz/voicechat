@@ -49,7 +49,7 @@
   /* ─────────────── 1. Кнопки ─────────────── */
 
   // Кнопки, которые оформляем «как на витрине»: текст перекатывается, точка раздувается.
-  var BTN_SEL = '.auth-submit-btn, .auth-ghost-btn, .lobby-logout-btn, .test-sound-btn, .leave-btn, .join-toggle-btn, .lobby-card > button'
+  var BTN_SEL = '.auth-submit-btn, .auth-ghost-btn, .lobby-logout-btn, .leave-btn, .join-toggle-btn, .lobby-card > button'
   // Кнопки, которые нельзя трогать: их подпись/содержимое меняет сам app.js или они иконочные
   var BTN_SKIP = '.password-toggle-btn, .tile-fullscreen-btn, .tile-kick-btn, .panel-close, .auth-switch-link, .screen-ctx-item, .solo-copy-btn'
 
