@@ -465,6 +465,34 @@ button {
 @keyframes lp-bar-a { 0% { transform: scaleY(0.5); } 7% { transform: scaleY(1.25); } 14% { transform: scaleY(0.6); } 22% { transform: scaleY(1.1); } 30% { transform: scaleY(0.45); } 38% { transform: scaleY(1); } 46%, 100% { transform: scaleY(0.3); } }
 @keyframes lp-bar-b { 0%, 50% { transform: scaleY(0.3); } 57% { transform: scaleY(1.25); } 64% { transform: scaleY(0.6); } 72% { transform: scaleY(1.1); } 80% { transform: scaleY(0.45); } 88% { transform: scaleY(1); } 96%, 100% { transform: scaleY(0.3); } }
 
+/* Знак «Живой голос»: облачко речи с эквалайзером (разметку собирает anker.js, makePulse).
+   Основной логотип — лобби и шапка звонка. Ноутбук (.ank-sigil) остаётся только на входе/регистрации.
+   По умолчанию статичный кадр и анимация при наведении, с классом is-live — всё время. */
+.ank-pulse {
+  --d: 44px;
+  width: var(--d);
+  height: var(--d);
+  flex: 0 0 auto;
+  display: inline-block;
+  line-height: 0;
+}
+.ank-pulse svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ank-pulse .pl-bubble { fill: #0458cf; transform-box: fill-box; transform-origin: 30% 90%; }
+.ank-pulse .pl-bar { fill: #fff; transform-box: fill-box; transform-origin: 50% 50%; }
+/* Статичный кадр: полоски разной высоты, как застывший голос */
+.ank-pulse .pl-bar:nth-of-type(1) { transform: scaleY(0.5); }
+.ank-pulse .pl-bar:nth-of-type(2) { transform: scaleY(1); }
+.ank-pulse .pl-bar:nth-of-type(3) { transform: scaleY(0.7); }
+.ank-pulse .pl-bar:nth-of-type(4) { transform: scaleY(0.38); }
+
+:is(.ank-pulse.is-live, .ank-pulse:hover, .ank-brand:hover .ank-pulse, .ank-brandline:hover .ank-pulse) .pl-bar { animation: pl-talk 1.2s ease-in-out infinite; }
+:is(.ank-pulse.is-live, .ank-pulse:hover, .ank-brand:hover .ank-pulse, .ank-brandline:hover .ank-pulse) .pl-bar:nth-of-type(2) { animation-delay: 0.15s; }
+:is(.ank-pulse.is-live, .ank-pulse:hover, .ank-brand:hover .ank-pulse, .ank-brandline:hover .ank-pulse) .pl-bar:nth-of-type(3) { animation-delay: 0.3s; }
+:is(.ank-pulse.is-live, .ank-pulse:hover, .ank-brand:hover .ank-pulse, .ank-brandline:hover .ank-pulse) .pl-bar:nth-of-type(4) { animation-delay: 0.45s; }
+:is(.ank-pulse.is-live, .ank-pulse:hover, .ank-brand:hover .ank-pulse, .ank-brandline:hover .ank-pulse) .pl-bubble { animation: pl-breathe 2.4s ease-in-out infinite; }
+@keyframes pl-talk { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+@keyframes pl-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+
 /* След за курсором: тонкая синяя лента и мягкое пятно (только мышь, без reduced-motion) */
 .ank-pointer {
   position: fixed;
@@ -521,7 +549,7 @@ button {
   .rv { opacity: 1; transform: none; }
   .ank-pointer { display: none; }
   /* Знак — всегда статичный кадр открытого ноутбука */
-  .ank-sigil * { animation: none !important; }
+  .ank-sigil *, .ank-pulse * { animation: none !important; }
 }
 
 /* ═══════════════ ЭКРАН АВТОРИЗАЦИИ ═══════════════
@@ -1177,7 +1205,7 @@ button {
   flex-shrink: 0;
   min-height: 56px;
 }
-.room-topbar .ank-sigil { --d: 30px; -webkit-app-region: no-drag; }
+.room-topbar .ank-pulse { --d: 30px; -webkit-app-region: no-drag; }
 
 /* Шапка звонка: знак продукта слева + название рядом с ним (собирает anker.js).
    Раньше в топбаре была только иконка звонка — без подписи её принимали за кнопку. */
@@ -1188,9 +1216,13 @@ button {
   flex-shrink: 0;
   min-width: 0;
 }
+/* Название в шапке звонка: дисплейная гарнитура системы (плотнее в заголовках), жирнее и крупнее */
 .room-topbar .ank-brandline__name {
-  font: 600 15px/1.15 var(--font);
-  letter-spacing: -0.01em;
+  font-family: 'Segoe UI Variable Display', 'SF Pro Display', -apple-system, BlinkMacSystemFont, var(--font);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
   color: var(--text);
   white-space: nowrap;
 }
@@ -2399,7 +2431,7 @@ body.inapp-fullscreen { overflow: hidden; }
   /* Телефон: подписи «Подключено»/«Создатель» не влезают — точка, код и корона */
   .room-topbar .room-info { overflow: hidden; padding: 0 12px; gap: 8px; }
   .room-topbar .room-status-text { display: none; }
-  .room-topbar .ank-sigil { --d: 26px; }
+  .room-topbar .ank-pulse { --d: 26px; }
   /* На телефоне подпись рядом со знаком не влезает вместе с кодом комнаты и статусом */
   .room-topbar .ank-brandline__name { display: none; }
   .room-topbar .host-indicator span { display: none; }

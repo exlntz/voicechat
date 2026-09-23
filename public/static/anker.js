@@ -296,6 +296,28 @@
     return d
   }
 
+  // Основной логотип — «Живой голос»: облачко речи, в котором полоски голоса
+  // двигаются по очереди. Анимация в CSS (.ank-pulse), режимы те же, что у ноутбука.
+  var PULSE =
+    '<svg viewBox="0 0 120 120" aria-hidden="true">' +
+      '<g class="pl-bubble"><rect x="8" y="12" width="104" height="80" rx="28"/>' +
+      '<path d="M26 86 L22 108 L48 90 Z" stroke="#0458cf" stroke-width="4" stroke-linejoin="round"/></g>' +
+      '<rect class="pl-bar" x="34" y="32" width="9" height="40" rx="4.5"/>' +
+      '<rect class="pl-bar" x="49" y="32" width="9" height="40" rx="4.5"/>' +
+      '<rect class="pl-bar" x="64" y="32" width="9" height="40" rx="4.5"/>' +
+      '<rect class="pl-bar" x="79" y="32" width="9" height="40" rx="4.5"/>' +
+    '</svg>'
+
+  function makePulse(size, live) {
+    var d = make('span', 'ank-pulse' + (live ? ' is-live' : ''))
+    d.setAttribute('role', 'img')
+    d.setAttribute('aria-label', 'Voice Lobby')
+    if (size) d.style.setProperty('--d', size + 'px')
+    d.innerHTML = PULSE
+    $$('*', d).forEach(mark)
+    return d
+  }
+
   /* ─────────────── 4. След за курсором ─────────────── */
 
   // Вместо кольца вокруг стрелки — сужающийся синий след и мягкое свечение.
@@ -528,13 +550,13 @@
     if (!card || card.__ankDone) return
     card.__ankDone = true
 
-    // Шапка: знак продукта + название. В лобби знак анимирован всё время
+    // Шапка: логотип «Живой голос» + название. В лобби логотип анимирован всё время
     var h1 = $('h1', card)
     if (h1 && !$('.ank-brand', card)) {
       var brand = make('div', 'ank-brand')
       var tx = make('div', 'ank-brand__tx')
       card.insertBefore(brand, h1)
-      brand.appendChild(makeSigil(38, true))
+      brand.appendChild(makePulse(44, true))
       brand.appendChild(tx)
       tx.appendChild(h1)
     }
@@ -553,7 +575,7 @@
       var line = make('div', 'ank-brandline')
       // Пока идёт подключение — анимация всё время; в звонке — статично, при наведении
       // (класс переключает setStatus в app.js)
-      line.appendChild(makeSigil(0, !!$('.status-dot.connecting', screen)))
+      line.appendChild(makePulse(0, !!$('.status-dot.connecting', screen)))
       line.appendChild(make('span', 'ank-brandline__name', 'Voice Lobby'))
       topbar.insertBefore(line, topbar.firstChild)
     }
