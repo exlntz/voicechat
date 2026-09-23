@@ -158,6 +158,22 @@ function setCallActive(active) {
   } catch {}
 }
 
+// Плавное появление узла (плитка, приглашение, кнопка): класс .is-entering с задержкой,
+// снимается после анимации — при перестановке узла в сетке анимация не повторяется
+function playEnter(node, delay = 0) {
+  if (!node) return
+  try { if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return } catch {}
+  node.style.setProperty('--enter-delay', delay + 'ms')
+  node.classList.add('is-entering')
+  const done = () => { node.classList.remove('is-entering'); node.style.removeProperty('--enter-delay') }
+  node.addEventListener('animationend', function onEnd(e) {
+    if (e.target !== node || e.animationName !== 'vl-enter') return
+    node.removeEventListener('animationend', onEnd)
+    done()
+  })
+  setTimeout(done, 900 + delay) // страховка, если анимация не запустилась (скрытая вкладка)
+}
+
 // Сбросить прокрутку документа (и фокус поля ввода, чтобы закрыть экранную клавиатуру)
 function resetPageScroll(blurInput = false) {
   if (blurInput) {
@@ -1085,6 +1101,8 @@ async function enterRoom(joinData) {
   controls.appendChild(divider1)
   controls.appendChild(leaveBtn)
   screen.appendChild(controls)
+  // Кнопки звонка проявляются по очереди слева направо
+  Array.from(controls.children).forEach((b, i) => playEnter(b, 80 + i * 50))
 
   root.appendChild(screen)
   resetPageScroll()
@@ -1167,6 +1185,7 @@ async function enterRoom(joinData) {
       el('div', { class: 'solo-invite__code' }, ['Код комнаты: ', el('b', {}, state.roomCode || '')]),
       el('p', { class: 'solo-invite__hint' }, 'Как только кто-то подключится, он появится рядом с вами.')
     ])
+    playEnter(soloInviteCard, 120) // чуть позже своей плитки
     return soloInviteCard
   }
 
@@ -1365,6 +1384,7 @@ async function enterRoom(joinData) {
         tile.appendChild(kickBtn)
       }
     }
+    playEnter(tile)
     return { tile, video, placeholder, label, micIcon, camIcon, volumeCtl, kickBtn, fsBtn }
   }
 
@@ -1556,6 +1576,7 @@ async function enterRoom(joinData) {
       e.stopPropagation()
       openScreenContextMenu(e.clientX, e.clientY, { tile, video, identity, sid, isLocal })
     })
+    playEnter(tile)
     return { tile, video, label, fsBtn, volumeCtl }
   }
 
