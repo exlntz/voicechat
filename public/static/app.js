@@ -2,6 +2,10 @@
 // Работает как в браузере, так и внутри Electron (window.electronAPI, если доступен)
 const LK = window.LivekitClient
 const IS_ELECTRON = !!window.electronAPI
+// iPadOS представляется «Mac», но с тач-экраном — поэтому проверка по maxTouchPoints
+const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+  (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+const IS_APPLE = IS_IOS || /Mac/.test(navigator.platform || navigator.userAgent)
 
 const state = {
   currentUser: null, // { id, username, displayName } - авторизованный пользователь (см. renderAuthScreen/fetchMe)
@@ -211,7 +215,7 @@ const DEVICE_ALIAS_IDS = ['default', 'communications']
 function dedupeDevices(list) {
   const real = list.filter((d) => !DEVICE_ALIAS_IDS.includes(d.deviceId))
   const aliases = new Map()
-  const devices = []
+  let devices = []
   list.forEach((d) => {
     if (!DEVICE_ALIAS_IDS.includes(d.deviceId)) { devices.push(d); return }
     const target =
@@ -220,7 +224,56 @@ function dedupeDevices(list) {
     if (target) aliases.set(d.deviceId, target.deviceId)
     else devices.push(d) // не на что сослаться — оставляем как есть
   })
+  // iPhone отдаёт каждую заднюю камеру отдельно («Задняя камера», «…сверхширокоугольная»,
+  // «…двойная», «…телефото»…). Оставляем одну обычную: с названием ровно «Back Camera» /
+  // «Задняя камера», иначе самую короткую. Остальные ведут на неё (сохранённый выбор не теряется).
+  if (IS_IOS) {
+    const backs = devices.filter((d) => d.kind === 'videoinput' && d.label && BACK_CAMERA_RE.test(d.label))
+    if (backs.length > 1) {
+      const keep = backs.find((d) => /^(back camera|задняя камера)$/i.test(d.label.trim())) ||
+        backs.slice().sort((a, b) => a.label.length - b.label.length)[0]
+      backs.forEach((d) => { if (d !== keep) aliases.set(d.deviceId, keep.deviceId) })
+      devices = devices.filter((d) => !backs.includes(d) || d === keep)
+    }
+  }
   return { devices, aliases }
+}
+
+// ---- Зеркало своей камеры ----
+// Селфи-камеру показываем зеркально (как в зеркале), заднюю — нет: у неё кадр и так
+// совпадает с тем, что человек видит глазами, а зеркало переворачивает надписи.
+// Зеркалится только превью у себя (CSS у <video>), исходящий трек не трогаем.
+const BACK_CAMERA_RE = /(^|[^a-z])(back|rear|environment)([^a-z]|$)|задн|основная камера/i
+
+function isBackCamera(track) {
+  if (!track) return false
+  try {
+    const st = track.getSettings ? track.getSettings() : null
+    if (st && st.facingMode) return st.facingMode === 'environment'
+  } catch {}
+  try {
+    // Safari иногда не отдаёт facingMode в getSettings(), но отдаёт в getCapabilities()
+    const caps = track.getCapabilities ? track.getCapabilities() : null
+    if (caps && caps.facingMode && caps.facingMode.length === 1) return caps.facingMode[0] === 'environment'
+  } catch {}
+  return BACK_CAMERA_RE.test(track.label || '')
+}
+
+function applyLocalMirror(video) {
+  if (!video) return
+  let track = null
+  try { track = video.srcObject && video.srcObject.getVideoTracks ? video.srcObject.getVideoTracks()[0] : null } catch {}
+  video.style.transform = isBackCamera(track) ? 'none' : 'scaleX(-1)'
+}
+
+// Следить за своим <video>: трек меняется при переключении камеры, а facingMode
+// у Safari иногда появляется только после первого кадра
+function watchLocalMirror(video) {
+  if (!video || video._mirrorWatched) return
+  video._mirrorWatched = true
+  const recheck = () => { applyLocalMirror(video); setTimeout(() => applyLocalMirror(video), 300) }
+  ;['loadedmetadata', 'playing', 'resize', 'emptied'].forEach((ev) => video.addEventListener(ev, recheck))
+  recheck()
 }
 
 // Реальный deviceId для сохранённого выбора (ярлык 'default' → устройство за ним)
@@ -266,6 +319,11 @@ function closeDropdown(returnFocus = false) {
 }
 
 function makeDropdown(select) {
+  // На iPhone и Mac системный список выбора аккуратный и привычный — оставляем его
+  if (IS_APPLE) {
+    select.classList.add('native-select')
+    return select
+  }
   select.hidden = true
   const label = el('span', { class: 'dd-label' })
   const btn = el('button', { type: 'button', class: 'dd-btn', 'aria-haspopup': 'listbox', 'aria-expanded': 'false' }, [
@@ -659,6 +717,7 @@ async function renderLobby(prefillRoomCode = '') {
   // Device preview
   const preview = el('div', { class: 'device-preview' })
   const previewVideo = el('video', { autoplay: true, muted: true, playsinline: true, 'webkit-playsinline': 'true' })
+  watchLocalMirror(previewVideo) // задняя камера — без зеркала
   const noCam = el('div', { class: 'no-cam' }, 'Камера отключена')
   preview.appendChild(previewVideo)
   preview.appendChild(noCam)
@@ -744,6 +803,7 @@ async function renderLobby(prefillRoomCode = '') {
       })
       state.previewStream = stream
       previewVideo.srcObject = stream
+      applyLocalMirror(previewVideo)
       noCam.style.display = 'none'
     } catch (e) {
       noCam.style.display = 'flex'
@@ -1205,7 +1265,7 @@ async function enterRoom(joinData) {
   function makeCameraTile(identity, name, isLocal, hostBadge) {
     const tile = el('div', { class: 'tile camera-tile', id: `tile-cam-${identity}` })
     const video = el('video', { autoplay: true, playsinline: true, 'webkit-playsinline': 'true', ...(isLocal ? { muted: true } : {}) })
-    if (isLocal) video.style.transform = 'scaleX(-1)'
+    if (isLocal) watchLocalMirror(video) // передняя — зеркально, задняя — как есть
     const placeholder = el('div', { class: 'no-video-placeholder' }, [el('div', { class: 'avatar-circle' }, initials(name))])
     const micIcon = el('i', { class: 'fas fa-microphone-slash', style: 'display:none' })
     // По умолчанию считаем камеру выключенной (большинство участников входят с выключенной камерой),
@@ -1284,7 +1344,7 @@ async function enterRoom(joinData) {
   // false, Element.requestFullscreen нет вовсе) - раньше кнопка "на весь экран" там просто
   // показывала ошибку. Теперь порядок такой:
   //   1) нативный requestFullscreen (десктоп, Android, Electron);
-  //   2) webkitEnterFullscreen у самого <video> (системный плеер iPhone, если трек уже играет);
+  //   2) webkitEnterFullscreen у самого <video> (системный плеер iPhone) — только для демонстрации;
   //   3) "внутренний" полный экран - тайл раскрывается на весь вьюпорт через CSS
   //      (position: fixed + высота 100dvh/--app-vh + safe-area), без Fullscreen API.
   // Во всех трёх случаях повторное нажатие/Escape возвращает обычную раскладку.
@@ -1383,7 +1443,14 @@ async function enterRoom(joinData) {
       if (p) return
     }
     const video = tile.querySelector('video')
-    if (video && typeof video.webkitEnterFullscreen === 'function' && video.readyState > 0) {
+    // Камеры в системный плеер iPhone не отправляем: он теряет зеркало передней камеры,
+    // а после выхода ставит видео на паузу (картинка «застывала»). Для камеры — внутренний
+    // полный экран; системный плеер только для демонстрации экрана.
+    if (video && !tile.classList.contains('camera-tile') && typeof video.webkitEnterFullscreen === 'function' && video.readyState > 0) {
+      if (!video._resumeOnExit) {
+        video._resumeOnExit = true
+        video.addEventListener('webkitendfullscreen', () => { if (video.paused) video.play().catch(() => {}) })
+      }
       try {
         video.webkitEnterFullscreen()
         return
@@ -2276,7 +2343,7 @@ async function enterRoom(joinData) {
       // Страховка: локальное превью должно показывать новый трек
       const camPub = room.localParticipant.getTrackPublication(LK.Track.Source.Camera)
       const t = cameraTilesMap.get(room.localParticipant.identity)
-      if (camPub && camPub.track && t) camPub.track.attach(t.video)
+      if (camPub && camPub.track && t) { camPub.track.attach(t.video); applyLocalMirror(t.video) }
       if (!silent) showToast('Камера переключена', 'success')
     } catch (e) {
       showToast('Не удалось переключить камеру', 'error')
