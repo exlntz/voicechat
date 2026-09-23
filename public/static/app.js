@@ -170,6 +170,35 @@ function resetPageScroll(blurInput = false) {
   if (root) root.scrollTop = 0
 }
 
+// ---- Пользовательские настройки (localStorage, у каждого браузера свои) ----
+const PREFS = {
+  // Подключаться к звонку с выключенным микрофоном. По умолчанию — нет.
+  joinMicMuted: { key: 'pref:joinMicMuted', def: false }
+}
+
+function getPref(name) {
+  const p = PREFS[name]
+  try {
+    const v = localStorage.getItem(p.key)
+    return v === null ? p.def : v === '1'
+  } catch { return p.def }
+}
+
+function setPref(name, on) {
+  try { localStorage.setItem(PREFS[name].key, on ? '1' : '0') } catch {}
+}
+
+// Переключатель-«тумблер»: строка с подписью слева и switch справа
+function makeSwitchRow(labelText, checked, onChange) {
+  const input = el('input', { type: 'checkbox', role: 'switch' })
+  input.checked = !!checked
+  input.addEventListener('change', () => onChange(input.checked))
+  return el('label', { class: 'settings-row' }, [
+    el('span', { class: 'settings-row__text' }, labelText),
+    el('span', { class: 'switch' }, [input, el('span', { class: 'switch__track', 'aria-hidden': 'true' })])
+  ])
+}
+
 // ---- Выбор устройств: один компонент для лобби и для окна «Настройки» в звонке ----
 // Раньше лобби и звонок рисовали одно и то же по-разному (строки vs карточки, полоска vs
 // точки, «Тест» vs «Проверить»). Теперь оба экрана собирают карточки здесь, поэтому
@@ -682,6 +711,9 @@ function renderAuthScreen(afterLoginRoomCode = '') {
 
 async function renderLobby(prefillRoomCode = '') {
   setCallActive(false)
+  // «Подключаться с выключенным микрофоном» — стартовое положение переключателя в лобби
+  // (его по-прежнему можно включить перед входом)
+  if (getPref('joinMicMuted')) state.micEnabled = false
   // Требуем авторизацию перед лобби - если нет активной сессии, показываем экран входа/регистрации.
   if (!state.currentUser) {
     state.currentUser = await fetchMe()
@@ -965,19 +997,24 @@ async function enterRoom(joinData) {
 
   // ---- Верхняя панель ----
   const topbar = el('div', { class: 'room-topbar' })
+  // Статус, код комнаты и отметка создателя — одна капсула с тонкими разделителями
   const roomInfo = el('div', { class: 'room-info' })
   const statusDot = el('span', { class: 'status-dot connecting' })
-  roomInfo.appendChild(statusDot)
-  roomInfo.appendChild(el('span', {}, 'Подключение...'))
-  const codeBadge = el('span', { class: 'room-code-badge', title: 'Нажмите, чтобы скопировать код' }, `Комната: ${roomCode}`)
+  const statusText = el('span', { class: 'room-status-text' }, 'Подключение…')
+  roomInfo.appendChild(el('span', { class: 'room-status', role: 'status' }, [statusDot, statusText]))
+  const codeBadge = el('button', { type: 'button', class: 'room-code-badge', title: 'Скопировать код комнаты' }, [
+    el('span', { class: 'room-code-badge__label' }, 'Комната'),
+    el('span', { class: 'room-code-badge__code' }, roomCode),
+    el('i', { class: 'fas fa-copy room-code-badge__icon', 'aria-hidden': 'true' })
+  ])
   codeBadge.addEventListener('click', async () => {
     const ok = await copyToClipboard(roomCode)
     showToast(ok ? 'Скопировано' : 'Не удалось скопировать код комнаты', ok ? 'success' : 'error')
   })
   roomInfo.appendChild(codeBadge)
   if (state.isHost) {
-    roomInfo.appendChild(el('span', { class: 'host-indicator', title: 'Вы создатель этой комнаты - можете выгонять участников' }, [
-      el('i', { class: 'fas fa-crown' }), ' Вы создатель'
+    roomInfo.appendChild(el('span', { class: 'host-indicator', title: 'Вы создатель комнаты — можете выгонять участников' }, [
+      el('i', { class: 'fas fa-crown' }), el('span', {}, 'Создатель')
     ]))
   }
   topbar.appendChild(roomInfo)
@@ -1063,7 +1100,7 @@ async function enterRoom(joinData) {
 
   function setStatus(text, cls) {
     statusDot.className = `status-dot ${cls}`
-    roomInfo.querySelector('span:nth-child(2)').textContent = text
+    statusText.textContent = text
   }
 
   // ---- Приглашение, когда в звонке пока только ты ----
@@ -2428,7 +2465,36 @@ async function enterRoom(joinData) {
     inCallMicSelect.addEventListener('change', () => { applyMicDevice(inCallMicSelect.value || null); startInCallMeter() })
     inCallCamSelect.addEventListener('change', () => applyCamDevice(inCallCamSelect.value || null))
     inCallSpkSelect.addEventListener('change', () => applySpeakerDevice(inCallSpkSelect.value || null))
-    sheet.appendChild(el('div', { class: 'settings-body' }, [inCallDevices.micCard, inCallDevices.spkCard, inCallDevices.camCard]))
+    inCallDevices.micCard.appendChild(makeSwitchRow('Подключаться с выключенным микрофоном', getPref('joinMicMuted'), (on) => {
+      setPref('joinMicMuted', on)
+      showToast(on ? 'В следующий звонок войдёте с выключенным микрофоном' : 'В следующий звонок войдёте с включённым микрофоном', 'info')
+    }))
+
+    // Разделы: слева меню, справа содержимое. Пока раздел один — «Звук»;
+    // новые добавляются в SECTIONS и сразу появляются в меню.
+    const SECTIONS = [
+      { group: 'Звонок', id: 'sound', icon: 'fas fa-volume-high', title: 'Звук', build: () => [inCallDevices.micCard, inCallDevices.spkCard, inCallDevices.camCard] }
+    ]
+    const nav = el('nav', { class: 'settings-nav', 'aria-label': 'Разделы настроек' })
+    const content = el('div', { class: 'settings-body' })
+    const navButtons = new Map()
+    const show = (id) => {
+      const sec = SECTIONS.find((x) => x.id === id) || SECTIONS[0]
+      navButtons.forEach((b, key) => { b.classList.toggle('active', key === sec.id); b.setAttribute('aria-current', key === sec.id ? 'page' : 'false') })
+      content.innerHTML = ''
+      content.appendChild(el('h4', { class: 'settings-section-title' }, sec.title))
+      sec.build().forEach((n) => content.appendChild(n))
+    }
+    let lastGroup = null
+    SECTIONS.forEach((sec) => {
+      if (sec.group !== lastGroup) { nav.appendChild(el('div', { class: 'settings-nav__group' }, sec.group)); lastGroup = sec.group }
+      const b = el('button', { type: 'button', class: 'settings-nav__item' }, [el('i', { class: sec.icon, 'aria-hidden': 'true' }), sec.title])
+      b.addEventListener('click', () => show(sec.id))
+      navButtons.set(sec.id, b)
+      nav.appendChild(b)
+    })
+    show('sound')
+    sheet.appendChild(el('div', { class: 'settings-layout' }, [nav, content]))
 
     const overlay = el('div', { class: 'settings-overlay' }, [sheet])
     overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDevicePopup() })
