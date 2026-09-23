@@ -1205,7 +1205,9 @@ button {
   flex-shrink: 0;
   min-height: 56px;
 }
-.room-topbar .ank-pulse { --d: 30px; -webkit-app-region: no-drag; }
+/* Знак и название в шапке — уменьшенная копия шапки лобби (44px / 30px / отступ 14px):
+   те же шрифт, начертание и пропорции — 32px / 22px / 10px */
+.room-topbar .ank-pulse { --d: 32px; -webkit-app-region: no-drag; }
 
 /* Шапка звонка: знак продукта слева + название рядом с ним (собирает anker.js).
    Раньше в топбаре была только иконка звонка — без подписи её принимали за кнопку. */
@@ -1216,13 +1218,12 @@ button {
   flex-shrink: 0;
   min-width: 0;
 }
-/* Название в шапке звонка: дисплейная гарнитура системы (плотнее в заголовках), жирнее и крупнее */
 .room-topbar .ank-brandline__name {
-  font-family: 'Segoe UI Variable Display', 'SF Pro Display', -apple-system, BlinkMacSystemFont, var(--font);
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
+  font-family: var(--font);
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
   color: var(--text);
   white-space: nowrap;
 }
