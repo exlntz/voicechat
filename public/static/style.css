@@ -1794,39 +1794,74 @@ body.inapp-fullscreen { overflow: hidden; }
 .screen-ctx-submenu .screen-ctx-item.selected .ctx-icon { color: var(--accent-soft); }
 .screen-ctx-submenu .screen-ctx-item.selected:hover { color: #fff; }
 
-/* ---- Нижняя шторка настроек устройств (шестерёнка в controls-bar) ----
-   Та же механика, что у боковой панели участников (.panel-overlay/.panel):
-   оверлей с блюром + прямоугольная шторка снизу на ~3/4 высоты экрана,
-   въезд/выезд анимацией. Строки выбора переиспользуют .device-row из лобби. */
+/* ---- Окно настроек устройств (шестерёнка в controls-bar) ----
+   Отдельное прямоугольное окно по центру на 80% ширины и высоты экрана,
+   фон звонка под ним размыт. Появление/закрытие — лёгкий zoom + fade.
+   Карточки внутри раскладываются сеткой: на широком окне в 2–3 колонки. */
 .settings-overlay {
   position: fixed; inset: 0;
   z-index: 1100;
-  display: flex; justify-content: center; align-items: flex-end;
-  background: rgba(5, 7, 10, 0.55);
-  -webkit-backdrop-filter: blur(10px) saturate(1.15);
-  backdrop-filter: blur(10px) saturate(1.15);
+  display: flex; justify-content: center; align-items: center;
+  background: rgba(5, 7, 10, 0.5);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
   animation: ank-fade-in .25s var(--ease);
 }
 .settings-overlay.is-closing {
-  animation: ank-fade-out .36s var(--ease-io) forwards;
-  pointer-events: none; /* пока шторка уезжает, клики уже уходят в звонок */
+  animation: ank-fade-out .28s var(--ease-io) forwards;
+  pointer-events: none; /* пока окно закрывается, клики уже уходят в звонок */
 }
 .settings-sheet {
-  width: min(600px, calc(100vw - 24px));
-  height: 76%;
-  max-height: calc(100% - 32px);
-  overflow-y: auto;
+  position: relative;
+  width: 80vw;
+  height: 80vh;
+  height: 80dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-bottom: none;
-  border-radius: 20px 20px 0 0;
-  padding: 20px 22px calc(22px + env(safe-area-inset-bottom));
-  box-shadow: var(--shadow-md);
-  animation: ank-sheet-in .38s var(--ease-io);
+  border-radius: 20px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+  animation: ank-sheet-in .32s var(--ease-io);
 }
-@keyframes ank-sheet-in { from { transform: translateY(100%); } to { transform: none; } }
-.settings-overlay.is-closing .settings-sheet { animation: ank-sheet-out .36s var(--ease-io) forwards; }
-@keyframes ank-sheet-out { from { transform: none; } to { transform: translateY(100%); } }
+@keyframes ank-sheet-in { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+.settings-overlay.is-closing .settings-sheet { animation: ank-sheet-out .28s var(--ease-io) forwards; }
+@keyframes ank-sheet-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(.94); } }
+/* Шапка окна: заголовок слева, крестик справа, под ней тонкий разделитель */
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 14px 24px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.settings-head .panel-close { float: none; }
+.settings-sheet .settings-head h3 { margin: 0; }
+/* Прокручиваемое тело с карточками */
+.settings-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 22px 24px calc(24px + env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+  align-content: start;
+}
+.settings-body .settings-card { margin-bottom: 0; }
+/* Телефон: 80% слишком тесно — окно почти на весь экран */
+@media (max-width: 600px) {
+  .settings-sheet { width: calc(100vw - 24px); height: calc(100dvh - 48px); }
+  .settings-body { padding: 16px; grid-template-columns: 1fr; }
+  .settings-head { padding-left: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-overlay, .settings-sheet,
+  .settings-overlay.is-closing, .settings-overlay.is-closing .settings-sheet { animation-duration: 1ms; }
+}
 .settings-sheet h3 {
   margin: 0 0 16px;
   font-size: 20px;

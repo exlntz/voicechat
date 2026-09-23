@@ -2016,8 +2016,8 @@ async function enterRoom(joinData) {
   })
 
   // ---- Настройки устройств прямо в звонке (шестерёнка справа от демонстрации) ----
-  // Нижняя шторка «Настройки» на ~3/4 высоты экрана с блюром фона — та же механика,
-  // что у боковой панели участников (.panel-overlay/.panel), только выезжает снизу.
+  // Окно «Настройки» по центру на 80% экрана с блюром фона. Закрытие — та же механика,
+  // что у боковой панели участников (.panel-overlay/.panel): класс .is-closing + animationend.
   // Внутри: микрофон, камера, динамики. Выбор применяется мгновенно без переподключения:
   // входы — через room.switchActiveDevice() LiveKit (с фолбэком на выкл/вкл с deviceId),
   // выход — через setSinkId() на всех уже играющих <audio> (новые подписки подхватывают
@@ -2210,11 +2210,12 @@ async function enterRoom(joinData) {
     }
     closeScreenContextMenu()
 
-    const sheet = el('div', { class: 'settings-sheet' })
+    const sheet = el('div', { class: 'settings-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Настройки' })
     const closeBtn = el('button', { class: 'panel-close', type: 'button', 'aria-label': 'Закрыть настройки' }, [el('i', { class: 'fas fa-times' })])
     closeBtn.addEventListener('click', closeDevicePopup)
-    sheet.appendChild(closeBtn)
-    sheet.appendChild(el('h3', {}, 'Настройки'))
+    sheet.appendChild(el('div', { class: 'settings-head' }, [el('h3', {}, 'Настройки'), closeBtn]))
+    const body = el('div', { class: 'settings-body' })
+    sheet.appendChild(body)
 
     inCallMicSelect = el('select', {})
     inCallCamSelect = el('select', {})
@@ -2245,9 +2246,9 @@ async function enterRoom(joinData) {
     if (!(typeof HTMLMediaElement !== 'undefined' && typeof HTMLMediaElement.prototype.setSinkId === 'function')) {
       spkCard.style.display = 'none'
     }
-    sheet.appendChild(micCard)
-    sheet.appendChild(spkCard)
-    sheet.appendChild(camCard)
+    body.appendChild(micCard)
+    body.appendChild(spkCard)
+    body.appendChild(camCard)
 
     const overlay = el('div', { class: 'settings-overlay' }, [sheet])
     overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDevicePopup() })
