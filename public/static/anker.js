@@ -296,16 +296,16 @@
     return d
   }
 
-  // Основной логотип — «Живой голос»: облачко речи, в котором полоски голоса
-  // двигаются по очереди. Анимация в CSS (.ank-pulse), режимы те же, что у ноутбука.
+  // Основной логотип — «Живой голос»: облачко речи с полосками голоса, которые сжимаются
+  // в точки «печатает…» и обратно. Полоска = две круглые шапки + середина. Анимация в CSS (.ank-pulse), режимы те же, что у ноутбука.
   var PULSE =
     '<svg viewBox="0 0 120 120" aria-hidden="true">' +
       '<g class="pl-bubble"><rect x="8" y="12" width="104" height="80" rx="28"/>' +
       '<path d="M26 86 L22 108 L48 90 Z" stroke="#0458cf" stroke-width="4" stroke-linejoin="round"/></g>' +
-      '<rect class="pl-bar" x="34" y="32" width="9" height="40" rx="4.5"/>' +
-      '<rect class="pl-bar" x="49" y="32" width="9" height="40" rx="4.5"/>' +
-      '<rect class="pl-bar" x="64" y="32" width="9" height="40" rx="4.5"/>' +
-      '<rect class="pl-bar" x="79" y="32" width="9" height="40" rx="4.5"/>' +
+      '<g class="pl-bar pl-b1"><circle class="pl-top" cx="38.5" cy="52" r="4.5"/><rect class="pl-mid" x="34" y="36.5" width="9" height="31"/><circle class="pl-bot" cx="38.5" cy="52" r="4.5"/></g>' +
+      '<g class="pl-bar pl-b2"><circle class="pl-top" cx="53.5" cy="52" r="4.5"/><rect class="pl-mid" x="49" y="36.5" width="9" height="31"/><circle class="pl-bot" cx="53.5" cy="52" r="4.5"/></g>' +
+      '<g class="pl-bar pl-b3"><circle class="pl-top" cx="68.5" cy="52" r="4.5"/><rect class="pl-mid" x="64" y="36.5" width="9" height="31"/><circle class="pl-bot" cx="68.5" cy="52" r="4.5"/></g>' +
+      '<g class="pl-bar pl-b4"><circle class="pl-top" cx="83.5" cy="52" r="4.5"/><rect class="pl-mid" x="79" y="36.5" width="9" height="31"/><circle class="pl-bot" cx="83.5" cy="52" r="4.5"/></g>' +
     '</svg>'
 
   function makePulse(size, live) {
