@@ -621,15 +621,29 @@ function renderAuthScreen(afterLoginRoomCode = '') {
   screen.appendChild(container)
   root.appendChild(screen)
 
+  // Обе формы и обе половины синей панели всегда в разметке — видимую часть выбирает
+  // CSS-сдвиг. Невидимое делаем inert: иначе Tab доходил до скрытой кнопки
+  // «Зарегистрироваться», лежащей ровно под «Войти», и Enter/пробел запускал
+  // регистрацию — на месте «Войти» появлялось «Регистрация…», кнопка блокировалась.
   function setMode(next) {
     mode = next
     container.dataset.mode = mode
     container.classList.toggle('right-panel-active', mode === 'register')
+    const isLogin = mode === 'login'
+    ;[[loginPanel, isLogin], [overlayRight, isLogin], [registerPanel, !isLogin], [overlayLeft, !isLogin]].forEach(([node, visible]) => {
+      node.inert = !visible
+      node.setAttribute('aria-hidden', visible ? 'false' : 'true')
+    })
+    // Фокус не должен остаться в спрятанной половине
+    const active = document.activeElement
+    if (active && active !== document.body && active.closest && active.closest('[inert]')) { try { active.blur() } catch {} }
     loginErrorSlot.style.display = 'none'
     loginErrorSlot.classList.remove('success')
     registerErrorSlot.style.display = 'none'
     registerErrorSlot.classList.remove('success')
   }
+
+  setMode('login')
 
   toRegisterBtn.addEventListener('click', () => setMode('register'))
   toLoginBtn.addEventListener('click', () => setMode('login'))
@@ -644,6 +658,8 @@ function renderAuthScreen(afterLoginRoomCode = '') {
   }
 
   async function submit(kind, usernameInput, passwordInput, errorSlot, submitBtn, defaultLabel, loadingLabel, displayNameInput) {
+    // Страховка для браузеров без inert: спрятанная форма не отправляется
+    if (kind !== mode) return
     const username = usernameInput.value.trim()
     const password = passwordInput.value
     const displayName = displayNameInput ? displayNameInput.value.trim() : undefined
