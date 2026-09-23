@@ -166,9 +166,9 @@ function buildDeviceCards() {
   const camSelect = el('select', { 'aria-label': 'Камера' })
   const micDots = el('div', { class: 'lvl-dots', 'aria-hidden': 'true' })
   for (let i = 0; i < 8; i++) micDots.appendChild(el('span', {}))
-  const micCard = card('mic', micDots, micSelect)
-  const spkCard = card('spk', null, spkSelect)
-  const camCard = card('cam', null, camSelect)
+  const micCard = card('mic', micDots, makeDropdown(micSelect))
+  const spkCard = card('spk', null, makeDropdown(spkSelect))
+  const camCard = card('cam', null, makeDropdown(camSelect))
   if (!speakerSelectionSupported()) spkCard.style.display = 'none'
   return { micCard, spkCard, camCard, micSelect, spkSelect, camSelect, micDots }
 }
@@ -182,7 +182,141 @@ function fillDeviceSelect(select, kind, list, currentId) {
   }
   list.forEach((d, i) => select.appendChild(el('option', { value: d.deviceId }, d.label || `${DEVICE_META[kind].fallback} ${i + 1}`)))
   select.value = currentId && list.some((d) => d.deviceId === currentId) ? currentId : list[0].deviceId
+  if (select._ddSync) select._ddSync()
   return select.value
+}
+
+// ---- Выпадающий список в стиле сайта вместо системного ----
+// Системный список <select> браузер рисует сам (белая рамка, голубая подсветка), CSS его
+// не меняет, а appearance: base-select в Electron 33 (Chromium 130) ещё нет. Поэтому
+// родной <select> остаётся скрытым источником правды (value, событие change — весь код
+// выбора устройств работает как раньше), а видимая часть — кнопка + меню как у ПКМ.
+let openDropdown = null
+
+function closeDropdown(returnFocus = false) {
+  if (!openDropdown) return
+  const { menu, btn, cleanup } = openDropdown
+  openDropdown = null
+  cleanup()
+  menu.remove()
+  btn.setAttribute('aria-expanded', 'false')
+  btn.classList.remove('open')
+  if (returnFocus) { try { btn.focus() } catch {} }
+}
+
+function makeDropdown(select) {
+  select.hidden = true
+  const label = el('span', { class: 'dd-label' })
+  const btn = el('button', { type: 'button', class: 'dd-btn', 'aria-haspopup': 'listbox', 'aria-expanded': 'false' }, [
+    label,
+    el('i', { class: 'fas fa-chevron-down dd-chevron', 'aria-hidden': 'true' })
+  ])
+  if (select.getAttribute('aria-label')) btn.setAttribute('aria-label', select.getAttribute('aria-label'))
+  const wrap = el('div', { class: 'dd' }, [select, btn])
+
+  const sync = () => {
+    const opt = select.options[select.selectedIndex]
+    label.textContent = opt ? opt.textContent : ''
+    btn.title = label.textContent
+  }
+  select._ddSync = sync
+  select.addEventListener('change', sync)
+  new MutationObserver(sync).observe(select, { childList: true })
+  sync()
+
+  function choose(value) {
+    closeDropdown(true)
+    if (value === select.value) return
+    select.value = value
+    sync()
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+  }
+
+  function open() {
+    if (openDropdown && openDropdown.btn === btn) { closeDropdown(); return }
+    closeDropdown()
+    const items = Array.from(select.options).map((o) => {
+      const item = el('div', {
+        class: 'dd-item' + (o.value === select.value ? ' selected' : ''),
+        role: 'option',
+        tabindex: '-1',
+        'aria-selected': String(o.value === select.value),
+        title: o.textContent
+      }, [el('span', { class: 'dd-item-text' }, o.textContent), el('i', { class: 'fas fa-check dd-check', 'aria-hidden': 'true' })])
+      item.addEventListener('click', (e) => { e.stopPropagation(); choose(o.value) })
+      return item
+    })
+    const menu = el('div', { class: 'dd-menu', role: 'listbox' }, items)
+    document.body.appendChild(menu)
+
+    // Позиция: под кнопкой во всю её ширину, а если снизу не хватает места — над ней.
+    // Пересчитывается каждый кадр, пока меню открыто: окно настроек появляется с
+    // масштабом, и координаты кнопки в первые доли секунды ещё «плывут».
+    let placeRAF = 0
+    let last = ''
+    let up = null
+    const place = () => {
+      const r = btn.getBoundingClientRect()
+      const key = [r.left, r.top, r.width, window.innerWidth, window.innerHeight].map(Math.round).join()
+      if (key !== last) {
+        last = key
+        const vw = window.innerWidth
+        const vh = window.innerHeight
+        const width = Math.min(Math.max(r.width, 220), vw - 16)
+        menu.style.minWidth = width + 'px'
+        menu.style.maxWidth = Math.max(width, Math.min(560, vw - 16)) + 'px'
+        menu.style.left = Math.max(8, Math.min(r.left, vw - menu.offsetWidth - 8)) + 'px'
+        const below = vh - r.bottom - 12
+        const above = r.top - 12
+        if (up === null) up = below < Math.min(menu.scrollHeight, 240) && above > below
+        menu.classList.toggle('up', up)
+        menu.style.maxHeight = (up ? above : below) + 'px'
+        menu.style.top = up ? '' : (r.bottom + 6) + 'px'
+        menu.style.bottom = up ? (vh - r.top + 6) + 'px' : ''
+      }
+      if (!document.body.contains(btn)) { closeDropdown(); return }
+      placeRAF = requestAnimationFrame(place)
+    }
+    place()
+
+    btn.setAttribute('aria-expanded', 'true')
+    btn.classList.add('open')
+    const focusItem = (i) => { const it = items[Math.max(0, Math.min(items.length - 1, i))]; if (it) { it.focus(); it.scrollIntoView({ block: 'nearest' }) } }
+    focusItem(Math.max(0, select.selectedIndex))
+
+    const onKey = (e) => {
+      const i = items.indexOf(document.activeElement)
+      if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); closeDropdown(true) }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); focusItem(i + 1) }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); focusItem(i - 1) }
+      else if (e.key === 'Home') { e.preventDefault(); focusItem(0) }
+      else if (e.key === 'End') { e.preventDefault(); focusItem(items.length - 1) }
+      else if ((e.key === 'Enter' || e.key === ' ') && i >= 0) { e.preventDefault(); choose(select.options[i].value) }
+      else if (e.key === 'Tab') closeDropdown()
+    }
+    // Клик мимо меню закрывает его, но сам клик проходит дальше (как у системного списка)
+    const onDown = (e) => { if (!menu.contains(e.target) && !btn.contains(e.target)) closeDropdown() }
+    // Прокрутка страницы/панели под меню закрывает его (как у системного списка)
+    const onScroll = (e) => { if (!menu.contains(e.target)) closeDropdown() }
+    window.addEventListener('keydown', onKey, true)
+    document.addEventListener('pointerdown', onDown, true)
+    window.addEventListener('scroll', onScroll, true)
+    openDropdown = {
+      menu, btn,
+      cleanup: () => {
+        cancelAnimationFrame(placeRAF)
+        window.removeEventListener('keydown', onKey, true)
+        document.removeEventListener('pointerdown', onDown, true)
+        window.removeEventListener('scroll', onScroll, true)
+      }
+    }
+  }
+
+  btn.addEventListener('click', (e) => { e.stopPropagation(); open() })
+  btn.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (!openDropdown) open() }
+  })
+  return wrap
 }
 
 // Живой индикатор уровня микрофона (точки). Возвращает функцию остановки.
@@ -2027,6 +2161,7 @@ async function enterRoom(joinData) {
   // Закрытие — той же анимацией в обратную сторону (см. closeParticipantsPanel):
   // вешаем .is-closing и убираем узел только после окончания анимации.
   function closeDevicePopup() {
+    closeDropdown()
     stopInCallMeter()
     const existing = document.querySelector('.settings-overlay')
     if (!existing) return
