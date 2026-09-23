@@ -1245,7 +1245,7 @@ button {
 /* Название в шапке звонка: дисплейная гарнитура системы (плотнее в заголовках), жирнее и крупнее */
 .room-topbar .ank-brandline__name {
   font-family: 'Segoe UI Variable Display', 'SF Pro Display', -apple-system, BlinkMacSystemFont, var(--font);
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: -0.02em;
