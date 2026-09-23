@@ -283,67 +283,187 @@ button {
 
 /* ═══════════════ АТОМЫ: знак продукта, появление блоков, курсор ═══════════════ */
 
-/* Знак Voice Lobby: эмодзи-трубка в синем круге, коротко «звонит» */
+/* Знак Voice Lobby: открытый MacBook с видеозвонком на двоих (разметку собирает anker.js).
+   Все размеры в em от --d (высота знака), ширина ≈ 1.77 × высоты.
+   Режимы:
+   - по умолчанию — статичный кадр открытого ноутбука, анимация при наведении;
+   - .is-live — анимация играет всё время (вход/регистрация, подключение к звонку);
+   - reduced-motion — всегда статичный кадр. */
 .ank-sigil {
   --d: 44px;
-  position: relative;
-  width: var(--d);
-  height: var(--d);
+  --lp-accent: #0458cf;
+  --lp-soft: #6ea8f5;
+  font-size: calc(var(--d) / 18.7);
+  width: 33em;
+  height: 18.7em;
   flex: 0 0 auto;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  border-radius: 30%;
-  isolation: isolate;
-  background: linear-gradient(150deg, #2a7ff0 0%, #0458cf 62%, #0341a0 100%);
-  box-shadow: 0 6px 18px rgba(4, 88, 207, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.10) inset;
+  perspective: 90em;
+  line-height: 0;
 }
-.ank-sigil__g {
+.ank-sigil span { display: block; box-sizing: border-box; }
+.ank-sigil .lp-lid {
+  width: 27em;
+  height: 17.5em;
+  padding: 0.35em;
+  border-radius: 1.5em 1.5em 0.5em 0.5em;
+  background: linear-gradient(180deg, #666d78 0%, #454b54 60%, #3a3f47 100%);
+  transform-origin: 50% 100%;
+}
+.ank-sigil .lp-bezel {
   position: relative;
-  z-index: 2;
-  display: block;
-  /* явный эмодзи-стек: иначе глиф пытается рисоваться текстовой гарнитурой */
-  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", "Android Emoji", sans-serif;
-  font-size: calc(var(--d) * 0.5);
-  line-height: 1;
-  text-align: center;
-  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
-  transform-origin: 50% 62%;
-  animation: ank-ring 4.2s var(--ease) infinite;
+  width: 100%;
+  height: 100%;
+  padding: 0.5em 0.7em 0.9em;
+  background: #050608;
+  border-radius: 1.2em 1.2em 0.3em 0.3em;
 }
-/* Две расходящиеся волны «звука» */
-.ank-sigil::before,
-.ank-sigil::after {
-  content: "";
+.ank-sigil .lp-notch {
   position: absolute;
-  left: 50%; top: 50%;
-  width: calc(var(--d) * 0.8);
-  height: calc(var(--d) * 0.8);
-  margin: calc(var(--d) * -0.4) 0 0 calc(var(--d) * -0.4);
-  border: 1px solid var(--accent-soft);
-  border-radius: 34%;
-  opacity: 0;
-  animation: ank-wave 4.2s var(--ease) infinite;
-  pointer-events: none;
+  top: 0;
+  left: 50%;
+  z-index: 2;
+  width: 3.8em;
+  height: 1em;
+  margin-left: -1.9em;
+  background: #050608;
+  border-radius: 0 0 0.55em 0.55em;
 }
-.ank-sigil::after { animation-delay: 0.34s; }
+.ank-sigil .lp-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 1.3em 0.8em 0.7em;
+  background: #0b1220;
+  border-radius: 0.55em;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6em;
+}
+.ank-sigil .lp-tiles {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6em;
+}
+.ank-sigil .lp-tile {
+  position: relative;
+  border-radius: 0.8em;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.ank-sigil .lp-a { background: var(--lp-accent); box-shadow: 0 0 0 0.18em var(--lp-soft), 0 0 1.6em rgba(110, 168, 245, 0.55); }
+.ank-sigil .lp-b { background: #1a2740; }
+.ank-sigil .lp-pp { display: block; width: 62%; height: auto; }
+.ank-sigil .lp-a .lp-pp { fill: #d6e5fb; }
+.ank-sigil .lp-b .lp-pp { fill: var(--lp-soft); }
+.ank-sigil .lp-chip {
+  position: absolute;
+  left: 0.45em;
+  bottom: 0.45em;
+  height: 1.2em;
+  padding: 0.22em 0.35em;
+  background: rgba(5, 7, 10, 0.5);
+  border-radius: 0.4em;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.14em;
+}
+.ank-sigil .lp-bar { width: 0.18em; height: 0.24em; border-radius: 0.1em; background: var(--lp-soft); transform-origin: 50% 100%; }
+.ank-sigil .lp-a .lp-bar { background: #fff; }
+.ank-sigil .lp-a .lp-bar:nth-child(1) { height: 0.45em; }
+.ank-sigil .lp-a .lp-bar:nth-child(2) { height: 0.76em; }
+.ank-sigil .lp-a .lp-bar:nth-child(3) { height: 0.55em; }
+.ank-sigil .lp-ctrl {
+  align-self: center;
+  display: flex;
+  gap: 0.45em;
+  padding: 0.3em 0.5em;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 2em;
+}
+.ank-sigil .lp-btn { width: 1.5em; height: 1.5em; border-radius: 50%; background: #243044; }
+.ank-sigil .lp-end { width: 2.1em; border-radius: 1em; background: #d94a3d; }
+.ank-sigil .lp-glare,
+.ank-sigil .lp-flash { position: absolute; inset: 0; pointer-events: none; }
+.ank-sigil .lp-glare { background: linear-gradient(115deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0) 42%); }
+.ank-sigil .lp-flash { background: var(--lp-soft); opacity: 0; }
+.ank-sigil .lp-base {
+  width: 33em;
+  height: 1.2em;
+  border-radius: 0.2em 0.2em 1.4em 1.4em / 0.2em 0.2em 1em 1em;
+  background: linear-gradient(180deg, #9aa1ab 0%, #6a717b 22%, #474c55 70%, #33373e 100%);
+  display: flex;
+  justify-content: center;
+}
+.ank-sigil .lp-scoop {
+  width: 5.5em;
+  height: 0.38em;
+  border-radius: 0 0 0.6em 0.6em;
+  background: linear-gradient(180deg, #2c3037 0%, #50565f 100%);
+}
+/* Слои заранее растрируются в полном размере — иначе 3D-поворот крышки мылится */
+.ank-sigil .lp-lid, .ank-sigil .lp-tile, .ank-sigil .lp-ctrl, .ank-sigil .lp-pp { will-change: transform; backface-visibility: hidden; }
 
-@keyframes ank-ring {
-  0%, 62%, 100% { transform: rotate(0deg) scale(1); }
-  4%  { transform: rotate(-13deg) scale(1.05); }
-  8%  { transform: rotate(11deg) scale(1.05); }
-  12% { transform: rotate(-9deg) scale(1.04); }
-  16% { transform: rotate(7deg) scale(1.03); }
-  20% { transform: rotate(-5deg) scale(1.02); }
-  26% { transform: rotate(3deg) scale(1.01); }
-  32% { transform: rotate(0deg) scale(1); }
+/* При наведении: крышка открывается, экран вспыхивает, рамки проявляются, идёт разговор */
+:is(.ank-sigil:hover, .ank-brand:hover .ank-sigil, .ank-brandline:hover .ank-sigil):not(.is-live) .lp-lid { animation: lp-lid 1.05s cubic-bezier(.3, .7, .3, 1) both; }
+:is(.ank-sigil:hover, .ank-brand:hover .ank-sigil, .ank-brandline:hover .ank-sigil):not(.is-live) .lp-flash { animation: lp-flash 0.9s 0.4s ease-out both; }
+:is(.ank-sigil:hover, .ank-brand:hover .ank-sigil, .ank-brandline:hover .ank-sigil):not(.is-live) .lp-a { animation: lp-in 0.65s 0.7s cubic-bezier(.22, 1, .36, 1) both, lp-speak-a 2.4s 1.5s infinite; }
+:is(.ank-sigil:hover, .ank-brand:hover .ank-sigil, .ank-brandline:hover .ank-sigil):not(.is-live) .lp-b { animation: lp-in 0.65s 0.82s cubic-bezier(.22, 1, .36, 1) both, lp-speak-b 2.4s 1.5s infinite; }
+:is(.ank-sigil:hover, .ank-brand:hover .ank-sigil, .ank-brandline:hover .ank-sigil):not(.is-live) .lp-ctrl { animation: lp-in 0.55s 1s cubic-bezier(.22, 1, .36, 1) both; }
+:is(.ank-sigil:hover, .ank-brand:hover .ank-sigil, .ank-brandline:hover .ank-sigil):not(.is-live) .lp-a .lp-pp { animation: lp-nod-a 2.4s 1.5s ease-in-out infinite; }
+:is(.ank-sigil:hover, .ank-brand:hover .ank-sigil, .ank-brandline:hover .ank-sigil):not(.is-live) .lp-b .lp-pp { animation: lp-nod-b 2.4s 1.5s ease-in-out infinite; }
+:is(.ank-sigil:hover, .ank-brand:hover .ank-sigil, .ank-brandline:hover .ank-sigil):not(.is-live) .lp-a .lp-bar { animation: lp-bar-a 2.4s 1.5s infinite; }
+:is(.ank-sigil:hover, .ank-brand:hover .ank-sigil, .ank-brandline:hover .ank-sigil):not(.is-live) .lp-b .lp-bar { animation: lp-bar-b 2.4s 1.5s infinite; }
+:is(.ank-sigil:hover, .ank-brand:hover .ank-sigil, .ank-brandline:hover .ank-sigil):not(.is-live) .lp-bar:nth-child(2) { animation-delay: 1.58s; }
+:is(.ank-sigil:hover, .ank-brand:hover .ank-sigil, .ank-brandline:hover .ank-sigil):not(.is-live) .lp-bar:nth-child(3) { animation-delay: 1.66s; }
+
+/* Всё время: тот же сценарий по кругу за 6 с — открылся, поговорили, закрылся */
+.ank-sigil.is-live .lp-lid { animation: lp-lid-loop 6s cubic-bezier(.3, .7, .3, 1) infinite; }
+.ank-sigil.is-live .lp-flash { animation: lp-flash-loop 6s ease-out infinite; }
+.ank-sigil.is-live .lp-a { animation: lp-in-loop 6s infinite, lp-speak-a 2.4s 1.2s infinite; }
+.ank-sigil.is-live .lp-b { animation: lp-in-loop 6s 0.12s infinite, lp-speak-b 2.4s 1.2s infinite; }
+.ank-sigil.is-live .lp-ctrl { animation: lp-in-loop 6s 0.28s infinite; }
+.ank-sigil.is-live .lp-a .lp-pp { animation: lp-nod-a 2.4s 1.2s ease-in-out infinite; }
+.ank-sigil.is-live .lp-b .lp-pp { animation: lp-nod-b 2.4s 1.2s ease-in-out infinite; }
+.ank-sigil.is-live .lp-a .lp-bar { animation: lp-bar-a 2.4s 1.2s infinite; }
+.ank-sigil.is-live .lp-b .lp-bar { animation: lp-bar-b 2.4s 1.2s infinite; }
+.ank-sigil.is-live .lp-bar:nth-child(2) { animation-delay: 1.28s; }
+.ank-sigil.is-live .lp-bar:nth-child(3) { animation-delay: 1.36s; }
+
+@keyframes lp-lid { 0% { transform: rotateX(-88deg); } 58% { transform: rotateX(6deg); } 78% { transform: rotateX(-2deg); } 100% { transform: rotateX(0deg); } }
+@keyframes lp-flash { 0% { opacity: 0; } 30% { opacity: 0.4; } 100% { opacity: 0; } }
+@keyframes lp-in { 0% { opacity: 0; transform: translateY(1.2em); } 100% { opacity: 1; transform: translateY(0); } }
+@keyframes lp-lid-loop {
+  0% { transform: rotateX(-88deg); }
+  10% { transform: rotateX(6deg); }
+  13.5% { transform: rotateX(-2deg); }
+  17%, 86% { transform: rotateX(0deg); }
+  96%, 100% { transform: rotateX(-88deg); }
 }
-@keyframes ank-wave {
-  0%   { transform: scale(0.75); opacity: 0; }
-  8%   { opacity: 0.5; }
-  40%  { transform: scale(1.7); opacity: 0; }
-  100% { transform: scale(1.7); opacity: 0; }
+@keyframes lp-flash-loop { 0%, 6% { opacity: 0; } 10% { opacity: 0.4; } 22%, 100% { opacity: 0; } }
+@keyframes lp-in-loop {
+  0%, 11% { opacity: 0; transform: translateY(1.2em); }
+  21%, 84% { opacity: 1; transform: translateY(0); }
+  90%, 100% { opacity: 0; transform: translateY(0); }
 }
+@keyframes lp-speak-a {
+  0%, 46%, 100% { box-shadow: 0 0 0 0.18em #6ea8f5, 0 0 1.6em rgba(110, 168, 245, 0.55); }
+  52%, 94% { box-shadow: 0 0 0 0 rgba(110, 168, 245, 0), 0 0 0 rgba(110, 168, 245, 0); }
+}
+@keyframes lp-speak-b {
+  0%, 46%, 100% { box-shadow: 0 0 0 0 rgba(110, 168, 245, 0), 0 0 0 rgba(110, 168, 245, 0); }
+  52%, 94% { box-shadow: 0 0 0 0.18em #6ea8f5, 0 0 1.6em rgba(110, 168, 245, 0.55); }
+}
+@keyframes lp-nod-a { 0%, 44%, 100% { transform: translateY(0); } 11% { transform: translateY(-0.25em); } 22% { transform: translateY(0); } 33% { transform: translateY(-0.18em); } }
+@keyframes lp-nod-b { 0%, 50%, 94%, 100% { transform: translateY(0); } 61% { transform: translateY(-0.25em); } 72% { transform: translateY(0); } 83% { transform: translateY(-0.18em); } }
+@keyframes lp-bar-a { 0% { transform: scaleY(0.5); } 7% { transform: scaleY(1.25); } 14% { transform: scaleY(0.6); } 22% { transform: scaleY(1.1); } 30% { transform: scaleY(0.45); } 38% { transform: scaleY(1); } 46%, 100% { transform: scaleY(0.3); } }
+@keyframes lp-bar-b { 0%, 50% { transform: scaleY(0.3); } 57% { transform: scaleY(1.25); } 64% { transform: scaleY(0.6); } 72% { transform: scaleY(1.1); } 80% { transform: scaleY(0.45); } 88% { transform: scaleY(1); } 96%, 100% { transform: scaleY(0.3); } }
 
 /* След за курсором: тонкая синяя лента и мягкое пятно (только мышь, без reduced-motion) */
 .ank-pointer {
@@ -400,8 +520,8 @@ button {
   }
   .rv { opacity: 1; transform: none; }
   .ank-pointer { display: none; }
-  .ank-sigil__g { animation: none; }
-  .ank-sigil::before, .ank-sigil::after { animation: none; opacity: 0; }
+  /* Знак — всегда статичный кадр открытого ноутбука */
+  .ank-sigil * { animation: none !important; }
 }
 
 /* ═══════════════ ЭКРАН АВТОРИЗАЦИИ ═══════════════
@@ -639,13 +759,9 @@ button {
   color: #fff;
 }
 .auth-overlay-panel .ank-sigil {
-  --d: 60px;
-  margin-bottom: 22px;
-  background: rgba(255, 255, 255, 0.16);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28) inset;
+  --d: 76px;
+  margin-bottom: 24px;
 }
-.auth-overlay-panel .ank-sigil::before,
-.auth-overlay-panel .ank-sigil::after { border-color: rgba(255, 255, 255, 0.55); }
 
 /* Название продукта над формой — только в мобильной раскладке */
 .auth-brand-mobile {
@@ -2332,7 +2448,17 @@ body.inapp-fullscreen { overflow: hidden; }
   .stage.stage-solo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-content: stretch; }
   .stage.stage-solo .tile.camera-tile,
   .solo-invite { min-height: 0; }
-  .solo-invite { gap: 12px; padding: 16px; }
+  /* Приглашение ужимается под невысокую половину сцены (iPhone в альбомной ориентации
+     шире 860px, поэтому телефонные правила выше сюда не доходят) */
+  .stage.stage-solo .solo-invite { height: 100%; gap: 8px; padding: 10px 18px; overflow: hidden; }
+  .stage.stage-solo .solo-invite__title { font-size: 15px; line-height: 1.3; }
+  .stage.stage-solo .solo-copy-btn { min-height: 40px; padding: 10px 18px; font-size: 14px; }
+  .stage.stage-solo .solo-invite__code { font-size: 13px; }
+}
+/* Совсем низко (альбомная ориентация с открытыми панелями Safari): код комнаты
+   и так виден в шапке — строку под кнопкой убираем */
+@media (max-height: 340px) and (orientation: landscape) {
+  .stage.stage-solo .solo-invite__code { display: none; }
 }
 
 /* Низкий экран телефона (маленький портрет, любой ландшафт): в половину сцены
