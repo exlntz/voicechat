@@ -1037,7 +1037,20 @@ async function enterRoom(joinData) {
   // Секундомер звонка: считает с момента, как вы подключились. Пока идёт подключение —
   // вместо него подпись статуса (CSS: .room-info.is-live).
   const callTimer = el('span', { class: 'room-timer', 'aria-label': 'Длительность звонка' }, '0:00')
-  roomInfo.appendChild(el('span', { class: 'room-status', role: 'status' }, [statusDot, statusText, callTimer]))
+  // Качество связи (после подключения — вместо точки): три полоски как у сигнала телефона,
+  // по наведению/нажатию — карточка с пингом и параметрами вашего видео.
+  const connBars = el('span', { class: 'conn-bars', 'aria-hidden': 'true' }, [el('i'), el('i'), el('i')])
+  const connTitle = el('span', { class: 'conn-card__title' }, 'Связь определяется…')
+  const connPing = el('span', { class: 'conn-card__val' }, '—')
+  const connVideo = el('span', { class: 'conn-card__val' }, '—')
+  const connCard = el('div', { class: 'conn-card', role: 'tooltip' }, [
+    el('div', { class: 'conn-card__head' }, [el('span', { class: 'conn-card__dot' }), connTitle]),
+    el('div', { class: 'conn-card__row' }, [el('span', {}, 'Пинг'), connPing]),
+    el('div', { class: 'conn-card__row' }, [el('span', {}, 'Ваше видео'), connVideo])
+  ])
+  const roomStatus = el('span', { class: 'room-status', role: 'status', tabindex: '0' }, [statusDot, connBars, statusText, callTimer, connCard])
+  roomInfo.appendChild(roomStatus)
+  roomInfo.dataset.q = 'unknown'
   const codeBadge = el('button', { type: 'button', class: 'room-code-badge', title: 'Скопировать код комнаты' }, [
     el('span', { class: 'room-code-badge__code' }, roomCode),
     el('i', { class: 'fas fa-copy room-code-badge__icon', 'aria-hidden': 'true' })
@@ -1308,6 +1321,79 @@ async function enterRoom(joinData) {
     const sigil = document.querySelector('.room-topbar .ank-pulse')
     if (sigil) sigil.classList.toggle('is-live', cls === 'connecting')
   }
+
+  // ---- Качество связи: полоски + карточка «пинг / ваше видео» ----
+  // Уровень присылает сам LiveKit (ConnectionQualityChanged: excellent/good/poor/lost).
+  // Пинг и видео читаем из WebRTC-статистики — раз в секунду и только пока карточка открыта.
+  const CONN_LABEL = { excellent: 'Связь отличная', good: 'Связь хорошая', poor: 'Связь слабая', lost: 'Связь потеряна', unknown: 'Связь определяется…' }
+  function setConnQuality(q) {
+    const key = CONN_LABEL[q] ? q : 'unknown'
+    roomInfo.dataset.q = key
+    connTitle.textContent = CONN_LABEL[key]
+    roomStatus.setAttribute('aria-label', CONN_LABEL[key])
+  }
+  room.on(LK.RoomEvent.ConnectionQualityChanged, (quality, participant) => {
+    if (participant === room.localParticipant) setConnQuality(quality)
+  })
+
+  function pairRtt(report) {
+    let rtt = null
+    report.forEach((r) => {
+      if (rtt !== null) return
+      if (r.type === 'candidate-pair' && r.state === 'succeeded' && (r.nominated || r.selected) && typeof r.currentRoundTripTime === 'number') rtt = r.currentRoundTripTime
+    })
+    if (rtt === null) report.forEach((r) => { if (rtt === null && r.type === 'remote-inbound-rtp' && typeof r.roundTripTime === 'number') rtt = r.roundTripTime })
+    return rtt
+  }
+  async function readConnStats() {
+    let rtt = null
+    let video = null
+    const lp = room.localParticipant
+    for (const pub of lp.trackPublications.values()) {
+      const sender = pub.track && pub.track.sender
+      if (!sender) continue
+      const rep = await sender.getStats()
+      if (rtt === null) rtt = pairRtt(rep)
+      if (pub.source === LK.Track.Source.Camera) {
+        rep.forEach((r) => {
+          if (r.type === 'outbound-rtp' && r.frameHeight && (!video || r.frameHeight > video.h)) video = { h: r.frameHeight, fps: r.framesPerSecond }
+        })
+      }
+    }
+    // Своих треков нет (всё выключено) — пинг по входящему соединению
+    if (rtt === null) {
+      outer: for (const p of room.remoteParticipants.values()) {
+        for (const pub of p.trackPublications.values()) {
+          const receiver = pub.track && pub.track.receiver
+          if (!receiver) continue
+          rtt = pairRtt(await receiver.getStats())
+          if (rtt !== null) break outer
+        }
+      }
+    }
+    connPing.textContent = rtt === null ? '—' : `${Math.round(rtt * 1000)} мс`
+    if (!lp.isCameraEnabled) connVideo.textContent = 'камера выключена'
+    else if (!video) connVideo.textContent = '—'
+    else connVideo.textContent = `${video.h}p` + (video.fps ? ` · ${Math.round(video.fps)} к/с` : '')
+  }
+  let connStatsTimer = 0
+  function startConnStats() {
+    if (connStatsTimer) return
+    const run = () => readConnStats().catch(() => {})
+    run()
+    connStatsTimer = setInterval(run, 1000)
+  }
+  function stopConnStats() { clearInterval(connStatsTimer); connStatsTimer = 0 }
+  roomStatus.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') startConnStats() })
+  roomStatus.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && !roomStatus.classList.contains('is-open')) stopConnStats() })
+  roomStatus.addEventListener('focus', startConnStats)
+  roomStatus.addEventListener('blur', () => { roomStatus.classList.remove('is-open'); stopConnStats() })
+  // Телефон: наведения нет — карточка открывается и закрывается нажатием
+  roomStatus.addEventListener('click', () => {
+    if (!roomInfo.classList.contains('is-live')) return
+    const open = roomStatus.classList.toggle('is-open')
+    if (open) startConnStats(); else stopConnStats()
+  })
 
   // ---- Приглашение, когда в звонке пока только ты ----
   // Отдельная раскладка "пустой комнаты": слева большая карточка себя (камера или аккуратные
@@ -2857,6 +2943,7 @@ async function enterRoom(joinData) {
   function cleanupAndGoLobby() {
     clearInterval(screenTilesReconcileInterval)
     clearInterval(callTimerId)
+    stopConnStats()
     closeCallPip()
     if (miniWindow) setMiniWindow(false)
     setCallActive(false)

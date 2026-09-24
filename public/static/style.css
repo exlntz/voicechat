@@ -2987,3 +2987,76 @@ body.pip-body > .room-screen { height: 100%; }
 @media (max-height: 480px) and (orientation: landscape) {
   .room-topbar { padding: 8px 14px 28px; }
 }
+
+/* ═══════════════ Качество связи: полоски + карточка (Q2 с подробностями) ═══════════════
+   После подключения вместо зелёной точки — три полоски, как у сигнала телефона: число и цвет
+   полосок = качество (не только цвет). По наведению (на телефоне — нажатием) под ними
+   карточка: качество, пинг, параметры вашего видео. */
+.room-info[data-q="excellent"] { --q: #3aa86e; }
+.room-info[data-q="good"] { --q: #e3c14f; }
+.room-info[data-q="poor"] { --q: #e5603f; }
+.room-info[data-q="lost"], .room-info[data-q="unknown"] { --q: #8a93a3; }
+
+.conn-bars { display: none; align-items: flex-end; gap: 2px; height: 13px; }
+.conn-bars i { display: block; width: 3.5px; border-radius: 2px; background: rgba(242, 245, 249, 0.2); }
+.conn-bars i:nth-child(1) { height: 5px; }
+.conn-bars i:nth-child(2) { height: 9px; }
+.conn-bars i:nth-child(3) { height: 13px; }
+.room-info.is-live .conn-bars { display: inline-flex; }
+.room-info.is-live .status-dot { display: none; }
+.room-info[data-q="excellent"] .conn-bars i,
+.room-info[data-q="good"] .conn-bars i:nth-child(-n+2),
+.room-info[data-q="poor"] .conn-bars i:nth-child(1) { background: var(--q); }
+
+.room-topbar .room-status {
+  position: relative;
+  margin: -6px -8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-pill);
+  outline: none;
+  cursor: default;
+}
+.room-topbar .room-info.is-live .room-status { cursor: pointer; }
+.room-topbar .room-info.is-live .room-status:hover,
+.room-topbar .room-status:focus-visible,
+.room-topbar .room-status.is-open { background: rgba(242, 245, 249, 0.08); }
+
+.conn-card {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 50%;
+  z-index: 40;
+  width: 250px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: 18px;
+  background: rgba(21, 24, 30, 0.97);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  font: 400 14px/1.3 var(--font);
+  color: var(--text-faint);
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, -4px);
+  transition: opacity .18s var(--ease), transform .18s var(--ease), visibility 0s linear .18s;
+  pointer-events: none;
+}
+.room-info:not(.is-live) .conn-card { display: none; }
+.room-status:hover .conn-card,
+.room-status:focus-visible .conn-card,
+.room-status.is-open .conn-card {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+  transition-delay: 0s;
+}
+.conn-card__head { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text); }
+.conn-card__dot { width: 10px; height: 10px; border-radius: 50%; background: var(--q); flex-shrink: 0; }
+.conn-card__row { display: flex; justify-content: space-between; gap: 16px; }
+.conn-card__val { color: var(--text); font-variant-numeric: tabular-nums; }
+/* На телефоне центр шапки не обрезаем, иначе карточка не видна */
+@media (max-width: 600px) {
+  .room-topbar .room-info { overflow: visible; }
+}
