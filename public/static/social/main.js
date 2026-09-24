@@ -245,6 +245,7 @@ async function startSession(me, prefillRoom = '') {
   if (prefillRoom) history.replaceState({}, '', '/room/' + prefillRoom)
   else if (location.pathname === '/' || location.pathname === '') history.replaceState({}, '', '/friends' + location.search)
   applyRoute(parseRoute())
+  if (pendingLink) { const link = pendingLink; pendingLink = null; navigate(link) }
 }
 
 async function endSession({ callServer = false } = {}) {
@@ -293,10 +294,14 @@ window.addEventListener('vl:navigate', (e) => {
 })
 window.addEventListener('popstate', () => applyRoute(parseRoute()))
 
-// Ссылки внутри приложения (например, из уведомлений .exe: voicelobby://dm/12)
+// Ссылки внутри приложения (например, из уведомлений .exe: voicelobby://dm/12). Пришла до
+// входа в аккаунт — откроем сразу после входа.
+let pendingLink = null
 function openDeepLink(link) {
   const path = String(link || '').replace(/^voicelobby:\/\//i, '/').replace(/^\/+/, '/')
-  if (/^\/(dm\/\d+|room\/[a-z0-9]+|friends|lobby)/i.test(path)) navigate(path)
+  if (!/^\/(dm\/\d+|room\/[a-z0-9]+|friends|lobby)/i.test(path)) return
+  if (!sessionActive) { pendingLink = path; return }
+  navigate(path)
 }
 
 // ---------- События ----------

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+<title>Входящий звонок</title>
+<style>
+  /* Маленькое окно входящего звонка поверх всех окон. Цвета — те же, что у сайта. */
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #15181e; color: #f2f5f9;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; user-select: none; }
+  .card { height: 100%; display: flex; align-items: center; gap: 14px; padding: 0 16px; border: 1px solid rgba(242,245,249,0.12);
+    -webkit-app-region: drag; animation: in 0.25s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  @keyframes in { from { opacity: 0; transform: translateY(10px); } }
+  .ava { flex: 0 0 auto; width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; font-weight: 600; font-size: 20px;
+    color: #fff; animation: pulse 1.6s ease-out infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(58,168,110,0.55); } 100% { box-shadow: 0 0 0 16px rgba(58,168,110,0); } }
+  .text { flex: 1; min-width: 0; }
+  .name { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sub { font-size: 13px; color: rgba(242,245,249,0.7); margin-top: 2px; }
+  .btns { display: flex; gap: 10px; -webkit-app-region: no-drag; }
+  button { width: 46px; height: 46px; border-radius: 50%; border: 0; cursor: pointer; display: grid; place-items: center; color: #fff;
+    transition: transform 0.15s, filter 0.15s; }
+  button:hover { transform: scale(1.08); filter: brightness(1.1); }
+  button:focus-visible { outline: 2px solid #6ea8f5; outline-offset: 2px; }
+  .decline { background: #d94a3d; }
+  .accept { background: #3aa86e; animation: shake 1.6s ease-in-out infinite; }
+  @keyframes shake { 0%, 60%, 100% { transform: rotate(0); } 65%, 75%, 85% { transform: rotate(-12deg); } 70%, 80%, 90% { transform: rotate(12deg); } }
+  svg { width: 22px; height: 22px; fill: currentColor; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="ava" id="ava">?</div>
+    <div class="text">
+      <div class="name" id="name">Звонок</div>
+      <div class="sub">Входящий звонок…</div>
+    </div>
+    <div class="btns">
+      <button class="decline" id="decline" title="Отклонить" aria-label="Отклонить">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08a.96.96 0 0 1 0-1.36C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.72c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.69-1.36-2.67-1.85a1 1 0 0 1-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/></svg>
+      </button>
+      <button class="accept" id="accept" title="Принять" aria-label="Принять">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1C10.61 21 3 13.39 3 4c0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+      </button>
+    </div>
+  </div>
+<script>
+  let callId = null
+  let stopRing = () => {}
+
+  // Мелодия: тот же двухтональный сигнал, что и на сайте (WebAudio, без файлов)
+  function startRingtone() {
+    let ctx
+    try { ctx = new AudioContext() } catch (e) { return () => {} }
+    const tone = (freq, start, dur, gain) => {
+      const osc = ctx.createOscillator()
+      const g = ctx.createGain()
+      osc.frequency.value = freq
+      g.gain.setValueAtTime(0, start)
+      g.gain.linearRampToValueAtTime(gain, start + 0.015)
+      g.gain.exponentialRampToValueAtTime(0.0001, start + dur)
+      osc.connect(g).connect(ctx.destination)
+      osc.start(start)
+      osc.stop(start + dur + 0.02)
+    }
+    const ring = () => {
+      const t = ctx.currentTime
+      for (let i = 0; i < 2; i++) { tone(660, t + i * 0.42, 0.34, 0.12); tone(990, t + i * 0.42 + 0.02, 0.32, 0.06) }
+    }
+    ring()
+    const timer = setInterval(ring, 2600)
+    return () => { clearInterval(timer); try { ctx.close() } catch (e) {} }
+  }
+
+  window.callBridge.onData((data) => {
+    callId = data.callId
+    document.getElementById('name').textContent = data.name || 'Звонок'
+    const ava = document.getElementById('ava')
+    ava.textContent = data.initials || '?'
+    ava.style.background = data.color || '#0458cf'
+    document.title = `${data.name || 'Звонок'} — входящий звонок`
+    stopRing()
+    stopRing = startRingtone()
+    document.getElementById('accept').focus()
+  })
+  function act(action) {
+    stopRing()
+    if (callId) window.callBridge.action(callId, action)
+  }
+  document.getElementById('accept').addEventListener('click', () => act('accept'))
+  document.getElementById('decline').addEventListener('click', () => act('decline'))
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') act('decline')
+  })
+  window.addEventListener('beforeunload', () => stopRing())
+</script>
+</body>
+</html>

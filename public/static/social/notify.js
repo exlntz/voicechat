@@ -82,14 +82,17 @@ function updateBadge() {
   document.title = count ? `(${count > 99 ? '99+' : count}) ${baseTitle}` : baseTitle
   if (count === lastBadge) return
   lastBadge = count
-  drawFavicon(count)
   try {
     if (navigator.setAppBadge) count ? navigator.setAppBadge(count) : navigator.clearAppBadge()
   } catch {}
-  const e = E()
-  if (typeof e.setBadge === 'function') {
-    try { e.setBadge(count, count ? badgeImage(count, 32) : null) } catch {}
-  }
+  drawFavicon(count).then((iconWithBadge) => {
+    if (count !== lastBadge) return // пока рисовали, счётчик уже сменился
+    const e = E()
+    // .exe: кружок с числом — на иконку панели задач, иконка с кружком — в трей
+    if (typeof e.setBadge === 'function') {
+      try { e.setBadge(count, count ? badgeImage(count, 32) : null, iconWithBadge) } catch {}
+    }
+  })
 }
 
 // Красный кружок с числом — картинка для favicon и для значка на панели задач Windows
@@ -122,13 +125,12 @@ function loadFavicon() {
   return faviconReady
 }
 
+// Возвращает data-URL иконки с кружком (или null без счётчика)
 async function drawFavicon(count) {
   let link = document.querySelector('link[data-vl-badge]')
-  const originals = document.querySelectorAll('link[rel~="icon"]:not([data-vl-badge])')
   if (!count) {
     if (link) link.remove()
-    originals.forEach((l) => { l.disabled = false })
-    return
+    return null
   }
   await loadFavicon()
   const size = 64
@@ -153,7 +155,10 @@ async function drawFavicon(count) {
     link.dataset.vlBadge = '1'
     document.head.appendChild(link)
   }
-  link.href = c.toDataURL('image/png')
+  const url = c.toDataURL('image/png')
+  // Браузер берёт последнюю объявленную иконку — наша идёт после исходных
+  link.href = url
+  return url
 }
 
 // ---- Звуки (синтез WebAudio — отдельные файлы не нужны) ----

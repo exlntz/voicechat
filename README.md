@@ -50,6 +50,29 @@
 - `GET /api/metrics` — лёгкие метрики потребления ресурсов: `process.memoryUsage()`, память/загрузка всей машины, число комнат/участников/публикаций из LiveKit, счётчики SQLite. Доступен авторизованному пользователю или по `?token=$METRICS_TOKEN` (переменная окружения; если не задана — только по сессии)
 - `GET /` , `GET /room/:code` — HTML страницы (лобби / комната звонка)
 
+## Друзья и лички (как в Дискорде)
+Слева — «Друзья», «Звонок по коду» и список личек, справа — открытый чат или звонок.
+Адреса: `/friends`, `/dm/:id`, `/lobby` (звонок по коду), `/room/:code`.
+
+**Сервер** — `vps-backend-deployed-copy/src/social/`:
+- `db.js` — таблицы `friendships`, `conversations`, `conversation_members`, `messages` (создаются сами при старте), лимиты частоты;
+- `friends.js` — `GET /api/friends`, `POST /api/friends/request {username}`, `POST /api/friends/:id/accept|decline|block`, `DELETE /api/friends/:id`, `DELETE /api/friends/:id/block`;
+- `chats.js` — `GET /api/conversations`, `POST /api/conversations/dm {userId}`, `GET|POST /api/conversations/:id/messages` (по 50, `?before=`/`?after=`), `PATCH|DELETE .../messages/:mid`, `POST .../read`, `POST .../typing`, `POST .../call`, `POST /api/calls/:callId/accept|decline|cancel`;
+- `events.js` — реалтайм `GET /api/events` (SSE): пинг раз в 25 с, `X-Accel-Buffering: no` (nginx менять не нужно), после обрыва пропущенное доигрывается по `Last-Event-ID`; `POST /api/presence` — «Не беспокоить»/«Отошёл», выход из звонка.
+- Лимиты: сообщение до 4000 символов, не чаще 8 сообщений за 5 с и 60 в минуту; заявки в друзья — 20 за 10 минут.
+
+**Сайт** — `public/static/social/` (ES-модули, подключаются из `renderPage` в `server.js`):
+`main.js` (оболочка и адреса), `api.js`, `events.js` (SSE), `store.js` (состояние), `cache.js` (IndexedDB),
+`sidebar.js`, `friends.js`, `chat.js`, `call-invite.js` (звонок из чата и входящий), `notify.js` (уведомления, счётчик), `social.css`.
+- Звонок из лички не выкидывает из чата: он встаёт панелью сверху; кнопка в углу панели разворачивает его на весь экран.
+- Сообщение появляется сразу, до ответа сервера; история кэшируется в IndexedDB; старое подгружается при прокрутке вверх.
+- `app.js` по-прежнему рисует вход, лобби и звонок; с оболочкой он общается через `window.VL`.
+
+**.exe** (`electron-app/src/main.js`, `call.html`): уведомления Windows (клик открывает чат), иконка в трее со счётчиком
+и значок на панели задач, крестик сворачивает в трей, окно входящего звонка поверх всех окон с мелодией и миганием,
+автозапуск с Windows (галочка в меню трея), одна копия приложения, ссылки `voicelobby://dm/12`, горячая клавиша
+микрофона `Ctrl+Alt+M` во время звонка (запасная `Alt+Shift+M`), статус «Отошёл» после 10 минут простоя.
+
 ## Как это работает (пользовательский сценарий)
 1. Открыть .exe приложение (или веб-страницу)
 2. Ввести имя, оставить поле кода комнаты пустым (создаст новую) или ввести код существующей комнаты
