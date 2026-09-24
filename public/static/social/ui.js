@@ -120,8 +120,13 @@ export function setPresenceDot(avatarNode, presence) {
   dot.dataset.call = presence && presence.inCall ? '1' : ''
 }
 
+// Не в сети: «был(а) в сети 14:05», а если человек скрыл это в профиле — «был(а) недавно»
 export function presenceText(p) {
-  if (!p || p.status === 'offline') return 'Не в сети'
+  if (!p || p.status === 'offline') {
+    if (p && p.hidden) return 'Был(а) недавно'
+    if (p && p.lastSeen) return 'Был(а) в сети ' + lastSeenWhen(p.lastSeen)
+    return 'Не в сети'
+  }
   if (p.inCall) return 'В звонке'
   if (p.status === 'idle') return 'Отошёл'
   if (p.status === 'dnd') return 'Не беспокоить'
@@ -137,6 +142,18 @@ export function timeHM(ts) {
   const d = new Date(ts)
   return `${d.getHours()}:${pad(d.getMinutes())}`
 }
+function lastSeenWhen(ts) {
+  const diff = Date.now() - ts
+  if (diff < 60 * 1000) return 'только что'
+  if (diff < 60 * 60 * 1000) return `${Math.floor(diff / 60000)} мин. назад`
+  const d = new Date(ts)
+  const now = new Date()
+  const y = new Date(now); y.setDate(now.getDate() - 1)
+  if (sameDay(d, now)) return `сегодня в ${timeHM(ts)}`
+  if (sameDay(d, y)) return `вчера в ${timeHM(ts)}`
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`
+}
+
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря']
 export function dayLabel(ts) {
   const d = new Date(ts)

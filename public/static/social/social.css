@@ -132,14 +132,6 @@ body.vl-ready .lobby-userbar { display: none; }
   outline: 2px solid var(--accent-soft); outline-offset: 2px;
 }
 
-.vl-field, .vl-input {
-  width: 100%; height: 44px; padding: 0 18px; border: 1px solid transparent; border-radius: 999px; box-sizing: border-box;
-  background: var(--vl-field); color: var(--text); font: 14px var(--vl-font); outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-.vl-field::placeholder, .vl-input::placeholder { color: var(--text-faint); }
-.vl-field:focus, .vl-input:focus { border-color: rgba(110, 168, 245, 0.55); box-shadow: 0 0 0 4px var(--accent-wash); }
-
 .vl-badge {
   min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; box-sizing: border-box;
   background: var(--accent); color: #fff; font: 600 12px/22px var(--vl-font); text-align: center;
@@ -454,7 +446,7 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-tile--more { justify-content: center; border: 0; color: var(--text-dim); font: 600 14px var(--vl-font); }
 
 .vl-friends__bottom { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 18px 16px 12px; }
-.vl-friends__bar { display: flex; align-items: center; gap: 12px; padding: 0 8px 12px; flex-wrap: wrap; }
+.vl-friends__bar { display: flex; align-items: center; gap: 12px; padding: 4px 8px 12px; flex-wrap: wrap; }
 .vl-chips { display: flex; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
 .vl-chip {
   position: relative; height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--vl-soft); color: rgba(242, 245, 249, 0.8);
@@ -465,12 +457,10 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-chip.is-active { background: #f2f5f9; color: #0f1115; font-weight: 600; }
 .vl-chip__count { font-variant-numeric: tabular-nums; opacity: 0.65; }
 .vl-chip.has-new::after { content: ""; position: absolute; top: 5px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent-soft); }
-.vl-add { display: flex; align-items: center; gap: 8px; flex: 0 1 360px; min-width: 240px; }
-.vl-add .vl-round { --s: 44px; }
-.vl-add__status { font-size: 13px; padding: 0 12px 10px; }
-.vl-add__status:empty { display: none; }
-.vl-add__status.is-error { color: var(--danger-soft); }
-.vl-add__status.is-success { color: var(--success-soft); }
+/* Добавить в друзья: поле как на входе (anker.js) и круглая кнопка на уровне «таблетки» */
+.vl-add { display: flex; align-items: flex-start; gap: 10px; padding: 0 8px; }
+.vl-add .vl-fld-host { flex: 1; min-width: 0; }
+.vl-add .vl-round { --s: 52px; margin-top: 22px; }
 .vl-friend-list { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; min-height: 0; scrollbar-width: thin; scrollbar-color: var(--vl-soft-2) transparent; }
 .vl-friend {
   --vl-ring: var(--vl-panel);
@@ -492,6 +482,44 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-empty__icon { width: 64px; height: 64px; border-radius: 50%; background: var(--vl-soft); display: grid; place-items: center; color: var(--text-faint); }
 .vl-empty__icon .vl-ico { width: 26px; height: 26px; }
 .vl-empty p { margin: 0; max-width: 360px; font-size: 14px; }
+
+/* ─────────── Поля оболочки: та же анимация, что на входе и регистрации ───────────
+   Поле собирает anker.js (подпись внутри «таблетки» всплывает над ней, под строкой
+   печатается подсказка); здесь только подгонка под панели. */
+.vl-fld-host .fld { margin-bottom: 30px; }
+.vl-fld-host .fld input { font-family: var(--vl-font); background: var(--vl-stage); }
+.vl-fld-host .fld input:hover { background: #07080b; }
+.vl-fld-host .fld__lbl, .vl-fld-host .fld__msg { font-family: var(--vl-font); }
+.vl-fld-status { min-height: 0; margin: -2px 20px 12px; font: 500 13px/1.35 var(--vl-font); color: var(--text-faint); }
+.vl-fld-status:empty { display: none; }
+.vl-fld-status.is-ok { color: var(--success-soft); }
+.vl-fld-status.is-err { color: var(--danger-soft); }
+.vl-picker .vl-fld-host .fld { margin-bottom: 26px; }
+
+/* ─────────── Быстрый звонок по ссылке: экран после выхода ─────────── */
+body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { display: none !important; }
+.vl-ended { height: 100%; display: grid; place-items: center; padding: 16px; box-sizing: border-box; background: var(--vl-stage); font-family: var(--vl-font); }
+.vl-ended__card {
+  width: min(380px, 100%); padding: 32px 26px 22px; box-sizing: border-box; border-radius: 28px; background: var(--vl-panel);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), var(--vl-highlight); display: flex; flex-direction: column; align-items: center; text-align: center;
+  animation: vl-pop 0.35s var(--ease) both;
+}
+.vl-ended__icon { width: 64px; height: 64px; border-radius: 50%; background: var(--danger-wash); color: var(--danger-soft); display: grid; place-items: center; }
+.vl-ended__icon .vl-ico { width: 28px; height: 28px; }
+.vl-ended__title { margin: 16px 0 4px; font: 700 24px/1.2 var(--vl-font); letter-spacing: -0.02em; }
+.vl-ended__text { margin: 0; color: var(--text-dim); font-size: 14px; }
+.vl-ended__text b { color: var(--text); font-weight: 600; }
+.vl-ended__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: 100%; margin-top: 24px; }
+.vl-ended__actions .vl-btn { height: 48px; font-size: 15px; }
+.vl-ended__actions .vl-ico { width: 17px; height: 17px; }
+.vl-btn--ghost-text { margin-top: 10px; background: transparent; color: var(--text-dim); font-weight: 500; }
+.vl-btn--ghost-text:hover:not(:disabled) { background: var(--vl-hover); color: var(--text); }
+
+/* ─────────── Профиль (классы settings-* — общие с настройками звонка, см. style.css) ─────────── */
+.vl-profile { font-family: var(--vl-font); }
+.vl-profile-card { display: flex; align-items: center; gap: 16px; --vl-ring: var(--vl-raised); }
+.vl-profile-card__name { font: 700 19px/1.25 var(--vl-font); }
+.vl-profile-card__user { font-size: 14px; color: var(--text-dim); margin-top: 2px; }
 
 /* ─────────── Меню и окна ─────────── */
 .vl-menu {
@@ -522,7 +550,6 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-picker { display: flex; flex-direction: column; gap: 14px; max-height: min(560px, 90dvh); }
 .vl-picker__head { display: flex; align-items: center; justify-content: space-between; }
 .vl-picker__head .vl-modal__title { margin: 0; }
-.vl-picker .vl-input { background: var(--vl-field); }
 .vl-picker__list { overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 2px; }
 .vl-picker__row {
   --vl-ring: var(--vl-raised);

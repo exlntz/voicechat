@@ -50,6 +50,22 @@ const root = document.getElementById('app-root')
 // спрашивает её в ключевых точках (вход, выход, конец звонка). Хуки on* ставит оболочка;
 // если её нет (Cloudflare-версия страницы), всё работает как раньше.
 const VL = (window.VL = window.VL || {})
+// Юзернейм на экране всегда с «@»: поле само подставляет его первым символом.
+// Сервер «@» отрезает — в базе юзернейм хранится без него.
+function atPrefixField(input) {
+  input.addEventListener('input', () => {
+    const v = input.value
+    if (!v) return
+    const clean = v.replace(/@/g, '').replace(/\s+/g, '')
+    const next = clean ? '@' + clean : ''
+    if (next === v) return
+    const pos = input.selectionStart == null ? next.length : input.selectionStart + (next.length - v.length)
+    input.value = next
+    try { input.setSelectionRange(pos, pos) } catch {}
+  })
+}
+VL.atPrefixField = atPrefixField
+
 function vlNavigate(path) {
   if (location.pathname !== path) history.pushState({}, '', path)
   try { window.dispatchEvent(new CustomEvent('vl:navigate', { detail: { path } })) } catch {}
@@ -583,7 +599,8 @@ function renderAuthScreen(afterLoginRoomCode = '') {
 
   // ---- Форма входа ----
   const loginErrorSlot = el('div', { class: 'auth-error', style: 'display:none' })
-  const loginUsername = el('input', { type: 'text', placeholder: 'Юзернейм', maxlength: '24', autocomplete: 'username' })
+  const loginUsername = el('input', { type: 'text', placeholder: 'Юзернейм', maxlength: '25', autocomplete: 'username' })
+  atPrefixField(loginUsername)
   const { wrapper: loginPasswordField, input: loginPassword } = makePasswordField('Пароль', '100', 'current-password')
   const loginSubmit = el('button', { type: 'button', class: 'auth-submit-btn' }, 'Войти')
 
@@ -608,7 +625,8 @@ function renderAuthScreen(afterLoginRoomCode = '') {
   // для добавления в друзья), поэтому строго ограничен латиницей/цифрами/_/- .
   const registerErrorSlot = el('div', { class: 'auth-error', style: 'display:none' })
   const registerDisplayName = el('input', { type: 'text', placeholder: 'Отображаемое имя', maxlength: '40', autocomplete: 'name' })
-  const registerUsername = el('input', { type: 'text', placeholder: 'Юзернейм (для входа)', maxlength: '24', autocomplete: 'username' })
+  const registerUsername = el('input', { type: 'text', placeholder: 'Юзернейм (для входа)', maxlength: '25', autocomplete: 'username' })
+  atPrefixField(registerUsername)
   const { wrapper: registerPasswordField, input: registerPassword } = makePasswordField('Пароль (мин. 6 символов)', '100', 'new-password')
   const registerSubmit = el('button', { type: 'button', class: 'auth-submit-btn' }, 'Зарегистрироваться')
 

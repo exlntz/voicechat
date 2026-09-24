@@ -16,6 +16,7 @@ import { initSocialSchema } from './social/db.js'
 import { createHub } from './social/events.js'
 import { registerFriendRoutes } from './social/friends.js'
 import { registerChatRoutes } from './social/chats.js'
+import { registerProfileRoutes } from './social/profile.js'
 
 const scrypt = promisify(scryptCb)
 
@@ -186,12 +187,14 @@ function createCallRoom() {
 }
 const friends = registerFriendRoutes(app, { db, hub })
 const chats = registerChatRoutes(app, { db, hub, friends, createCallRoom })
+registerProfileRoutes(app, { db, hub })
 hub.mount(app)
 
 // ---------- API: регистрация ----------
 app.post('/api/auth/register', async (c) => {
   const body = await c.req.json().catch(() => ({}))
-  const username = (body.username || '').trim()
+  // «@» перед юзернеймом только для глаз: в базе юзернейм хранится без него
+  const username = (body.username || '').trim().replace(/^@+/, '')
   // displayName необязателен - если не передан (или пуст), используем username как отображаемое имя
   const displayName = (body.displayName || '').trim() || username
   const password = typeof body.password === 'string' ? body.password : ''
@@ -231,7 +234,8 @@ app.post('/api/auth/register', async (c) => {
 // ---------- API: вход ----------
 app.post('/api/auth/login', async (c) => {
   const body = await c.req.json().catch(() => ({}))
-  const username = (body.username || '').trim()
+  // «@» перед юзернеймом только для глаз: в базе юзернейм хранится без него
+  const username = (body.username || '').trim().replace(/^@+/, '')
   const password = typeof body.password === 'string' ? body.password : ''
 
   if (!username || !password) {

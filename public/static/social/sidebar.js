@@ -5,9 +5,7 @@ import { h, icon, avatar, displayName, presenceText, messagePreview, timeShort, 
 import { notificationsNeedPermission, requestNotificationPermission } from './notify.js'
 import { callState, inCall } from './call-invite.js'
 
-const STATUS_LABELS = { online: 'В сети', idle: 'Отошёл', dnd: 'Не беспокоить' }
-
-export function createSidebar({ root, navigate, openDmWith, setStatus, logout }) {
+export function createSidebar({ root, navigate, openDmWith, openProfile }) {
   let route = { name: 'friends' }
   const unsub = []
 
@@ -56,27 +54,17 @@ export function createSidebar({ root, navigate, openDmWith, setStatus, logout })
   const meAvatarSlot = h('span', { class: 'vl-me__ava' })
   const meName = h('div', { class: 'vl-me__name' })
   const meSub = h('div', { class: 'vl-me__sub' })
-  const meBtn = h('button', { type: 'button', class: 'vl-me__btn', title: 'Статус' }, [meAvatarSlot, h('div', { class: 'vl-me__text' }, [meName, meSub])])
-  const logoutBtn = h('button', { type: 'button', class: 'vl-round is-ghost', title: 'Выйти из аккаунта', 'aria-label': 'Выйти из аккаунта' }, [icon('right-from-bracket')])
-  const mePanel = h('div', { class: 'vl-me' }, [meBtn, logoutBtn])
-  meBtn.addEventListener('click', () => {
-    const item = (status, label, cls) => ({ label, icon: store.myStatus === status ? 'check' : cls, onClick: () => setStatus(status) })
-    showMenu([
-      item('online', 'В сети', 'circle'),
-      item('idle', 'Отошёл', 'moon'),
-      item('dnd', 'Не беспокоить', 'circle-minus'),
-      'sep',
-      { label: 'Скопировать юзернейм', icon: 'at', onClick: async () => { const ok = await window.VL.copyToClipboard(store.me.username); toast(ok ? 'Скопировано' : 'Не удалось скопировать', ok ? 'success' : 'error') } }
-    ], meBtn)
-  })
-  logoutBtn.addEventListener('click', () => logout())
+  // Нажатие на своё имя открывает профиль (оформление, конфиденциальность, выход)
+  const meBtn = h('button', { type: 'button', class: 'vl-me__btn', title: 'Профиль' }, [meAvatarSlot, h('div', { class: 'vl-me__text' }, [meName, meSub])])
+  const mePanel = h('div', { class: 'vl-me' }, [meBtn])
+  meBtn.addEventListener('click', () => openProfile())
 
   function renderMe() {
     if (!store.me) return
     const p = { status: store.connected ? store.myStatus : 'offline', inCall: false }
     meAvatarSlot.replaceChildren(avatar(store.me, { size: 36, presence: p }))
     meName.textContent = displayName(store.me)
-    meSub.textContent = store.connected ? (STATUS_LABELS[store.myStatus] || 'В сети') : 'Подключение…'
+    meSub.textContent = store.connected ? '@' + store.me.username : 'Подключение…'
   }
 
   // ---- Список личек ----
@@ -154,12 +142,12 @@ export function createSidebar({ root, navigate, openDmWith, setStatus, logout })
 
   // ---- Выбор друга для новой лички ----
   function openPicker() {
-    const input = h('input', { type: 'text', class: 'vl-input', placeholder: 'Имя или юзернейм друга', autocomplete: 'off' })
+    const input = h('input', { type: 'text', placeholder: 'Имя или юзернейм друга', autocomplete: 'off', spellcheck: 'false' })
     const list = h('div', { class: 'vl-picker__list' })
     const close = h('button', { type: 'button', class: 'vl-round is-ghost', 'aria-label': 'Закрыть' }, [icon('xmark')])
     const card = h('div', { class: 'vl-modal vl-picker', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Новое сообщение' }, [
       h('div', { class: 'vl-picker__head' }, [h('h3', { class: 'vl-modal__title' }, 'Написать другу'), close]),
-      input, list
+      h('div', { class: 'vl-fld-host' }, [input]), list
     ])
     const overlay = h('div', { class: 'vl-modal-overlay' }, [card])
     let results = []
@@ -201,7 +189,7 @@ export function createSidebar({ root, navigate, openDmWith, setStatus, logout })
   )
 
   unsub.push(on('conversations', renderDms), on('presence', () => { renderDms(); renderMe() }), on('typing-any', renderDms))
-  unsub.push(on('friends', renderNav), on('unread', renderNav), on('connection', renderMe), on('status', renderMe))
+  unsub.push(on('friends', renderNav), on('unread', renderNav), on('connection', renderMe), on('status', renderMe), on('me', renderMe))
   unsub.push(on('call-changed', () => { renderNav(); renderDms() }))
   const onCallUi = () => renderDms()
   window.addEventListener('vl-call-state', onCallUi)

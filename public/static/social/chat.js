@@ -40,6 +40,7 @@ export function createChatView({ convId, navigate, menuButton }) {
 
   // ---------- Шапка ----------
   const headAvatar = avatar(peer, { size: 44, presence: presenceOf(peer.id) })
+  const headName = h('span', { class: 'vl-chat__head-name' })
   const headSub = h('span', { class: 'vl-chat__head-sub' })
   const callBtn = h('button', { type: 'button', class: 'vl-round is-lg', title: 'Позвонить', 'aria-label': 'Позвонить' }, [icon('phone')])
   const muteBtn = h('button', { type: 'button', class: 'vl-round is-lg' })
@@ -58,14 +59,18 @@ export function createChatView({ convId, navigate, menuButton }) {
   const header = h('header', { class: 'vl-view__head vl-chat__head' }, [
     menuButton(),
     headAvatar,
-    h('div', { class: 'vl-chat__head-text' }, [h('span', { class: 'vl-chat__head-name' }, displayName(peer)), headSub]),
+    h('div', { class: 'vl-chat__head-text' }, [headName, headSub]),
     h('div', { class: 'vl-chat__head-actions' }, [callBtn, muteBtn])
   ])
   function renderHeader() {
     const conv = store.conversations.get(convId)
+    // Собеседник мог сменить юзернейм, пока чат открыт, — берём свежие данные
+    const cur = userById(peer.id) || peer
     const p = presenceOf(peer.id)
     setPresenceDot(headAvatar, p)
-    headSub.textContent = `@${peer.username} · ${presenceText(p)}`
+    headName.textContent = displayName(cur)
+    headSub.textContent = `@${cur.username} · ${presenceText(p)}`
+    input.placeholder = `Написать @${cur.username || 'собеседнику'}`
     const muted = !!(conv && conv.muted)
     muteBtn.replaceChildren(icon(muted ? 'bell-slash' : 'bell'))
     muteBtn.title = muted ? 'Включить уведомления' : 'Без звука'
@@ -101,6 +106,8 @@ export function createChatView({ convId, navigate, menuButton }) {
   try { input.value = sessionStorage.getItem(draftKey) || '' } catch {}
 
   function autosize() {
+    // Пока поле не на странице, его высота 0 — если запомнить её, подсказка обрезается
+    if (!input.isConnected) return
     input.style.height = 'auto'
     input.style.height = Math.min(input.scrollHeight, Math.round(window.innerHeight * 0.4)) + 'px'
   }
@@ -550,6 +557,10 @@ export function createChatView({ convId, navigate, menuButton }) {
   unsub.push(on('conversation:' + convId, () => { renderHeader(); renderList() }))
   unsub.push(on('presence', (id) => { if (id == null || id === peer.id) renderHeader() }))
   unsub.push(on('friends', renderBlocked))
+  unsub.push(on('me', renderList))
+  // «был(а) в сети N мин. назад» в шапке стареет — обновляем раз в минуту
+  const headerTimer = setInterval(renderHeader, 60000)
+  unsub.push(() => clearInterval(headerTimer))
   unsub.push(on('typing:' + convId, renderTyping))
   const onCallChange = () => { renderHeader(); renderList() }
   window.addEventListener('vl-call-state', onCallChange)
@@ -582,7 +593,7 @@ export function createChatView({ convId, navigate, menuButton }) {
     node,
     convId,
     focus() { if (!('ontouchstart' in window)) input.focus({ preventScroll: true }) },
-    onShown() { positionInitially(); if (atBottom) scrollToBottom() },
+    onShown() { autosize(); positionInitially(); if (atBottom) scrollToBottom() },
     destroy() {
       destroyed = true
       if (store.activeConvId === convId) store.activeConvId = null

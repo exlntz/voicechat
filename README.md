@@ -59,11 +59,13 @@
 - `friends.js` — `GET /api/friends`, `POST /api/friends/request {username}`, `POST /api/friends/:id/accept|decline|block`, `DELETE /api/friends/:id`, `DELETE /api/friends/:id/block`;
 - `chats.js` — `GET /api/conversations`, `POST /api/conversations/dm {userId}`, `GET|POST /api/conversations/:id/messages` (по 50, `?before=`/`?after=`), `PATCH|DELETE .../messages/:mid`, `POST .../read`, `POST .../typing`, `POST .../call`, `POST /api/calls/:callId/accept|decline|cancel`;
 - `events.js` — реалтайм `GET /api/events` (SSE): пинг раз в 25 с, `X-Accel-Buffering: no` (nginx менять не нужно), после обрыва пропущенное доигрывается по `Last-Event-ID`; `POST /api/presence` — «Не беспокоить»/«Отошёл», выход из звонка.
+- `profile.js` — `GET|PATCH /api/profile` (смена юзернейма, «показывать, когда был в сети»), `GET /api/users/check?username=` (свободен ли юзернейм). Юзернейм хранится без «@», интерфейс дорисовывает «@» сам; вход и регистрация принимают оба варианта.
 - Лимиты: сообщение до 4000 символов, не чаще 8 сообщений за 5 с и 60 в минуту; заявки в друзья — 20 за 10 минут.
 
 **Сайт** — `public/static/social/` (ES-модули, подключаются из `renderPage` в `server.js`):
 `main.js` (оболочка и адреса), `api.js`, `events.js` (SSE), `store.js` (состояние), `cache.js` (IndexedDB),
 `sidebar.js`, `friends.js`, `chat.js`, `call-invite.js` (звонок из чата и входящий), `notify.js` (уведомления, счётчик), `social.css`.
+- Ссылка на звонок `/room/<код>` открывает только экран входа в звонок, без чатов; после выхода из звонка появляются кнопки «Чаты» и «Друзья».
 - Звонок из лички не выкидывает из чата: он встаёт панелью сверху; кнопка в углу панели разворачивает его на весь экран.
 - Сообщение появляется сразу, до ответа сервера; история кэшируется в IndexedDB; старое подгружается при прокрутке вверх.
 - `app.js` по-прежнему рисует вход, лобби и звонок; с оболочкой он общается через `window.VL`.

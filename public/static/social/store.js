@@ -41,6 +41,25 @@ export function emit(topic, payload) {
 export function rememberUser(user) {
   if (user && user.id) store.users.set(Number(user.id), user)
 }
+export function updateUser(user) {
+  if (!user || !user.id) return
+  const id = Number(user.id)
+  rememberUser(user)
+  const f = store.friends.get(id)
+  if (f) f.user = user
+  for (const c of store.conversations.values()) {
+    if (c.peer && c.peer.id === id) c.peer = user
+    if (c.members) c.members = c.members.map((m) => (m.id === id ? user : m))
+  }
+  if (store.me && store.me.id === id) {
+    store.me = { ...store.me, ...user }
+    if (window.VL && window.VL.state) window.VL.state.currentUser = { ...window.VL.state.currentUser, ...user }
+    emit('me')
+  }
+  emit('friends')
+  emit('conversations')
+  emit('presence')
+}
 export function userById(id) {
   return store.users.get(Number(id)) || null
 }
@@ -373,6 +392,11 @@ export function applyEvent(type, data) {
     }
     case 'conversation.update': {
       setConversation(data)
+      break
+    }
+    case 'user.update': {
+      // Кто-то (или вы сами на другом устройстве) сменил юзернейм — обновить везде
+      updateUser(data.user)
       break
     }
     case 'message.new': {

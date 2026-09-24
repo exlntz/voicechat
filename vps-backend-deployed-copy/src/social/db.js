@@ -62,6 +62,11 @@ export function initSocialSchema(db) {
   )`)
   // История листается по (чат, id): и «последние 50», и «50 до такого-то» идут по индексу
   db.exec('CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id, id)')
+
+  // Профиль: когда пользователь последний раз был в сети и показывать ли это друзьям.
+  // ALTER падает, если колонка уже есть, — это нормально при повторном запуске.
+  try { db.exec('ALTER TABLE users ADD COLUMN last_seen INTEGER') } catch {}
+  try { db.exec('ALTER TABLE users ADD COLUMN show_last_seen INTEGER NOT NULL DEFAULT 1') } catch {}
 }
 
 // Публичный вид пользователя — без хешей и прочего

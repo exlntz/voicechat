@@ -39,16 +39,16 @@ export function createFriendsView({ openDmWith, menuButton, initialTab }) {
     b.addEventListener('click', () => setTab(t.id))
     return b
   })
-  const addInput = h('input', { type: 'text', class: 'vl-field', placeholder: 'Добавить по @юзернейму', maxlength: '25', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Юзернейм друга' })
+  // Поле — как на входе и регистрации (всплывающая подпись и подсказка, anker.js); «@» подставляется сам
+  const addInput = h('input', { type: 'text', placeholder: 'Юзернейм друга', maxlength: '25', autocomplete: 'off', spellcheck: 'false' })
+  if (window.VL.atPrefixField) window.VL.atPrefixField(addInput)
   const addBtn = h('button', { type: 'button', class: 'vl-round is-accent', title: 'Отправить заявку', 'aria-label': 'Отправить заявку', disabled: true }, [icon('user-plus')])
-  const addStatus = h('div', { class: 'vl-add__status', role: 'status' })
+  const addStatus = h('div', { class: 'vl-fld-status', role: 'status' })
   const list = h('div', { class: 'vl-friend-list', role: 'list' })
   const bottom = h('section', { class: 'vl-panel vl-friends__bottom' }, [
-    h('div', { class: 'vl-friends__bar' }, [
-      h('div', { class: 'vl-chips', role: 'tablist', 'aria-label': 'Список друзей' }, chips),
-      h('div', { class: 'vl-add' }, [addInput, addBtn])
-    ]),
+    h('div', { class: 'vl-add' }, [h('div', { class: 'vl-fld-host' }, [addInput]), addBtn]),
     addStatus,
+    h('div', { class: 'vl-friends__bar' }, [h('div', { class: 'vl-chips', role: 'tablist', 'aria-label': 'Список друзей' }, chips)]),
     list
   ])
 
@@ -56,9 +56,9 @@ export function createFriendsView({ openDmWith, menuButton, initialTab }) {
 
   // ---------- Добавить в друзья ----------
   addInput.addEventListener('input', () => {
-    addBtn.disabled = !addInput.value.trim()
+    addBtn.disabled = !addInput.value.replace(/^@+/, '').trim()
     addStatus.textContent = ''
-    addStatus.className = 'vl-add__status'
+    addStatus.className = 'vl-fld-status'
   })
   addInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !addBtn.disabled) addBtn.click() })
   addBtn.addEventListener('click', async () => {
@@ -67,14 +67,16 @@ export function createFriendsView({ openDmWith, menuButton, initialTab }) {
     try {
       const res = await api.requestFriend(username)
       setFriend(res.friend)
-      addStatus.className = 'vl-add__status is-success'
+      // Очистить поле так, чтобы подпись опустилась обратно (anker.js следит за событием input)
+      addInput.value = ''
+      addInput.dispatchEvent(new Event('input'))
+      addStatus.className = 'vl-fld-status is-ok'
       addStatus.textContent = res.friend.status === 'friend'
         ? `Готово, теперь вы друзья: ${displayName(res.friend.user)}.`
         : `Заявка отправлена: ${displayName(res.friend.user)}.`
-      addInput.value = ''
       if (res.friend.status !== 'friend') setTab('pending')
     } catch (e) {
-      addStatus.className = 'vl-add__status is-error'
+      addStatus.className = 'vl-fld-status is-err'
       addStatus.textContent = e.message
       addBtn.disabled = false
     }
@@ -121,9 +123,7 @@ export function createFriendsView({ openDmWith, menuButton, initialTab }) {
       return
     }
     if (!online.length) {
-      const add = h('button', { type: 'button', class: 'vl-linkbtn' }, 'Добавить друга')
-      add.addEventListener('click', () => addInput.focus())
-      tiles.replaceChildren(h('p', { class: 'vl-tiles__empty' }, ['Сейчас никого нет в сети. ', add]))
+      tiles.replaceChildren(h('p', { class: 'vl-tiles__empty' }, 'Сейчас никого нет в сети.'))
       return
     }
     const shown = online.slice(0, MAX_TILES)
@@ -276,6 +276,9 @@ export function createFriendsView({ openDmWith, menuButton, initialTab }) {
   }
 
   const unsub = [on('friends', render), on('presence', () => { renderTiles(); renderList() }), on('connection', render)]
+  // «Был(а) в сети 5 мин. назад» стареет — раз в минуту пересобираем список
+  const ageTimer = setInterval(renderList, 60000)
+  unsub.push(() => clearInterval(ageTimer))
   render()
   if (initialTab === 'add') setTimeout(() => addInput.focus(), 30)
 

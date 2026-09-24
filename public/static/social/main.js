@@ -9,10 +9,11 @@ import { api, setUnauthorizedHandler } from './api.js'
 import * as cache from './cache.js'
 import {
   store, on, emit, loadFriends, loadConversations, hydrateFromCache, ensureConversation, dmWith,
-  setConversation, refreshChat, resetStore
+  setConversation, refreshChat, resetStore, sortedConversations
 } from './store.js'
 import { startEvents, stopEvents } from './events.js'
 import { createSidebar } from './sidebar.js'
+import { openProfile, closeProfile } from './profile.js'
 import { createFriendsView } from './friends.js'
 import { createChatView } from './chat.js'
 import { initNotifications, setBaseTitle } from './notify.js'
@@ -260,14 +261,11 @@ export async function openDmWith(userId) {
   }
 }
 
-// ---------- Статус: ручной + автоматический «Отошёл» ----------
-let manualStatus = 'online'
+// ---------- Статус: только автоматический «Отошёл» (вручную статус не выбирается) ----------
 let autoIdle = false
-try { manualStatus = localStorage.getItem('vl:status') || 'online' } catch {}
-if (!['online', 'idle', 'dnd'].includes(manualStatus)) manualStatus = 'online'
+try { localStorage.removeItem('vl:status') } catch {} // от прежнего меню статусов
 
 function effectiveStatus() {
-  if (manualStatus !== 'online') return manualStatus
   return autoIdle ? 'idle' : 'online'
 }
 function pushStatus() {
@@ -275,11 +273,6 @@ function pushStatus() {
   store.myStatus = status
   emit('status')
   if (store.connected) api.setPresence({ status }).catch(() => {})
-}
-function setStatus(status) {
-  manualStatus = status
-  try { localStorage.setItem('vl:status', status) } catch {}
-  pushStatus()
 }
 
 // «Отошёл»: в .exe — по простою всей системы (главный процесс), на сайте — по простою страницы
@@ -309,7 +302,7 @@ async function startSession(me, prefillRoom = '') {
   body.classList.add('vl-ready')
 
   cache.openCache(store.me.id)
-  sidebar = createSidebar({ root: sidebarRoot, navigate, openDmWith, setStatus, logout })
+  sidebar = createSidebar({ root: sidebarRoot, navigate, openDmWith, openProfile: () => openProfile({ logout }) })
   hydrateFromCache().catch(() => {})
   store.myStatus = effectiveStatus()
   startEvents()
@@ -321,7 +314,76 @@ async function startSession(me, prefillRoom = '') {
   if (pendingLink) { const link = pendingLink; pendingLink = null; navigate(link) }
 }
 
+// ---------- Быстрый звонок по ссылке ----------
+// Пришли по ссылке /room/<код>: только экран входа в звонок, как раньше, без чатов и друзей
+// (ни списков, ни реалтайма, ни входящих). Когда человек выходит из звонка, появляются кнопки
+// «Чаты» и «Друзья» — по ним открывается полный интерфейс.
+let solo = null // { code }
+
+function enterSolo(me, code) {
+  solo = { code }
+  store.me = { ...me, id: Number(me.id) }
+  setSelfId(store.me.id)
+  VL.state.currentUser = me
+  body.classList.remove('vl-auth')
+  body.classList.add('vl-solo')
+  history.replaceState({}, '', '/room/' + code)
+  VL.renderLobby(code)
+}
+
+async function exitSolo(path, { openLatestChat = false } = {}) {
+  const me = VL.state.currentUser
+  solo = null
+  body.classList.remove('vl-solo')
+  appRoot.replaceChildren()
+  history.pushState({}, '', path)
+  await startSession(me)
+  if (!openLatestChat) return
+  // «Чаты»: открыть самую свежую личку, как только список загрузится
+  const tryOpen = () => {
+    const latest = sortedConversations()[0]
+    if (latest && route.name === 'friends') navigate('/dm/' + latest.id)
+    return !!latest || store.conversationsLoaded
+  }
+  if (!tryOpen()) {
+    const off = on('conversations', () => { if (tryOpen()) off() })
+    setTimeout(off, 8000)
+  }
+}
+
+function renderCallEnded(code) {
+  const toChats = h('button', { type: 'button', class: 'vl-btn vl-btn--primary vl-btn--pill' }, [icon('message'), 'Чаты'])
+  const toFriends = h('button', { type: 'button', class: 'vl-btn vl-btn--soft vl-btn--pill' }, [icon('user-group'), 'Друзья'])
+  const back = h('button', { type: 'button', class: 'vl-btn vl-btn--ghost-text' }, 'Вернуться в звонок')
+  toChats.addEventListener('click', () => exitSolo('/friends', { openLatestChat: true }))
+  toFriends.addEventListener('click', () => exitSolo('/friends'))
+  back.addEventListener('click', () => VL.renderLobby(code))
+  appRoot.replaceChildren(h('div', { class: 'vl-ended' }, [
+    h('div', { class: 'vl-ended__card', role: 'status' }, [
+      h('span', { class: 'vl-ended__icon', 'aria-hidden': 'true' }, [icon('phone-slash')]),
+      h('h1', { class: 'vl-ended__title' }, 'Звонок завершён'),
+      h('p', { class: 'vl-ended__text' }, ['Комната ', h('b', {}, code)]),
+      h('div', { class: 'vl-ended__actions' }, [toChats, toFriends]),
+      back
+    ])
+  ]))
+  toChats.focus()
+}
+
 async function endSession({ callServer = false } = {}) {
+  closeProfile()
+  if (solo) {
+    // Выход из аккаунта с экрана быстрого звонка: полной оболочки ещё нет
+    solo = null
+    if (callServer) { try { await api.logout() } catch {} }
+    body.classList.remove('vl-solo')
+    body.classList.add('vl-auth')
+    history.replaceState({}, '', '/')
+    VL.state.currentUser = null
+    store.me = null
+    VL.renderAuthScreen()
+    return
+  }
   if (!sessionActive) return
   if (inCall() && VL.leaveCall) VL.leaveCall()
   sessionActive = false
@@ -342,7 +404,7 @@ async function endSession({ callServer = false } = {}) {
 function logout() { endSession({ callServer: true }) }
 
 // ---------- Хуки для app.js ----------
-VL.onLogin = (user, prefillRoom) => startSession(user, prefillRoom)
+VL.onLogin = (user, prefillRoom) => (prefillRoom ? enterSolo(user, prefillRoom) : startSession(user))
 VL.onLogout = () => endSession()
 VL.onCallEnded = () => {
   const ctx = onCallEnded()
@@ -350,6 +412,12 @@ VL.onCallEnded = () => {
   // звонка точно нет, чтобы шапка чата и панель слева перестали показывать «в звонке»
   const announce = () => { try { window.dispatchEvent(new CustomEvent('vl-call-state', { detail: { active: false } })) } catch {} }
   if (isSwitching()) return
+  if (solo) {
+    history.replaceState({}, '', '/room/' + solo.code)
+    renderCallEnded(solo.code)
+    announce()
+    return
+  }
   appRoot.replaceChildren()
   if (isAppRoute(route)) {
     // Выход из развёрнутого звонка: в личку, из которой звонили, иначе — в лобби
@@ -390,7 +458,7 @@ on('resync', async () => {
 })
 on('connection', (up) => {
   body.classList.toggle('vl-offline', !up)
-  if (up && manualStatus !== 'online' || up && autoIdle) pushStatus()
+  if (up && autoIdle) pushStatus()
 })
 on('conversations', () => { if (route.name === 'dm') updateTitle() })
 
@@ -416,6 +484,8 @@ async function boot() {
     return
   }
   VL.state.currentUser = me
+  const initial = parseRoute()
+  if (initial.name === 'room') { enterSolo(me, initial.code); return }
   await startSession(me)
 }
 

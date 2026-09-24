@@ -3230,3 +3230,86 @@ body.pip-body > .room-screen { height: 100%; }
 }
 .solo-copy-btn.is-copied i { animation: solo-check-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) 1; }
 @media (prefers-reduced-motion: reduce) { .solo-copy-btn:hover i, .solo-copy-btn.is-copied i { animation: none; } }
+
+
+/* ═══════════════ Окно «Настройки» звонка и «Профиль» — как панели сайта ═══════════════
+   Раньше окно было светлее остального интерфейса, с рамками и линиями-разделителями.
+   Теперь оно в той же гамме, что чаты и друзья: тёмная панель без рамок, разделы слева —
+   «таблетки» (выбранный — синий), карточки справа чуть светлее панели, всё на скруглениях.
+   Шрифт — Onest (подключён в social/social.css; без него — системный). */
+.settings-overlay {
+  background: rgba(5, 6, 8, 0.62);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.settings-sheet {
+  background: #13161b;
+  border: 0;
+  border-radius: 28px;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  font-family: 'Onest', var(--font);
+}
+.settings-head {
+  padding: 18px 18px 8px 28px;
+  border-bottom: 0;
+}
+.settings-sheet .settings-head h3 { font: 700 22px/1.2 'Onest', var(--font); letter-spacing: -0.02em; }
+.settings-head .panel-close,
+.settings-head .vl-round {
+  width: 40px; height: 40px; border: 0; border-radius: 50%;
+  background: rgba(242, 245, 249, 0.07); color: var(--text-dim);
+  display: grid; place-items: center;
+  transition: background .2s var(--ease), color .2s, transform .2s var(--ease);
+}
+.settings-head .panel-close:hover { background: rgba(242, 245, 249, 0.14); color: #fff; transform: translateY(-1px); }
+.settings-layout { grid-template-columns: 236px minmax(0, 1fr); padding: 0 14px 14px; gap: 14px; }
+.settings-nav {
+  border-right: 0;
+  padding: 10px;
+  border-radius: 22px;
+  background: #0f1216;
+}
+.settings-nav__group { padding: 8px 12px 10px; font: 500 12px/1.2 'Onest', var(--font); color: var(--text-faint); }
+.settings-nav__item {
+  min-height: 44px;
+  border-radius: 14px;
+  font: 500 15px/1.2 'Onest', var(--font);
+  color: rgba(242, 245, 249, 0.75);
+}
+.settings-nav__item i,
+.settings-nav__item .vl-ico { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-faint); }
+.settings-nav__item:hover { background: rgba(242, 245, 249, 0.06); color: #fff; }
+.settings-nav__item.active { background: var(--accent); color: #fff; font-weight: 600; }
+.settings-nav__item.active i,
+.settings-nav__item.active .vl-ico { color: #fff; }
+.settings-nav__item.is-danger { color: var(--danger-soft); }
+.settings-nav__item.is-danger .vl-ico { color: var(--danger-soft); }
+.settings-nav__item.is-danger:hover { background: var(--danger-wash); color: var(--danger-soft); }
+.settings-nav__spacer { flex: 1; min-height: 12px; }
+.settings-body { padding: 10px 14px calc(18px + env(safe-area-inset-bottom)); gap: 10px; }
+.settings-section-title { margin: 4px 0 6px; font: 700 20px/1.2 'Onest', var(--font); letter-spacing: -0.01em; }
+.settings-sheet .settings-card {
+  background: #1a1e25;
+  border: 0;
+  border-radius: 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.settings-body .settings-card { padding: 20px 22px; }
+.settings-sheet .settings-card-head { font: 600 15px/1.3 'Onest', var(--font); }
+.settings-sheet .settings-card-title i,
+.settings-sheet .settings-card-title .vl-ico { width: 17px; height: 17px; color: var(--accent-soft); }
+.settings-sheet .settings-row { border-top-color: rgba(242, 245, 249, 0.07); }
+.settings-sheet .settings-row--first { margin-top: 4px; padding-top: 0; border-top: 0; }
+.settings-card-note { margin: -4px 0 14px; font-size: 13px; line-height: 1.5; color: var(--text-faint); }
+.settings-row + .settings-card-note { margin: 10px 0 0; }
+.settings-card-actions { display: flex; justify-content: flex-end; }
+.settings-sheet .dd-btn { background: #0f1216; }
+/* Телефон: разделы — строкой «таблеток» сверху, как и раньше */
+@media (max-width: 600px) {
+  .settings-sheet { border-radius: 24px; }
+  .settings-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); padding: 0 10px 10px; gap: 10px; }
+  .settings-nav { flex-direction: row; border-bottom: 0; border-radius: 999px; padding: 5px; }
+  .settings-nav__item { width: auto; min-height: 36px; padding: 0 14px; border-radius: 999px; flex-shrink: 0; }
+  .settings-nav__spacer { display: none; }
+  .settings-head { padding-left: 20px; }
+}
