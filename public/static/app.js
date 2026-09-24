@@ -1043,10 +1043,12 @@ async function enterRoom(joinData) {
   const connTitle = el('span', { class: 'conn-card__title' }, 'Связь определяется…')
   const connPing = el('span', { class: 'conn-card__val' }, '—')
   const connVideo = el('span', { class: 'conn-card__val' }, '—')
+  // Строка про видео есть только при включённой камере — иначе её просто нет
+  const connVideoRow = el('div', { class: 'conn-card__row', hidden: '' }, [el('span', {}, 'Ваше видео'), connVideo])
   const connCard = el('div', { class: 'conn-card', role: 'tooltip' }, [
     el('div', { class: 'conn-card__head' }, [el('span', { class: 'conn-card__dot' }), connTitle]),
     el('div', { class: 'conn-card__row' }, [el('span', {}, 'Пинг'), connPing]),
-    el('div', { class: 'conn-card__row' }, [el('span', {}, 'Ваше видео'), connVideo])
+    connVideoRow
   ])
   const roomStatus = el('span', { class: 'room-status', role: 'status', tabindex: '0' }, [statusDot, connBars, statusText, callTimer, connCard])
   roomInfo.appendChild(roomStatus)
@@ -1372,9 +1374,8 @@ async function enterRoom(joinData) {
       }
     }
     connPing.textContent = rtt === null ? '—' : `${Math.round(rtt * 1000)} мс`
-    if (!lp.isCameraEnabled) connVideo.textContent = 'камера выключена'
-    else if (!video) connVideo.textContent = '—'
-    else connVideo.textContent = `${video.h}p` + (video.fps ? ` · ${Math.round(video.fps)} к/с` : '')
+    connVideoRow.hidden = !lp.isCameraEnabled
+    if (lp.isCameraEnabled) connVideo.textContent = video ? `${video.h}p` + (video.fps ? ` · ${Math.round(video.fps)} к/с` : '') : '—'
   }
   let connStatsTimer = 0
   function startConnStats() {

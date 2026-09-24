@@ -3055,6 +3055,7 @@ body.pip-body > .room-screen { height: 100%; }
 .conn-card__head { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text); }
 .conn-card__dot { width: 10px; height: 10px; border-radius: 50%; background: var(--q); flex-shrink: 0; }
 .conn-card__row { display: flex; justify-content: space-between; gap: 16px; }
+.conn-card__row[hidden] { display: none; }
 .conn-card__val { color: var(--text); font-variant-numeric: tabular-nums; }
 /* На телефоне центр шапки не обрезаем, иначе карточка не видна */
 @media (max-width: 600px) {
