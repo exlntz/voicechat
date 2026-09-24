@@ -1346,6 +1346,22 @@ async function enterRoom(joinData) {
     })
   }
 
+  // ---- «Главный на весь экран» (spotlight) ----
+  // Когда в звонке двое и больше (и нет демонстраций), один участник занимает всю сцену,
+  // остальные — миниатюры поверх неё справа. Главный: закреплённый кликом по миниатюре,
+  // иначе последний говоривший собеседник, иначе первый собеседник. Свою плитку главной
+  // не делаем автоматически — только если сам её закрепил.
+  let spotlightPinned = null
+  let spotlightSpeaker = null
+  let spotlightSpeakerTimer = 0
+
+  function pickSpotlight() {
+    const localId = room.localParticipant.identity
+    const ids = Array.from(cameraTilesMap.keys())
+    return [spotlightPinned, spotlightSpeaker].find((id) => id && cameraTilesMap.has(id)) ||
+      ids.find((id) => id !== localId) || ids[0]
+  }
+
   function relayout() {
     // ВАЖНО ("баг: при уменьшении окна Chrome демонстрация исчезает и остаётся пустое место"):
     // раньше эта функция брала тайлы из document.querySelectorAll('.camera-tile'/'.screen-tile')
@@ -1364,6 +1380,7 @@ async function enterRoom(joinData) {
     const hasScreenShares = screenTiles.length > 0
     // "Я один в комнате" - особая раскладка с приглашением (см. getSoloInviteCard)
     const isSolo = !hasScreenShares && cameraTiles.length === 1
+    const isSpotlight = !hasScreenShares && cameraTiles.length >= 2
     // Две демонстрации рядом имеют смысл только на очень широкой сцене: паре кадров 16:9
     // нужна пропорция около 32:9, иначе друг под другом они получаются заметно крупнее
     // (на телефоне и в узком окне — тем более). Считаем по фактической сцене, а не по ширине окна.
@@ -1372,19 +1389,32 @@ async function enterRoom(joinData) {
     const sideBySideScreens = screenTiles.length > 1 && stageRatio >= 3.1
 
     stage.classList.toggle('stage-solo', isSolo)
-    stage.classList.toggle('stage-centered', !isSolo)
+    stage.classList.toggle('stage-centered', !isSolo && !isSpotlight)
+    stage.classList.toggle('stage-spotlight', isSpotlight)
+    roomMain.classList.toggle('is-spotlight', isSpotlight)
     stage.classList.toggle('screen-count-2', hasScreenShares && sideBySideScreens)
 
     // Сколько камер на сцене - от этого зависит размер плиток (CSS: .cam-count-N).
     // Без этого плитки всегда были одной ширины и на большом экране вдвоем выглядели потерянно.
-    const camCount = hasScreenShares ? 0 : Math.min(cameraTiles.length, 5)
+    const camCount = hasScreenShares || isSpotlight ? 0 : Math.min(cameraTiles.length, 5)
     for (let n = 1; n <= 5; n++) stage.classList.toggle(`cam-count-${n}`, camCount === n)
 
     if (hasScreenShares) {
       placeTiles(stage, screenTiles)
       placeTiles(sidebar, cameraTiles)
       sidebar.style.display = cameraTiles.length ? 'flex' : 'none'
+    } else if (isSpotlight) {
+      const mainId = pickSpotlight()
+      const localId = room.localParticipant.identity
+      const others = Array.from(cameraTilesMap.keys()).filter((id) => id !== mainId)
+      // Своя миниатюра — последней (внизу колонки)
+      others.sort((a, b) => (a === localId) - (b === localId))
+      cameraTilesMap.forEach((t, id) => t.tile.classList.toggle('is-main', id === mainId))
+      placeTiles(stage, [cameraTilesMap.get(mainId).tile])
+      placeTiles(sidebar, others.map((id) => cameraTilesMap.get(id).tile))
+      sidebar.style.display = 'flex'
     } else {
+      cameraTilesMap.forEach((t) => t.tile.classList.remove('is-main'))
       placeTiles(stage, isSolo ? cameraTiles.concat([getSoloInviteCard()]) : cameraTiles)
       placeTiles(sidebar, [])
       sidebar.style.display = 'none'
@@ -1508,6 +1538,12 @@ async function enterRoom(joinData) {
     })
     tile.appendChild(fsBtn)
     tile.addEventListener('dblclick', () => toggleTileFullscreen(tile))
+    // В режиме «главный на весь экран» клик по миниатюре делает участника главным
+    tile.addEventListener('click', () => {
+      if (!roomMain.classList.contains('is-spotlight') || tile.parentElement !== sidebar) return
+      spotlightPinned = identity
+      relayout()
+    })
 
     let volumeCtl = null
     let kickBtn = null
@@ -1977,6 +2013,8 @@ async function enterRoom(joinData) {
   }
 
   function removeCameraTile(identity) {
+    if (spotlightPinned === identity) spotlightPinned = null
+    if (spotlightSpeaker === identity) spotlightSpeaker = null
     const t = cameraTilesMap.get(identity)
     if (t) { t.tile.remove(); cameraTilesMap.delete(identity) }
     relayout()
@@ -2135,6 +2173,16 @@ async function enterRoom(joinData) {
     for (const [identity, t] of cameraTilesMap.entries()) {
       t.tile.classList.toggle('speaking', speakingIds.has(identity))
     }
+    // Самый громкий собеседник (не я) через ~0,9 с становится главным, если всё ещё говорит —
+    // короткие звуки и перебивания не перекидывают сцену туда-сюда
+    const loudest = speakers.find((p) => p.identity !== room.localParticipant.identity)
+    if (!loudest || loudest.identity === spotlightSpeaker) return
+    clearTimeout(spotlightSpeakerTimer)
+    spotlightSpeakerTimer = setTimeout(() => {
+      if (!loudest.isSpeaking || !cameraTilesMap.has(loudest.identity)) return
+      spotlightSpeaker = loudest.identity
+      if (!spotlightPinned) scheduleRelayout()
+    }, 900)
   })
 
   room.on(LK.RoomEvent.Disconnected, (reason) => {
