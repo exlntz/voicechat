@@ -3184,3 +3184,26 @@ body.pip-body > .room-screen { height: 100%; }
 @media (max-height: 480px) and (orientation: landscape) {
   .controls-pill .leave-btn { height: 44px; min-height: 44px; }
 }
+
+/* Демонстрация и настройки: тоже одна короткая анимация при каждом наведении.
+   Демонстрация — значок экрана подпрыгивает; настройки — шестерёнка поворачивается
+   на четверть оборота с мягкой остановкой. */
+.ctrl-btn--screen i,
+.ctrl-btn--settings i { display: inline-block; }
+@keyframes ctl-screen-hop {
+  0% { transform: translateY(0); }
+  35% { transform: translateY(-4px); }
+  60% { transform: translateY(0); }
+  80% { transform: translateY(-1.5px); }
+  100% { transform: translateY(0); }
+}
+@keyframes ctl-gear-turn {
+  0% { transform: rotate(0deg); }
+  70% { transform: rotate(100deg); }
+  100% { transform: rotate(90deg); }
+}
+.ctrl-btn--screen:hover i { animation: ctl-screen-hop 0.5s ease-out 1; }
+.ctrl-btn--settings:hover i { animation: ctl-gear-turn 0.55s cubic-bezier(0.22, 1, 0.36, 1) 1; }
+@media (prefers-reduced-motion: reduce) {
+  .ctrl-btn--screen:hover i, .ctrl-btn--settings:hover i { animation: none; }
+}

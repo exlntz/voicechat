@@ -1145,7 +1145,7 @@ async function enterRoom(joinData) {
       </g>
       <path class="ctl-ico__slash" d="M3 3.5 20.5 21" pathLength="1"/>
     </svg>`)])
-  const screenBtn = el('button', { class: 'ctrl-btn', title: 'Демонстрация экрана' }, [el('i', { class: 'fas fa-desktop' })])
+  const screenBtn = el('button', { class: 'ctrl-btn ctrl-btn--screen', title: 'Демонстрация экрана' }, [el('i', { class: 'fas fa-desktop' })])
   const screenCountBadge = el('span', { class: 'badge-count', style: 'display:none' }, '0')
   screenBtn.appendChild(screenCountBadge)
   // Кнопка настроек устройств — сразу справа от демонстрации: микрофон, камера
