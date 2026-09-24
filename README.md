@@ -55,17 +55,25 @@
 Адреса: `/friends`, `/dm/:id`, `/lobby` (звонок по коду), `/room/:code`.
 
 **Сервер** — `vps-backend-deployed-copy/src/social/`:
-- `db.js` — таблицы `friendships`, `conversations`, `conversation_members`, `messages` (создаются сами при старте), лимиты частоты;
+- `db.js` — таблицы `friendships`, `conversations`, `conversation_members`, `messages`, `files`, `message_files`, `message_hidden`, `pins` (создаются сами при старте), лимиты частоты. Юзернейм начинается с английской буквы; старые, начинавшиеся с цифры, «_» или «-», при старте получают приставку `user_` (войти можно и по старому имени — оно сохраняется в `legacy_username_lower`);
 - `friends.js` — `GET /api/friends`, `POST /api/friends/request {username}`, `POST /api/friends/:id/accept|decline|block`, `DELETE /api/friends/:id`, `DELETE /api/friends/:id/block`;
-- `chats.js` — `GET /api/conversations`, `POST /api/conversations/dm {userId}`, `GET|POST /api/conversations/:id/messages` (по 50, `?before=`/`?after=`), `PATCH|DELETE .../messages/:mid`, `POST .../read`, `POST .../typing`, `POST .../call`, `POST /api/calls/:callId/accept|decline|cancel`;
+- `chats.js` — `GET /api/conversations` (закреплённые сверху), `POST /api/conversations/dm {userId}`, `POST /api/conversations/saved` («Избранное»), `PATCH /api/conversations/:id {muted, pinned, wallpaper}`, `DELETE /api/conversations/:id?for=me|all`, `GET|POST /api/conversations/:id/messages` (по 50, `?before=`/`?after=`/`?around=`; `POST` принимает `attachments: [fileId]` и `forwardFrom: messageId`), `PATCH .../messages/:mid`, `DELETE .../messages/:mid?for=me|all`, `POST|DELETE .../pins`, `GET .../search?q=`, `GET .../media?type=media|files|voice|links`, `POST .../read`, `POST .../typing`, `POST .../call`, `POST /api/calls/:callId/accept|decline|cancel`;
+- `media.js` — загрузка файлов кусками по 768 КБ (лимит nginx 1 МБ не мешает): `POST /api/uploads {purpose, size, name}` → `PUT /api/uploads/:id/chunk?index=N` → `POST /api/uploads/:id/finish`; тип определяется по первым байтам файла. `GET /api/files/:id` — раздача с Range (перемотка видео/голосовых); вложения видны только участникам чата, всё, что не фото/видео/аудио, отдаётся как скачивание. Файлы лежат в `data/uploads/` рядом с базой (деплой её не трогает). Лимиты: вложение 64 МБ, аватарка 5 МБ, фон профиля 30 МБ, обои 10 МБ; `DELETE /api/profile/avatar|banner`;
 - `events.js` — реалтайм `GET /api/events` (SSE): пинг раз в 25 с, `X-Accel-Buffering: no` (nginx менять не нужно), после обрыва пропущенное доигрывается по `Last-Event-ID`; `POST /api/presence` — «Не беспокоить»/«Отошёл», выход из звонка.
+- `friends.js` также отдаёт карточку профиля `GET /api/users/:id` (друзьям и тем, с кем есть личка).
 - `profile.js` — `GET|PATCH /api/profile` (смена юзернейма, «показывать, когда был в сети»), `GET /api/users/check?username=` (свободен ли юзернейм). Юзернейм хранится без «@», интерфейс дорисовывает «@» сам; вход и регистрация принимают оба варианта.
 - Лимиты: сообщение до 4000 символов, не чаще 8 сообщений за 5 с и 60 в минуту; заявки в друзья — 20 за 10 минут.
 
 **Сайт** — `public/static/social/` (ES-модули, подключаются из `renderPage` в `server.js`):
 `main.js` (оболочка и адреса), `api.js`, `events.js` (SSE), `store.js` (состояние), `cache.js` (IndexedDB),
-`sidebar.js`, `friends.js`, `chat.js`, `call-invite.js` (звонок из чата и входящий), `notify.js` (уведомления, счётчик), `social.css`.
-- Ссылка на звонок `/room/<код>` открывает только экран входа в звонок, без чатов; после выхода из звонка появляются кнопки «Чаты» и «Друзья».
+`sidebar.js`, `friends.js`, `chat.js`, `call-invite.js` (звонок из чата и входящий), `notify.js` (уведомления, счётчик),
+`upload.js` (загрузка кусками, сжатие фото), `media-ui.js` (фото/видео/голосовые/файлы в ленте, просмотрщик), `forward.js` (переслать),
+`user-card.js` (профиль собеседника: фон, аватарка, вкладки Медиа/Файлы/Голосовые/Ссылки), `wallpapers.js` (обои), `social.css`.
+- В чате: фото, видео, файлы (скрепка, вставка из буфера, перетаскивание), голосовые (кнопка микрофона при пустом поле), поиск по чату (лупа или Ctrl+F), ответ двойным кликом или свайпом влево на телефоне, ПКМ по сообщению — ответить, изменить, копировать, закрепить, переслать, удалить (у себя или у обоих).
+- «Избранное» появляется в списке после первого сообщения; в окне «Переслать» оно всегда первое. ПКМ по чату слева — закрепить, выключить уведомления, удалить (у себя или у обоих).
+- Обои чата (готовые или своя картинка) — через «⋮» в шапке чата; видите их только вы.
+- Профиль: аватарка и фон (картинка, GIF или видео без звука) — в окне «Профиль» → «Оформление».
+- Ссылка на звонок `/room/<код>` открывает только экран входа в звонок, без чатов; после выхода из звонка снова экран входа, а в левом верхнем углу — кнопка «Чаты».
 - Звонок из лички не выкидывает из чата: он встаёт панелью сверху; кнопка в углу панели разворачивает его на весь экран.
 - Сообщение появляется сразу, до ответа сервера; история кэшируется в IndexedDB; старое подгружается при прокрутке вверх.
 - `app.js` по-прежнему рисует вход, лобби и звонок; с оболочкой он общается через `window.VL`.

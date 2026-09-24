@@ -1,7 +1,8 @@
 // ===================== Левая колонка: друзья, лички, панель звонка, профиль =====================
 import { store, on, sortedConversations, presenceOf, incomingCount, friendsBy } from './store.js'
 import { api } from './api.js'
-import { h, icon, avatar, displayName, presenceText, messagePreview, timeShort, showMenu, toast, waveBars } from './ui.js'
+import { h, icon, avatar, displayName, presenceText, messagePreview, timeShort, showMenu, toast, waveBars, isSavedConv } from './ui.js'
+import { askDeleteChat } from './chat.js'
 import { notificationsNeedPermission, requestNotificationPermission } from './notify.js'
 import { callState, inCall } from './call-invite.js'
 
@@ -79,44 +80,40 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
       const isTyping = typing && [...typing.values()].some((t) => t > Date.now())
       // В звонке именно с этим человеком — живые зелёные полоски вместо последнего сообщения
       const callHere = inCall() && callState.conversationId === conv.id
-      const subText = isTyping ? 'печатает…' : callHere ? 'в звонке с вами' : conv.lastMessage ? (conv.lastMessage.authorId === store.me.id ? 'Вы: ' : '') + messagePreview(conv.lastMessage) : presenceText(p)
+      const subText = isTyping ? 'печатает…' : callHere ? 'в звонке с вами' : conv.lastMessage ? (conv.lastMessage.authorId === store.me.id && conv.type !== 'saved' ? 'Вы: ' : '') + messagePreview(conv.lastMessage) : presenceText(p)
       const sub = callHere && !isTyping ? [waveBars(4), subText] : subText
-      const close = h('button', { type: 'button', class: 'vl-dm__close', title: 'Закрыть', 'aria-label': 'Закрыть личку' }, [icon('xmark')])
+      const saved = isSavedConv(conv)
       const item = h('a', {
         href: '/dm/' + conv.id,
         role: 'listitem',
-        class: `vl-dm${conv.id === activeId ? ' is-active' : ''}${conv.unread ? ' is-unread' : ''}${conv.muted ? ' is-muted' : ''}`
+        class: `vl-dm${conv.id === activeId ? ' is-active' : ''}${conv.unread ? ' is-unread' : ''}${conv.muted ? ' is-muted' : ''}${conv.pinned ? ' is-pinned' : ''}`
       }, [
-        avatar(peer, { size: 44, presence: p }),
+        avatar(peer, { size: 44, presence: saved ? null : p, saved }),
         h('div', { class: 'vl-dm__text' }, [
-          h('div', { class: 'vl-dm__row' }, [h('span', { class: 'vl-dm__name' }, displayName(peer)), h('span', { class: 'vl-dm__time' }, timeShort(conv.lastMessageAt))]),
-          h('div', { class: `vl-dm__sub${isTyping ? ' is-typing' : ''}${callHere ? ' is-call' : ''}` }, sub)
+          h('div', { class: 'vl-dm__row' }, [
+            h('span', { class: 'vl-dm__name' }, saved ? 'Избранное' : displayName(peer)),
+            conv.muted ? h('span', { class: 'vl-dm__flag', title: 'Уведомления выключены' }, [icon('bell-slash')]) : null,
+            h('span', { class: 'vl-dm__time' }, timeShort(conv.lastMessageAt))
+          ]),
+          h('div', { class: `vl-dm__sub${isTyping ? ' is-typing' : ''}${callHere ? ' is-call' : ''}` }, saved && !conv.lastMessage ? 'Сохранённые сообщения' : sub)
         ]),
-        conv.unread ? h('span', { class: 'vl-badge' }, conv.unread > 99 ? '99+' : String(conv.unread)) : null,
-        close
+        conv.unread ? h('span', { class: 'vl-badge' }, conv.unread > 99 ? '99+' : String(conv.unread)) : conv.pinned ? h('span', { class: 'vl-dm__pin', title: 'Закреплён' }, [icon('thumbtack')]) : null
       ])
       item.addEventListener('click', (e) => {
         if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return
         e.preventDefault()
         navigate('/dm/' + conv.id)
       })
-      close.addEventListener('click', async (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-        try {
-          await api.updateConversation(conv.id, { hidden: true })
-          store.conversations.delete(conv.id)
-          renderDms()
-          if (route.name === 'dm' && route.id === conv.id) navigate('/friends')
-        } catch (err) { toast(err.message, 'error') }
-      })
+      // ПКМ по чату: закрепить, уведомления, удалить (у себя или у обоих)
       item.addEventListener('contextmenu', (e) => {
         e.preventDefault()
+        const patch = (body) => api.updateConversation(conv.id, body).catch((er) => toast(er.message, 'error'))
         showMenu([
-          { label: conv.muted ? 'Включить уведомления' : 'Без звука', icon: conv.muted ? 'bell' : 'bell-slash', onClick: () => api.updateConversation(conv.id, { muted: !conv.muted }).catch((er) => toast(er.message, 'error')) },
-          { label: 'Позвонить', icon: 'phone', onClick: () => import('./call-invite.js').then((m) => { navigate('/dm/' + conv.id); m.startCall(conv.id) }) },
+          { label: conv.pinned ? 'Открепить' : 'Закрепить', icon: conv.pinned ? 'thumbtack-slash' : 'thumbtack', onClick: () => patch({ pinned: !conv.pinned }) },
+          saved ? null : { label: conv.muted ? 'Включить уведомления' : 'Выключить уведомления', icon: conv.muted ? 'bell' : 'bell-slash', onClick: () => patch({ muted: !conv.muted }) },
+          saved ? null : { label: 'Позвонить', icon: 'phone', onClick: () => import('./call-invite.js').then((m) => { navigate('/dm/' + conv.id); m.startCall(conv.id) }) },
           'sep',
-          { label: 'Закрыть личку', icon: 'xmark', onClick: () => close.click() }
+          { label: saved ? 'Очистить' : 'Удалить чат', icon: 'trash', danger: true, onClick: () => askDeleteChat(conv, { navigate }) }
         ], e)
       })
       nodes.push(item)

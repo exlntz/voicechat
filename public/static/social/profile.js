@@ -4,6 +4,7 @@
 import { api } from './api.js'
 import { store, updateUser } from './store.js'
 import { h, icon, avatar, displayName, toast } from './ui.js'
+import { uploadFile, squareAvatar, prepareImage, probeMedia } from './upload.js'
 
 let current = null // открытое окно
 
@@ -69,16 +70,98 @@ export function openProfile({ logout }) {
     if (active && current && current.overlay === overlay) show(active[0])
   }).catch(() => {})
 
-  // ---------- Оформление: карточка профиля и юзернейм ----------
+  // ---------- Оформление: аватарка, фон, юзернейм ----------
   function buildLook() {
     const me = store.me
-    const preview = h('div', { class: 'settings-card vl-profile-card' }, [
-      avatar(me, { size: 64 }),
-      h('div', { class: 'vl-profile-card__text' }, [
-        h('div', { class: 'vl-profile-card__name' }, displayName(me)),
-        h('div', { class: 'vl-profile-card__user' }, '@' + me.username)
+    // Превью — как профиль видят друзья: фон (картинка, GIF или видео) и аватарка на нём
+    const bannerBox = h('div', { class: 'vl-pcard__banner' })
+    const avaBox = h('div', { class: 'vl-pcard__ava' })
+    const preview = h('div', { class: 'settings-card vl-pcard' }, [
+      bannerBox,
+      h('div', { class: 'vl-pcard__row' }, [
+        avaBox,
+        h('div', { class: 'vl-profile-card__text' }, [
+          h('div', { class: 'vl-profile-card__name' }, displayName(me)),
+          h('div', { class: 'vl-profile-card__user' }, '@' + me.username)
+        ])
       ])
     ])
+    function paintPreview() {
+      const u = store.me
+      avaBox.replaceChildren(avatar(u, { size: 72 }))
+      if (u.bannerUrl) {
+        if (bannerBox.dataset.src !== u.bannerUrl) {
+          bannerBox.dataset.src = u.bannerUrl
+          bannerBox.replaceChildren(u.bannerKind === 'video'
+            ? h('video', { src: u.bannerUrl, autoplay: true, muted: true, loop: true, playsinline: true })
+            : h('img', { src: u.bannerUrl, alt: '' }))
+          const v = bannerBox.querySelector('video')
+          if (v) { v.muted = true; v.play().catch(() => {}) }
+        }
+      } else { bannerBox.replaceChildren(); delete bannerBox.dataset.src }
+      bannerBox.classList.toggle('has-media', !!u.bannerUrl)
+      removeAva.hidden = !u.avatarUrl
+      removeBanner.hidden = !u.bannerUrl
+    }
+
+    const mediaStatus = h('div', { class: 'vl-fld-status', role: 'status' })
+    const avaInput = h('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/gif', hidden: true })
+    const bannerInput = h('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime', hidden: true })
+    const pickAva = h('button', { type: 'button', class: 'vl-btn vl-btn--soft vl-btn--pill vl-btn--sm' }, [icon('camera'), 'Аватарка'])
+    const pickBanner = h('button', { type: 'button', class: 'vl-btn vl-btn--soft vl-btn--pill vl-btn--sm' }, [icon('image'), 'Фон'])
+    const removeAva = h('button', { type: 'button', class: 'vl-btn vl-btn--ghost-text vl-btn--sm' }, 'Убрать аватарку')
+    const removeBanner = h('button', { type: 'button', class: 'vl-btn vl-btn--ghost-text vl-btn--sm' }, 'Убрать фон')
+    pickAva.addEventListener('click', () => avaInput.click())
+    pickBanner.addEventListener('click', () => bannerInput.click())
+    const setMediaStatus = (text, kind) => { mediaStatus.textContent = text; mediaStatus.className = 'vl-fld-status' + (kind ? ' is-' + kind : '') }
+    async function upload(purpose, raw) {
+      pickAva.disabled = pickBanner.disabled = true
+      setMediaStatus('Загружаем…', '')
+      try {
+        let file = raw
+        let meta = {}
+        if (purpose === 'avatar') {
+          if (raw.size > 20 * 1024 * 1024) throw new Error('Картинка больше 20 МБ')
+          file = await squareAvatar(raw)
+          if (file.size > 5 * 1024 * 1024) throw new Error('GIF-аватарка больше 5 МБ')
+        } else if (raw.type.startsWith('video/')) {
+          if (raw.size > 30 * 1024 * 1024) throw new Error('Видео для фона — до 30 МБ')
+          meta = await probeMedia(raw)
+        } else {
+          const prepared = await prepareImage(raw, { maxSide: 1920 })
+          file = prepared.file
+          meta = prepared.meta
+          if (file.size > 30 * 1024 * 1024) throw new Error('Файл для фона — до 30 МБ')
+        }
+        await uploadFile(file, { purpose, meta, onProgress: (p) => setMediaStatus(`Загружаем… ${Math.round(p * 100)}%`, '') })
+        const r = await api.get('/api/profile')
+        if (r && r.user) updateUser(r.user)
+        setMediaStatus(purpose === 'avatar' ? 'Аватарка обновлена' : 'Фон обновлён', 'ok')
+        paintPreview()
+      } catch (e) {
+        setMediaStatus(e.message, 'err')
+      } finally {
+        pickAva.disabled = pickBanner.disabled = false
+      }
+    }
+    avaInput.addEventListener('change', () => { const f = avaInput.files[0]; avaInput.value = ''; if (f) upload('avatar', f) })
+    bannerInput.addEventListener('change', () => { const f = bannerInput.files[0]; bannerInput.value = ''; if (f) upload('banner', f) })
+    async function removeMedia(what) {
+      try {
+        const r = await api.del('/api/profile/' + what)
+        if (r && r.user) updateUser(r.user)
+        paintPreview()
+      } catch (e) { toast(e.message, 'error') }
+    }
+    removeAva.addEventListener('click', () => removeMedia('avatar'))
+    removeBanner.addEventListener('click', () => removeMedia('banner'))
+    const mediaCard = h('div', { class: 'settings-card' }, [
+      h('div', { class: 'settings-card-head' }, [h('span', { class: 'settings-card-title' }, [icon('image'), 'Аватарка и фон'])]),
+      h('p', { class: 'settings-card-note' }, 'Фон — картинка, GIF или короткое видео (до 30 МБ): друзья увидят его в вашем профиле. Видео играет без звука по кругу.'),
+      h('div', { class: 'vl-pcard__actions' }, [pickAva, pickBanner, removeAva, removeBanner]),
+      mediaStatus, avaInput, bannerInput
+    ])
+    paintPreview()
 
     const input = h('input', { type: 'text', placeholder: 'Новый юзернейм', maxlength: '25', autocomplete: 'off', spellcheck: 'false' })
     input.value = '@' + me.username
@@ -136,7 +219,7 @@ export function openProfile({ logout }) {
         save.disabled = false
       }
     })
-    return [preview, card]
+    return [preview, mediaCard, card]
   }
 
   // ---------- Конфиденциальность: «был в сети» ----------

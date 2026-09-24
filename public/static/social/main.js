@@ -143,7 +143,7 @@ function unmountView() {
 function updateTitle() {
   if (route.name === 'dm') {
     const conv = store.conversations.get(route.id)
-    setBaseTitle(conv && conv.peer ? `@${displayName(conv.peer)} — Voice Lobby` : 'Voice Lobby')
+    setBaseTitle(conv && conv.type === 'saved' ? 'Избранное — Voice Lobby' : conv && conv.peer ? `@${displayName(conv.peer)} — Voice Lobby` : 'Voice Lobby')
   } else if (route.name === 'friends') setBaseTitle('Друзья — Voice Lobby')
   else setBaseTitle('Voice Lobby')
 }
@@ -334,6 +334,8 @@ function enterSolo(me, code) {
 async function exitSolo(path, { openLatestChat = false } = {}) {
   const me = VL.state.currentUser
   solo = null
+  hideSoloChatsButton()
+  if (VL.teardownLobby) VL.teardownLobby()
   body.classList.remove('vl-solo')
   appRoot.replaceChildren()
   history.pushState({}, '', path)
@@ -351,23 +353,20 @@ async function exitSolo(path, { openLatestChat = false } = {}) {
   }
 }
 
-function renderCallEnded(code) {
-  const toChats = h('button', { type: 'button', class: 'vl-btn vl-btn--primary vl-btn--pill' }, [icon('message'), 'Чаты'])
-  const toFriends = h('button', { type: 'button', class: 'vl-btn vl-btn--soft vl-btn--pill' }, [icon('user-group'), 'Друзья'])
-  const back = h('button', { type: 'button', class: 'vl-btn vl-btn--ghost-text' }, 'Вернуться в звонок')
-  toChats.addEventListener('click', () => exitSolo('/friends', { openLatestChat: true }))
-  toFriends.addEventListener('click', () => exitSolo('/friends'))
-  back.addEventListener('click', () => VL.renderLobby(code))
-  appRoot.replaceChildren(h('div', { class: 'vl-ended' }, [
-    h('div', { class: 'vl-ended__card', role: 'status' }, [
-      h('span', { class: 'vl-ended__icon', 'aria-hidden': 'true' }, [icon('phone-slash')]),
-      h('h1', { class: 'vl-ended__title' }, 'Звонок завершён'),
-      h('p', { class: 'vl-ended__text' }, ['Комната ', h('b', {}, code)]),
-      h('div', { class: 'vl-ended__actions' }, [toChats, toFriends]),
-      back
-    ])
-  ]))
-  toChats.focus()
+// После звонка — снова экран входа в тот же звонок, а в левом верхнем углу кнопка «Чаты»:
+// по ней открывается полный интерфейс. Во время звонка кнопки нет.
+let soloChatsBtn = null
+function showSoloChatsButton() {
+  if (soloChatsBtn) return
+  soloChatsBtn = h('button', { type: 'button', class: 'vl-solo-chats', title: 'Открыть чаты и друзей' }, [
+    h('span', { class: 'vl-solo-chats__ico' }, [icon('message'), h('i'), h('i'), h('i')]),
+    h('span', {}, 'Чаты')
+  ])
+  soloChatsBtn.addEventListener('click', () => exitSolo('/friends', { openLatestChat: true }))
+  body.appendChild(soloChatsBtn)
+}
+function hideSoloChatsButton() {
+  if (soloChatsBtn) { soloChatsBtn.remove(); soloChatsBtn = null }
 }
 
 async function endSession({ callServer = false } = {}) {
@@ -375,6 +374,7 @@ async function endSession({ callServer = false } = {}) {
   if (solo) {
     // Выход из аккаунта с экрана быстрого звонка: полной оболочки ещё нет
     solo = null
+    hideSoloChatsButton()
     if (callServer) { try { await api.logout() } catch {} }
     body.classList.remove('vl-solo')
     body.classList.add('vl-auth')
@@ -414,7 +414,8 @@ VL.onCallEnded = () => {
   if (isSwitching()) return
   if (solo) {
     history.replaceState({}, '', '/room/' + solo.code)
-    renderCallEnded(solo.code)
+    VL.renderLobby(solo.code)
+    showSoloChatsButton()
     announce()
     return
   }
@@ -461,6 +462,8 @@ on('connection', (up) => {
   if (up && autoIdle) pushStatus()
 })
 on('conversations', () => { if (route.name === 'dm') updateTitle() })
+// Чат удалили (вы на другом устройстве или собеседник — «у всех») — уйти из него
+on('conversation-removed', (id) => { if (route.name === 'dm' && route.id === id) navigate('/friends', { replace: true }) })
 
 setUnauthorizedHandler(() => { if (sessionActive) { toast('Сессия истекла — войдите снова', 'warning'); endSession() } })
 

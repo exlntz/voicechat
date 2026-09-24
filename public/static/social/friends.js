@@ -5,6 +5,7 @@ import { store, on, friendsBy, presenceOf, setFriend, loadFriends } from './stor
 import { api } from './api.js'
 import { h, icon, avatar, displayName, presenceText, showMenu, confirmDialog, toast } from './ui.js'
 import { startCall } from './call-invite.js'
+import { openUserCard } from './user-card.js'
 
 const TABS = [
   { id: 'all', label: 'Все' },
@@ -15,8 +16,24 @@ const TABS = [
 const TAB_ALIASES = { online: 'all', add: 'all' }
 const MAX_TILES = 6
 
-export function createFriendsView({ openDmWith, menuButton, initialTab }) {
+export function createFriendsView({ navigate, openDmWith, menuButton, initialTab }) {
   let tab = normalizeTab(initialTab)
+  // Профиль друга: фон, аватарка, общие медиа и файлы
+  function openProfileOf(u) {
+    openUserCard({
+      userId: u.id,
+      onMessage: openDmWith,
+      onCall: callFriend,
+      onJump: (convId, id) => { store.pendingJump = { convId, id }; navigate('/dm/' + convId) }
+    })
+  }
+  // Клик по аватарке — профиль, по остальной строке — личка
+  function profileAvatar(node, u) {
+    node.classList.add('is-clickable')
+    node.setAttribute('title', 'Профиль')
+    node.addEventListener('click', (e) => { e.stopPropagation(); openProfileOf(u) })
+    return node
+  }
 
   function normalizeTab(id) {
     const t = TAB_ALIASES[id] || id
@@ -131,7 +148,7 @@ export function createFriendsView({ openDmWith, menuButton, initialTab }) {
       const u = f.user
       const p = presenceOf(u.id)
       const featured = i === 0 && p.inCall
-      const ava = avatar(u, { size: featured ? 64 : 52, presence: featured ? null : p })
+      const ava = profileAvatar(avatar(u, { size: featured ? 64 : 52, presence: featured ? null : p }), u)
       if (featured) ava.classList.add('is-ringed')
       const tile = h('div', { class: `vl-tile${featured ? ' is-featured' : ''}`, role: 'listitem', tabindex: '0' }, [
         ava,
@@ -196,7 +213,7 @@ export function createFriendsView({ openDmWith, menuButton, initialTab }) {
       ]
     }
     const item = h('div', { class: `vl-friend${extra}`, role: 'listitem', tabindex: f.status === 'friend' ? '0' : null }, [
-      avatar(u, { size: 44, presence: f.status === 'friend' ? p : null }),
+      f.status === 'friend' ? profileAvatar(avatar(u, { size: 44, presence: p }), u) : avatar(u, { size: 44 }),
       h('div', { class: 'vl-friend__text' }, [
         h('div', { class: 'vl-friend__name' }, [h('span', {}, displayName(u)), h('span', { class: 'vl-friend__user' }, '@' + u.username)]),
         h('div', { class: `vl-friend__sub${p.inCall && f.status === 'friend' ? ' is-call' : ''}` }, sub)
@@ -214,6 +231,7 @@ export function createFriendsView({ openDmWith, menuButton, initialTab }) {
   function moreMenu(f, anchor) {
     const u = f.user
     showMenu([
+      { label: 'Профиль', icon: 'user', onClick: () => openProfileOf(u) },
       { label: 'Написать', icon: 'message', onClick: () => openDmWith(u.id) },
       { label: 'Позвонить', icon: 'phone', onClick: () => callFriend(u.id) },
       { label: 'Скопировать юзернейм', icon: 'at', onClick: () => window.VL.copyToClipboard(u.username).then((ok) => toast(ok ? 'Скопировано' : 'Не удалось скопировать', ok ? 'success' : 'error')) },
