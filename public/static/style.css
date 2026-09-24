@@ -2730,3 +2730,158 @@ body.pip-body > .room-screen { height: 100%; }
   cursor: pointer;
 }
 .pip-placeholder__btn:hover, .pip-placeholder__btn:focus-visible { background: var(--accent-hover); }
+
+/* ═══════════════ МЯГКИЙ СТИЛЬ (направление S1) ═══════════════
+   Слой поверх базовых правил: цвета и кнопки прежние, меняется подача.
+   · Крупные скругления: карточки 32–36px, вложенные блоки ~22px.
+   · Рамок нет — слои отличаются только тоном: фон (--bg) → карточка (--surface)
+     → вложенный блок (--surface-2); поле ввода «проваливается» обратно в --bg.
+   · Поля, выпадающие списки и кнопки — капсулы (--radius-pill).
+   Разметку и JS слой не трогает; убрать его = вернуть прежний вид. */
+:root {
+  --radius-lg: 32px;
+  --radius: 22px;
+  --radius-sm: 16px;
+  --soft-card: 36px;
+  /* почти невидимая волосяная линия там, где разделитель всё же нужен */
+  --border: rgba(242, 245, 249, 0.06);
+}
+
+/* ---- Карточки: без рамок, тоном ---- */
+.auth-container,
+.lobby-card {
+  border: 0;
+  border-radius: var(--soft-card);
+}
+.lobby-card { padding: 32px 36px 28px; }
+@media (min-width: 900px) {
+  .lobby-card { column-gap: 32px; }
+}
+@media (max-width: 600px) {
+  .lobby-card { padding: 24px 20px 20px; border-radius: 28px; }
+}
+
+/* Строка пользователя — капсула; «Выйти» — капсула внутри */
+.lobby-userbar {
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  padding: 8px 8px 8px 18px;
+}
+.lobby-card .lobby-logout-btn,
+.lobby-logout-btn,
+.lobby-card .btn-secondary {
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 10px 18px;
+}
+
+/* Превью камеры — мягкий «экран» без рамки */
+.device-preview {
+  border: 0;
+  border-radius: 28px;
+}
+
+/* Камера / Микрофон — две капсулы, состояние цветом заливки */
+.join-toggles { gap: 12px; }
+.join-toggle-btn {
+  min-height: 52px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+}
+.join-toggle-btn:hover { background: var(--surface-3); }
+.join-toggle-btn.on { border: 0; background: #10264a; color: var(--text); }
+.join-toggle-btn.on:hover { background: #143063; }
+
+/* Карточки устройств (лобби и «Настройки» звонка) */
+.settings-card {
+  border: 0;
+  border-radius: 22px;
+  padding: 18px 20px;
+}
+.device-settings { gap: 12px; }
+.device-settings .settings-card { padding: 16px 18px; }
+
+/* Выпадающие списки — капсула, «проваленная» в фон */
+.dd-btn,
+.settings-card select.native-select {
+  min-height: 46px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background-color: var(--bg);
+  padding-left: 18px;
+  padding-right: 16px;
+}
+.settings-card select.native-select { padding-right: 36px; background-position: right 16px center; }
+.dd-btn:hover,
+.settings-card select.native-select:hover { background-color: #0b0d11; }
+.dd-btn:focus-visible,
+.dd-btn.open,
+.settings-card select.native-select:focus {
+  background-color: var(--accent-wash);
+  outline: 2px solid var(--accent-soft);
+  outline-offset: -2px;
+}
+.dd-btn:disabled { border: 0; background: rgba(15, 17, 21, 0.6); }
+.dd-menu {
+  border: 0;
+  border-radius: 20px;
+  padding: 8px;
+}
+.dd-item { border-radius: 14px; }
+
+/* ---- Поля ввода: капсула вместо подчёркнутой строки ----
+   Подпись лежит внутри капсулы и при вводе/фокусе всплывает над ней. */
+.fld { padding-top: 22px; }
+.fld input,
+.password-field input {
+  height: 52px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  transition: background-color 0.25s var(--ease), outline-color 0.25s var(--ease);
+}
+.fld input:hover { background: #0b0d11; }
+.fld input:focus {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: -2px;
+}
+.fld.is-err input { outline: 2px solid var(--danger); outline-offset: -2px; }
+.fld.is-ok input { outline: 2px solid rgba(58, 168, 110, 0.7); outline-offset: -2px; }
+.fld__bar { display: none; }
+.fld__lbl { left: 20px; top: 40px; }
+.fld input:focus ~ .fld__lbl,
+.fld input:not(:placeholder-shown) ~ .fld__lbl,
+.fld.is-filled .fld__lbl { transform: translateY(-38px) scale(0.84); }
+.fld__msg { left: 20px; right: 20px; }
+.password-field input { padding-right: 56px; }
+.password-toggle-btn { right: 6px; bottom: 6px; border-radius: 50%; width: 40px; }
+/* автозаполнение Chrome: закрашиваем тенью под новый фон поля */
+.fld input:-webkit-autofill,
+.fld input:-webkit-autofill:hover,
+.fld input:-webkit-autofill:focus,
+.fld input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px var(--bg) inset;
+  box-shadow: 0 0 0 1000px var(--bg) inset;
+}
+.fld input:autofill { background: var(--bg); }
+
+/* ---- Главные и второстепенные кнопки — капсулы ---- */
+.auth-submit-btn,
+.lobby-card > button {
+  min-height: 56px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  font-size: 16px;
+  font-weight: 700;
+}
+.auth-ghost-btn { border-radius: var(--radius-pill); }
+
+/* ---- Сообщения, уведомления, панели ---- */
+.error-box { border: 0; border-radius: 18px; padding: 12px 18px; }
+.toast { border: 0; border-radius: 20px; }
+.panel { border-left: 0; }
