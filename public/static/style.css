@@ -2861,3 +2861,14 @@ body.pip-body > .room-screen { height: 100%; }
 .error-box { border: 0; border-radius: 18px; padding: 12px 18px; }
 .toast { border: 0; border-radius: 20px; }
 .panel { border-left: 0; }
+
+/* Телефоны и планшеты: наведения нет, поэтому «Выйти» (звонок и лобби) сразу в том
+   виде, который на компьютере появляется при наведении, — залитая красная кнопка. */
+@media (hover: none) {
+  .leave-btn,
+  .lobby-logout-btn {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #fff;
+  }
+}
