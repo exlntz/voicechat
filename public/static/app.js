@@ -44,6 +44,13 @@ const SCREEN_SHARE_CONTENT_HINT = 'motion'
 
 const root = document.getElementById('app-root')
 
+// SVG из разметки (el() создаёт элементы в HTML-пространстве имён, SVG так не собрать)
+function svgIcon(markup) {
+  const t = document.createElement('template')
+  t.innerHTML = markup.trim()
+  return t.content.firstElementChild
+}
+
 function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag)
   for (const [k, v] of Object.entries(attrs)) {
@@ -1115,8 +1122,29 @@ async function enterRoom(joinData) {
   // ---- Панель управления ----
   const controls = el('div', { class: 'controls-bar' })
 
-  const micBtn = el('button', { class: 'ctrl-btn active', title: 'Микрофон' }, [el('i', { class: 'fas fa-microphone' })])
-  const camBtn = el('button', { class: 'ctrl-btn active', title: 'Камера' }, [el('i', { class: 'fas fa-video' })])
+  // Микрофон и камера — свои SVG-иконки с чертой: при выключении (класс .off у кнопки)
+  // черта «прочерчивается» поверх значка, при включении втягивается обратно (CSS).
+  // Под чертой значок вырезан маской — черта не сливается с ним.
+  const micBtn = el('button', { class: 'ctrl-btn active', title: 'Микрофон' }, [svgIcon(`
+    <svg class="ctl-ico" viewBox="0 0 24 24" aria-hidden="true">
+      <defs><mask id="vl-mask-mic" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+        <rect width="24" height="24" fill="#fff"/><path class="ctl-ico__cut" d="M4 3.5 20.5 20" pathLength="1"/></mask></defs>
+      <g mask="url(#vl-mask-mic)">
+        <rect x="8.5" y="2.5" width="7" height="12" rx="3.5" fill="currentColor"/>
+        <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </g>
+      <path class="ctl-ico__slash" d="M4 3.5 20.5 20" pathLength="1"/>
+    </svg>`)])
+  const camBtn = el('button', { class: 'ctrl-btn active', title: 'Камера' }, [svgIcon(`
+    <svg class="ctl-ico" viewBox="0 0 24 24" aria-hidden="true">
+      <defs><mask id="vl-mask-cam" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+        <rect width="24" height="24" fill="#fff"/><path class="ctl-ico__cut" d="M3 3.5 20.5 21" pathLength="1"/></mask></defs>
+      <g mask="url(#vl-mask-cam)">
+        <rect x="2.5" y="6" width="13.5" height="12" rx="3" fill="currentColor"/>
+        <path d="M17 10.2 21.5 7.4v9.2L17 13.8z" fill="currentColor"/>
+      </g>
+      <path class="ctl-ico__slash" d="M3 3.5 20.5 21" pathLength="1"/>
+    </svg>`)])
   const screenBtn = el('button', { class: 'ctrl-btn', title: 'Демонстрация экрана' }, [el('i', { class: 'fas fa-desktop' })])
   const screenCountBadge = el('span', { class: 'badge-count', style: 'display:none' }, '0')
   screenBtn.appendChild(screenCountBadge)
@@ -1138,7 +1166,9 @@ async function enterRoom(joinData) {
 
   // Панель парит поверх сцены: кнопки звонка — в «капсуле», «Выйти» — рядом
   const controlsPill = el('div', { class: 'controls-pill' })
-  const leaveBtn = el('button', { class: 'leave-btn' }, [el('i', { class: 'fas fa-phone-slash' }), ' Выйти'])
+  // «Выйти»: положенная трубка; при наведении она покачивается (CSS: .leave-ico)
+  const leaveBtn = el('button', { class: 'leave-btn' }, [svgIcon(`
+    <svg class="leave-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M2.6 13.1c5.2-4.9 13.6-4.9 18.8 0 .6.6.7 1.6.1 2.2l-1.8 2c-.5.5-1.3.6-1.9.2l-2.4-1.6c-.5-.3-.8-.9-.7-1.5l.3-1.9a10.6 10.6 0 0 0-6.6 0l.3 1.9c.1.6-.2 1.2-.7 1.5l-2.4 1.6c-.6.4-1.4.3-1.9-.2l-1.8-2c-.6-.6-.5-1.6.1-2.2z"/></svg>`), ' Выйти'])
 
   controlsPill.appendChild(micBtn)
   controlsPill.appendChild(camBtn)
@@ -2368,10 +2398,8 @@ async function enterRoom(joinData) {
     // Синхронизируем кнопки управления с фактическим стартовым состоянием
     micBtn.classList.toggle('active', state.micEnabled)
     micBtn.classList.toggle('off', !state.micEnabled)
-    micBtn.querySelector('i').className = state.micEnabled ? 'fas fa-microphone' : 'fas fa-microphone-slash'
     camBtn.classList.toggle('active', state.cameraEnabled)
     camBtn.classList.toggle('off', !state.cameraEnabled)
-    camBtn.querySelector('i').className = state.cameraEnabled ? 'fas fa-video' : 'fas fa-video-slash'
 
     // Render existing remote participants
     room.remoteParticipants.forEach((participant) => {
@@ -2409,7 +2437,6 @@ async function enterRoom(joinData) {
     await room.localParticipant.setMicrophoneEnabled(state.micEnabled)
     micBtn.classList.toggle('active', state.micEnabled)
     micBtn.classList.toggle('off', !state.micEnabled)
-    micBtn.querySelector('i').className = state.micEnabled ? 'fas fa-microphone' : 'fas fa-microphone-slash'
   })
 
   camBtn.addEventListener('click', async () => {
@@ -2417,7 +2444,6 @@ async function enterRoom(joinData) {
     const pub = await room.localParticipant.setCameraEnabled(state.cameraEnabled)
     camBtn.classList.toggle('active', state.cameraEnabled)
     camBtn.classList.toggle('off', !state.cameraEnabled)
-    camBtn.querySelector('i').className = state.cameraEnabled ? 'fas fa-video' : 'fas fa-video-slash'
     const t = cameraTilesMap.get(room.localParticipant.identity)
     if (t) {
       // Если камера включается впервые за это подключение (входили с выключенной), трек создаётся только сейчас -

@@ -3096,3 +3096,34 @@ body.pip-body > .room-screen { height: 100%; }
 .room-topbar .ctrl-btn { background: rgba(15, 17, 21, 0.78); }
 .room-topbar .ctrl-btn:hover { background: rgba(15, 17, 21, 0.92); }
 .tile .tile-label { background: rgba(6, 8, 12, 0.86); }
+
+/* ═══════════════ Иконки звонка: черта микрофона/камеры и трубка «Выйти» ═══════════════
+   Микрофон/камера: при выключении (.off) черта прочерчивается сверху вниз, при включении
+   втягивается обратно; под чертой значок вырезан маской. «Выйти»: при наведении трубка
+   покачивается, как у звонящего телефона. */
+.ctl-ico { width: 1.15em; height: 1.15em; display: block; overflow: visible; }
+.ctl-ico__slash,
+.ctl-ico__cut {
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.ctl-ico__slash { stroke: currentColor; stroke-width: 2.2; }
+.ctl-ico__cut { stroke: #000; stroke-width: 5.5; }
+.ctrl-btn.off .ctl-ico__slash,
+.ctrl-btn.off .ctl-ico__cut { stroke-dashoffset: 0; }
+
+.leave-ico { width: 1.25em; height: 1.25em; display: block; flex-shrink: 0; transform-origin: 50% 60%; }
+@keyframes leave-ico-ring {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-14deg); }
+  75% { transform: rotate(14deg); }
+}
+.leave-btn:hover .leave-ico,
+.leave-btn:focus-visible .leave-ico { animation: leave-ico-ring 0.5s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .leave-btn:hover .leave-ico, .leave-btn:focus-visible .leave-ico { animation: none; }
+  .ctl-ico__slash, .ctl-ico__cut { transition: none; }
+}
