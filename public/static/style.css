@@ -1777,7 +1777,9 @@ body.inapp-fullscreen { overflow: hidden; }
   right: 0;
   width: fit-content;
   margin: 0 auto;
-  bottom: calc(18px + env(safe-area-inset-bottom));
+  /* Без env(safe-area-inset-bottom): у body уже есть отступ под полоску «домой» iPhone,
+     второй раз его прибавлять нельзя — внизу оставалась пустая полоса */
+  bottom: 18px;
   z-index: 20;
   display: flex;
   align-items: center;
@@ -1801,7 +1803,7 @@ body.inapp-fullscreen { overflow: hidden; }
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
 }
 /* Вне режима «главный на весь экран» (один, демонстрации) сцена не заходит под панель */
-.room-main:not(.is-spotlight) { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+.room-main:not(.is-spotlight) { padding-bottom: 96px; }
 
 /* Круглая кнопка управления */
 .ctrl-btn {
@@ -2575,10 +2577,12 @@ body.inapp-fullscreen { overflow: hidden; }
     min-width: 0;
   }
 
+  /* Панель парит (см. .controls-bar): своих отступов у неё нет — прежний padding от
+     сплошной полосы поднимал кнопки выше зарезервированного места, и они наезжали
+     на приглашение */
   .controls-bar {
     gap: 10px;
-    padding: 12px 10px;
-    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    padding: 0;
     flex-wrap: nowrap;
   }
   .ctrl-btn { width: 48px; height: 48px; font-size: 16px; flex-shrink: 0; }
@@ -2604,7 +2608,7 @@ body.inapp-fullscreen { overflow: hidden; }
    чтобы сцена не осталась без места */
 @media (max-height: 480px) and (orientation: landscape) {
   .room-topbar { min-height: 46px; padding: 6px 12px; }
-  .controls-bar { padding: 8px 12px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); gap: 10px; }
+  .controls-bar { padding: 0; gap: 10px; }
   .ctrl-btn { width: 44px; height: 44px; }
   .leave-btn { height: 44px; min-height: 44px; }
   .stage { padding: 8px; }
@@ -2643,13 +2647,13 @@ body.inapp-fullscreen { overflow: hidden; }
 @media (max-width: 860px) {
   .stage.stage-spotlight .tile.is-main .tile-label,
   .stage.stage-spotlight .tile.is-main .tile-fullscreen-btn,
-  .stage.stage-spotlight .tile.is-main .tile-kick-btn { bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .stage.stage-spotlight .tile.is-main .tile-kick-btn { bottom: 96px; }
 }
 /* Низкий ландшафт телефона: панель ниже и плотнее */
 @media (max-height: 480px) and (orientation: landscape) {
-  .controls-bar { bottom: calc(10px + env(safe-area-inset-bottom)); }
+  .controls-bar { bottom: 10px; }
   .controls-pill { padding: 5px; gap: 6px; }
-  .room-main:not(.is-spotlight) { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .room-main:not(.is-spotlight) { padding-bottom: 76px; }
 }
 
 /* ═══════════════ Звонок в отдельном окне ═══════════════
