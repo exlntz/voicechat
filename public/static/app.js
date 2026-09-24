@@ -1111,9 +1111,9 @@ async function enterRoom(joinData) {
   // Скрываем кнопку целиком, если API физически отсутствует.
   const canScreenShare = !!(navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === 'function')
 
-  // Панель парит поверх сцены: кнопки звонка — в «капсуле», выход — отдельная красная кнопка
+  // Панель парит поверх сцены: кнопки звонка — в «капсуле», «Выйти» — рядом
   const controlsPill = el('div', { class: 'controls-pill' })
-  const leaveBtn = el('button', { class: 'leave-btn', title: 'Выйти из звонка', 'aria-label': 'Выйти из звонка' }, [el('i', { class: 'fas fa-phone-slash' })])
+  const leaveBtn = el('button', { class: 'leave-btn' }, [el('i', { class: 'fas fa-phone-slash' }), ' Выйти'])
 
   controlsPill.appendChild(micBtn)
   controlsPill.appendChild(camBtn)

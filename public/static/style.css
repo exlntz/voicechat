@@ -1774,7 +1774,7 @@ body.inapp-fullscreen { overflow: hidden; }
 
 /* ---- Панель управления звонком ---- */
 /* Панель парит поверх сцены по центру снизу: кнопки звонка в полупрозрачной
-   «капсуле», выход — отдельная красная круглая кнопка. Сцена под неё не ужимается
+   «капсуле», «Выйти» — рядом. Сцена под неё не ужимается
    (в режиме «главный на весь экран» видео идёт до самого низа). */
 .room-screen { position: relative; }
 .controls-bar {
@@ -1808,7 +1808,7 @@ body.inapp-fullscreen { overflow: hidden; }
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
 }
 /* Вне режима «главный на весь экран» (один, демонстрации) сцена не заходит под панель */
-.room-main:not(.is-spotlight) { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+.room-main:not(.is-spotlight) { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 
 /* Круглая кнопка управления */
 .ctrl-btn {
@@ -1859,10 +1859,8 @@ body.inapp-fullscreen { overflow: hidden; }
 
 .ctrl-divider { width: 1px; height: 32px; background: var(--border); margin: 0 6px; }
 
+/* Размер кнопок — прежний (.ctrl-btn и его адаптив ниже), здесь только вид внутри капсулы */
 .controls-pill .ctrl-btn {
-  width: 44px;
-  height: 44px;
-  font-size: 15px;
   border-color: transparent;
   background: rgba(242, 245, 249, 0.07);
 }
@@ -1875,21 +1873,6 @@ body.inapp-fullscreen { overflow: hidden; }
 .controls-pill .ctrl-btn.off:hover,
 .controls-pill .ctrl-btn.danger:hover { background: var(--danger); border-color: var(--danger); }
 
-/* Выход — красный круг рядом с капсулой */
-.controls-bar .leave-btn {
-  width: 58px;
-  height: 58px;
-  min-height: 58px;
-  padding: 0;
-  border-radius: 50%;
-  border: 0;
-  background: var(--danger);
-  color: #fff;
-  font-size: 19px;
-  box-shadow: 0 12px 28px rgba(217, 74, 61, 0.42);
-}
-.controls-bar .leave-btn:hover,
-.controls-bar .leave-btn:focus-visible { background: #e55a4d; color: #fff; box-shadow: 0 12px 32px rgba(217, 74, 61, 0.55); }
 
 /* Кнопка завершения звонка */
 .leave-btn {
@@ -2655,23 +2638,19 @@ body.inapp-fullscreen { overflow: hidden; }
   .ctrl-btn { width: 44px; height: 44px; }
   .leave-btn { padding: 0 14px; height: 44px; min-height: 44px; }
   .controls-pill { gap: 6px; padding: 6px; }
-  .controls-pill .ctrl-btn { width: 40px; height: 40px; }
-  .controls-bar .leave-btn { width: 50px; height: 50px; min-height: 50px; }
 }
 
 /* Узкий экран: у главного подпись и кнопки поднимаются над плавающей панелью */
 @media (max-width: 860px) {
   .stage.stage-spotlight .tile.is-main .tile-label,
   .stage.stage-spotlight .tile.is-main .tile-fullscreen-btn,
-  .stage.stage-spotlight .tile.is-main .tile-kick-btn { bottom: calc(88px + env(safe-area-inset-bottom)); }
+  .stage.stage-spotlight .tile.is-main .tile-kick-btn { bottom: calc(96px + env(safe-area-inset-bottom)); }
 }
 /* Низкий ландшафт телефона: панель ниже и плотнее */
 @media (max-height: 480px) and (orientation: landscape) {
   .controls-bar { bottom: calc(10px + env(safe-area-inset-bottom)); }
   .controls-pill { padding: 5px; gap: 6px; }
-  .controls-pill .ctrl-btn { width: 38px; height: 38px; font-size: 14px; }
-  .controls-bar .leave-btn { width: 48px; height: 48px; min-height: 48px; font-size: 16px; }
-  .room-main:not(.is-spotlight) { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+  .room-main:not(.is-spotlight) { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
 }
 
 /* ═══════════════ Звонок в отдельном окне ═══════════════
@@ -2698,9 +2677,7 @@ body.inapp-fullscreen { overflow: hidden; }
   bottom: 8px;
 }
 .room-screen.is-compact .controls-pill { padding: 4px; gap: 4px; }
-.room-screen.is-compact .controls-pill .ctrl-btn { width: 32px; height: 32px; font-size: 13px; }
-.room-screen.is-compact .controls-bar .leave-btn { width: 40px; height: 40px; min-height: 40px; font-size: 14px; }
-.room-screen.is-compact .room-main:not(.is-spotlight) { padding-bottom: 52px; }
+.room-screen.is-compact .room-main:not(.is-spotlight) { padding-bottom: 58px; }
 .room-screen.is-compact .ctrl-btn {
   width: 38px;
   height: 38px;
