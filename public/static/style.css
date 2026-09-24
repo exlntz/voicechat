@@ -1703,9 +1703,9 @@ body.inapp-fullscreen { overflow: hidden; }
 }
 .sidebar-participants .tile { aspect-ratio: 16/9; flex-shrink: 0; }
 
-/* ---- «Главный на весь экран» (двое и больше, без демонстраций) ----
-   Главный участник занимает всю сцену, остальные — миниатюры поверх неё справа
-   сверху. Клик по миниатюре делает участника главным (app.js: spotlightPinned). */
+/* ---- «Главный + колонка» (двое и больше, без демонстраций) ----
+   Главный (последний говоривший собеседник) — большая плитка слева, остальные —
+   колонка справа от неё. На узком экране колонка — поверх главного в углу. */
 .room-main.is-spotlight { position: relative; }
 .stage.stage-spotlight {
   grid-template-columns: minmax(0, 1fr);
@@ -1723,16 +1723,11 @@ body.inapp-fullscreen { overflow: hidden; }
 .tile.is-main .tile-label { bottom: 16px; left: 16px; padding: 9px 14px; font-size: 16px; font-weight: 600; gap: 10px; }
 
 .room-main.is-spotlight .sidebar-participants {
-  position: absolute;
-  top: 28px;
-  right: 28px;
-  width: 208px;
-  max-height: calc(100% - 56px);
-  padding: 0;
+  width: 240px;
+  padding: 14px 14px 14px 0; /* отступ слева даёт padding сцены */
   border: 0;
   background: none;
-  gap: 10px;
-  z-index: 5;
+  gap: 12px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
@@ -1740,14 +1735,12 @@ body.inapp-fullscreen { overflow: hidden; }
 .room-main.is-spotlight .sidebar-participants::-webkit-scrollbar { display: none; }
 .room-main.is-spotlight .sidebar-participants .tile {
   aspect-ratio: 16/10;
-  cursor: pointer;
   background: #1a1d24;
   border: 1px solid rgba(242, 245, 249, 0.08);
   border-radius: 14px;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
-  transition: border-color .2s var(--ease), box-shadow .2s var(--ease), transform .2s var(--ease);
+  transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
 }
-.room-main.is-spotlight .sidebar-participants .tile:hover { border-color: rgba(242, 245, 249, 0.22); transform: translateY(-1px); }
 .room-main.is-spotlight .sidebar-participants .tile.speaking { border-color: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent-soft), 0 14px 34px rgba(0, 0, 0, 0.5); }
 .room-main.is-spotlight .sidebar-participants .no-video-placeholder { background: #1a1d24; }
 /* В миниатюре — только имя и аватар: громкость и кнопки доступны у главного */
@@ -1872,6 +1865,8 @@ body.inapp-fullscreen { overflow: hidden; }
 .controls-pill .ctrl-btn.danger { background: var(--danger-wash); border-color: rgba(217, 74, 61, 0.55); }
 .controls-pill .ctrl-btn.off:hover,
 .controls-pill .ctrl-btn.danger:hover { background: var(--danger); border-color: var(--danger); }
+/* «Выйти» — овальная, в тон круглым кнопкам капсулы */
+.controls-bar .leave-btn { border-radius: var(--radius-pill); }
 
 
 /* Кнопка завершения звонка */
@@ -2498,9 +2493,13 @@ body.inapp-fullscreen { overflow: hidden; }
   .sidebar-participants .tile { width: 160px; height: 100%; flex-shrink: 0; }
   /* «Главный на весь экран» на узком экране: миниатюры колонкой в правом верхнем углу */
   .room-main.is-spotlight .sidebar-participants {
+    position: absolute;
+    z-index: 5;
     top: 18px;
     right: 18px;
     width: 96px;
+    gap: 10px;
+    scrollbar-width: none;
     height: auto;
     min-height: 0;
     max-height: calc(100% - 36px);

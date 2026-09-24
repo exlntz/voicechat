@@ -1348,19 +1348,17 @@ async function enterRoom(joinData) {
   }
 
   // ---- «Главный на весь экран» (spotlight) ----
-  // Когда в звонке двое и больше (и нет демонстраций), один участник занимает всю сцену,
-  // остальные — миниатюры поверх неё справа. Главный: закреплённый кликом по миниатюре,
-  // иначе последний говоривший собеседник, иначе первый собеседник. Свою плитку главной
-  // не делаем автоматически — только если сам её закрепил.
-  let spotlightPinned = null
+  // Когда в звонке двое и больше (и нет демонстраций), один участник — большая плитка
+  // слева, остальные — колонка справа. Главный: последний говоривший собеседник, иначе
+  // первый собеседник; своя плитка главной не становится.
   let spotlightSpeaker = null
   let spotlightSpeakerTimer = 0
 
   function pickSpotlight() {
     const localId = room.localParticipant.identity
     const ids = Array.from(cameraTilesMap.keys())
-    return [spotlightPinned, spotlightSpeaker].find((id) => id && cameraTilesMap.has(id)) ||
-      ids.find((id) => id !== localId) || ids[0]
+    if (spotlightSpeaker && cameraTilesMap.has(spotlightSpeaker)) return spotlightSpeaker
+    return ids.find((id) => id !== localId) || ids[0]
   }
 
   function relayout() {
@@ -1539,12 +1537,6 @@ async function enterRoom(joinData) {
     })
     tile.appendChild(fsBtn)
     tile.addEventListener('dblclick', () => toggleTileFullscreen(tile))
-    // В режиме «главный на весь экран» клик по миниатюре делает участника главным
-    tile.addEventListener('click', () => {
-      if (!roomMain.classList.contains('is-spotlight') || tile.parentElement !== sidebar) return
-      spotlightPinned = identity
-      relayout()
-    })
 
     let volumeCtl = null
     let kickBtn = null
@@ -2014,7 +2006,6 @@ async function enterRoom(joinData) {
   }
 
   function removeCameraTile(identity) {
-    if (spotlightPinned === identity) spotlightPinned = null
     if (spotlightSpeaker === identity) spotlightSpeaker = null
     const t = cameraTilesMap.get(identity)
     if (t) { t.tile.remove(); cameraTilesMap.delete(identity) }
@@ -2182,7 +2173,7 @@ async function enterRoom(joinData) {
     spotlightSpeakerTimer = setTimeout(() => {
       if (!loudest.isSpeaking || !cameraTilesMap.has(loudest.identity)) return
       spotlightSpeaker = loudest.identity
-      if (!spotlightPinned) scheduleRelayout()
+      scheduleRelayout()
     }, 900)
   })
 
