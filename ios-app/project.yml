@@ -1,0 +1,47 @@
+# Описание Xcode-проекта для XcodeGen: сам .xcodeproj в git не храним,
+# его собирает CI (.github/workflows/build-ios.yml) командой `xcodegen generate`.
+name: VoiceLobby
+options:
+  bundleIdPrefix: online.voicelobby
+  deploymentTarget:
+    iOS: "16.0"
+
+packages:
+  LiveKit:
+    url: https://github.com/livekit/client-sdk-swift
+    from: 2.0.0
+
+targets:
+  VoiceLobby:
+    type: application
+    platform: iOS
+    sources:
+      - VoiceLobby
+    dependencies:
+      - package: LiveKit
+    scheme: {}
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: online.voicelobby.app
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    info:
+      path: VoiceLobby/Info.plist
+      properties:
+        CFBundleDisplayName: Voice Lobby
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UIUserInterfaceStyle: Dark
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIBackgroundModes:
+          - audio
+          - voip
+        NSMicrophoneUsageDescription: Микрофон нужен, чтобы собеседники слышали вас в звонке.
+        NSCameraUsageDescription: Камера нужна, чтобы собеседники видели вас в звонке.
+        ITSAppUsesNonExemptEncryption: false

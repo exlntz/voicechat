@@ -1,0 +1,79 @@
+# Сборка iOS-приложения (ios-app/) в неподписанный .ipa.
+# Подписывает его сам SideStore/AltStore бесплатным Apple ID при установке.
+# Готовый файл — в релизе ios-latest:
+#   https://github.com/exlntz/voicechat/releases/download/ios-latest/VoiceLobby.ipa
+name: Build iOS app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ios-app/**"
+      - ".github/workflows/build-ios.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-ios
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: Забрать код
+        uses: actions/checkout@v4
+
+      - name: Инструменты (XcodeGen, xcbeautify)
+        run: brew install xcodegen xcbeautify
+
+      - name: Сгенерировать Xcode-проект
+        working-directory: ios-app
+        run: xcodegen generate
+
+      - name: Собрать (без подписи)
+        working-directory: ios-app
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project VoiceLobby.xcodeproj \
+            -scheme VoiceLobby \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build | xcbeautify --renderer github-actions
+
+      - name: Упаковать .ipa
+        working-directory: ios-app
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/VoiceLobby.app Payload/
+          zip -qry VoiceLobby.ipa Payload
+          ls -lh VoiceLobby.ipa
+
+      - name: Сохранить артефакт
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoiceLobby-ipa
+          path: ios-app/VoiceLobby.ipa
+
+      - name: Опубликовать в релиз ios-latest
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ios-latest
+          name: Voice Lobby для iPhone — тестовая сборка
+          prerelease: true
+          make_latest: false
+          files: ios-app/VoiceLobby.ipa
+          body: |
+            Тестовая сборка приложения для iPhone (не подписана).
+            Установка: откройте VoiceLobby.ipa в SideStore (или AltStore) — он подпишет приложение вашим Apple ID.
+            Обновляется автоматически при каждом изменении ios-app/ в main.

@@ -1,0 +1,6 @@
+# Генерируется XcodeGen и сборкой в CI
+VoiceLobby.xcodeproj/
+VoiceLobby/Info.plist
+build/
+Payload/
+*.ipa
