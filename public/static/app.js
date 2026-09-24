@@ -2436,10 +2436,53 @@ async function enterRoom(joinData) {
 
   // Битрейт подбираем под выбранную частоту кадров: чем больше кадров в секунду, тем
   // больше данных нужно, чтобы картинка не рассыпалась; на 15 кадрах 8 Мбит/с - излишество.
+  // ---- Максимальное качество демонстрации: до 4K и 60 FPS ----
+  // Размер захвата — родное разрешение экрана (с учётом масштабирования Windows/macOS),
+  // но не больше 4K (3840×2160) с сохранением пропорций.
+  const SCREEN_MAX_W = 3840
+  const SCREEN_MAX_H = 2160
+  function screenCaptureSize() {
+    const dpr = window.devicePixelRatio || 1
+    let w = Math.round((window.screen && window.screen.width || 1920) * dpr)
+    let h = Math.round((window.screen && window.screen.height || 1080) * dpr)
+    const k = Math.min(1, SCREEN_MAX_W / Math.max(w, h), SCREEN_MAX_H / Math.min(w, h))
+    w = Math.round(w * k / 2) * 2
+    h = Math.round(h * k / 2) * 2
+    return { width: Math.max(w, 1280), height: Math.max(h, 720) }
+  }
+  // Битрейт от реального числа пикселей и кадров: 1080p60 ≈ 9 Мбит/с, 1440p60 ≈ 16,
+  // 4K60 — 25 (потолок: больше не вытянет интернет у большинства зрителей).
+  function screenBitrate(width, height, fps) {
+    const bps = (width || 1920) * (height || 1080) * (fps || 60) * 0.075
+    return Math.round(Math.min(25_000_000, Math.max(4_000_000, bps)))
+  }
+  // Совместимость: меню FPS и старый код зовут bitrateForFps — считаем от текущего захвата
   function bitrateForFps(fps) {
-    if (fps <= 15) return 4_000_000
-    if (fps <= 30) return 6_000_000
-    return 8_000_000 // 8 Мбит/с - запас для 60 кадров без просадок
+    const pub = room.localParticipant.getTrackPublication(LK.Track.Source.ScreenShare)
+    const st = pub && pub.track && pub.track.mediaStreamTrack && pub.track.mediaStreamTrack.getSettings
+      ? pub.track.mediaStreamTrack.getSettings() : null
+    const size = st && st.width ? st : screenCaptureSize()
+    return screenBitrate(size.width, size.height, fps)
+  }
+  // Выставить параметры отправителя демонстрации: без уменьшения картинки, нужные FPS и
+  // битрейт, высокий приоритет. Делаем это и после публикации — старый .exe (site-boost.js)
+  // при публикации срезает битрейт до 8 Мбит/с, а здесь мы возвращаем полный.
+  function tuneScreenSender(track, fps) {
+    const sender = track && track.sender
+    if (!sender || typeof sender.getParameters !== 'function') return
+    try {
+      const params = sender.getParameters()
+      if (!params.encodings || !params.encodings.length) return
+      params.degradationPreference = 'maintain-framerate'
+      params.encodings.forEach((enc) => {
+        enc.maxFramerate = fps
+        enc.maxBitrate = bitrateForFps(fps)
+        enc.scaleResolutionDownBy = 1
+        enc.priority = 'high'
+        enc.networkPriority = 'high'
+      })
+      Promise.resolve(sender.setParameters(params)).catch(() => {})
+    } catch {}
   }
 
   // ---- Применить выбранный FPS к уже идущей демонстрации "живьём" ----
@@ -2455,16 +2498,7 @@ async function enterRoom(joinData) {
     if (msTrack && typeof msTrack.applyConstraints === 'function') {
       msTrack.applyConstraints({ frameRate: { ideal: fps, min: Math.min(fps, 30) } }).catch(() => {})
     }
-    const sender = track.sender
-    if (sender && typeof sender.getParameters === 'function') {
-      try {
-        const params = sender.getParameters()
-        if (params.encodings && params.encodings.length) {
-          params.encodings.forEach((enc) => { enc.maxFramerate = fps; enc.maxBitrate = bitrateForFps(fps) })
-          Promise.resolve(sender.setParameters(params)).catch(() => {})
-        }
-      } catch {}
-    }
+    tuneScreenSender(track, fps)
   }
 
   // Вызывается из подменю "Качество передачи" (ПКМ на своём тайле демонстрации):
@@ -2527,15 +2561,22 @@ async function enterRoom(joinData) {
         // браузерах констрейнт просто игнорируется, без ошибки).
         audio: { restrictOwnAudio: true }, // всегда запрашиваем звук - живое вкл/выкл делается позже мьютом трека, не пересозданием
         systemAudio: 'include',
-        resolution: { width: 1920, height: 1080, frameRate: fps },
+        // Родное разрешение экрана до 4K (раньше захват был прибит к 1920×1080)
+        resolution: { ...screenCaptureSize(), frameRate: fps },
         contentHint: hint
       }, {
-        videoEncoding: { maxBitrate: bitrateForFps(fps), maxFramerate: fps },
+        // ВАЖНО: для демонстрации LiveKit берёт параметры ТОЛЬКО из screenShareEncoding,
+        // videoEncoding для неё игнорируется. Раньше здесь был только videoEncoding, и на сайте
+        // срабатывал встроенный пресет LiveKit — 1080p, 15 FPS, ~2,5 Мбит/с (в .exe его
+        // перекрывал site-boost.js). Передаём оба поля.
+        screenShareEncoding: { maxBitrate: screenBitrate(screenCaptureSize().width, screenCaptureSize().height, fps), maxFramerate: fps, priority: 'high' },
+        videoEncoding: { maxBitrate: screenBitrate(screenCaptureSize().width, screenCaptureSize().height, fps), maxFramerate: fps, priority: 'high' },
         // degradationPreference по умолчанию для ScreenShare = "maintain-resolution" - при перегрузке
         // CPU/сети WebRTC-энкодер режет именно FPS, сохраняя разрешение, отсюда и проседание до 40-50
         // на 60 FPS. Для плавности важнее стабильный FPS, чем максимальная резкость - переключаем на
         // "balanced", чтобы энкодер мог слегка снизить резкость/битрейт, но удерживал частоту кадров.
-        degradationPreference: 'balanced',
+        // Плавность важнее: при нехватке ресурсов энкодер снижает разрешение, а не FPS
+        degradationPreference: 'maintain-framerate',
         simulcast: false,
         // H264 имеет аппаратное ускорение кодирования на Windows (наша целевая платформа для Electron) -
         // при наличии GPU это даёт заметно более плавную и лёгкую по CPU демонстрацию, ближе к тому,
@@ -2557,6 +2598,7 @@ async function enterRoom(joinData) {
             await msTrack.applyConstraints({ frameRate: { ideal: fps, min: Math.min(fps, 30) } }).catch(() => {})
           }
         }
+        tuneScreenSender(pub.track, fps)
       } catch {}
 
       isScreenSharing = true
