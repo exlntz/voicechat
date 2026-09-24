@@ -1,0 +1,254 @@
+// ===================== Левая колонка: друзья, лички, панель звонка, профиль =====================
+import { store, on, sortedConversations, presenceOf, incomingCount, friendsBy } from './store.js'
+import { api } from './api.js'
+import { h, icon, avatar, displayName, presenceText, messagePreview, timeShort, showMenu, toast } from './ui.js'
+import { notificationsNeedPermission, requestNotificationPermission } from './notify.js'
+import { callState, inCall } from './call-invite.js'
+
+const STATUS_LABELS = { online: 'В сети', idle: 'Отошёл', dnd: 'Не беспокоить' }
+
+export function createSidebar({ root, navigate, openDmWith, setStatus, logout }) {
+  let route = { name: 'friends' }
+  const unsub = []
+
+  // ---- Шапка: «Найти или начать беседу» ----
+  const finder = h('button', { type: 'button', class: 'vl-side__finder' }, [icon('magnifying-glass'), h('span', {}, 'Найти или начать беседу')])
+  finder.addEventListener('click', () => openPicker())
+
+  // ---- Навигация ----
+  const friendsBadge = h('span', { class: 'vl-badge', hidden: true })
+  const navFriends = h('a', { href: '/friends', class: 'vl-nav', 'data-nav': 'friends' }, [icon('user-group'), h('span', {}, 'Друзья'), friendsBadge])
+  const navLobby = h('a', { href: '/lobby', class: 'vl-nav', 'data-nav': 'lobby' }, [icon('hashtag'), h('span', {}, 'Звонок по коду')])
+  for (const a of [navFriends, navLobby]) {
+    a.addEventListener('click', (e) => {
+      if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return
+      e.preventDefault()
+      navigate(a.getAttribute('href'))
+    })
+  }
+
+  const addDmBtn = h('button', { type: 'button', class: 'vl-icon-btn vl-side__add', title: 'Новое сообщение', 'aria-label': 'Новое сообщение' }, [icon('plus')])
+  addDmBtn.addEventListener('click', () => openPicker())
+  const dmList = h('div', { class: 'vl-dm-list', role: 'list' })
+  const scroller = h('div', { class: 'vl-side__scroll' }, [
+    h('nav', { class: 'vl-side__nav' }, [navFriends, navLobby]),
+    h('div', { class: 'vl-side__section' }, [h('span', {}, 'Личные сообщения'), addDmBtn]),
+    dmList
+  ])
+
+  // ---- Баннер «включите уведомления» (сайт; разрешение просим только по клику) ----
+  const notifBanner = h('div', { class: 'vl-notif-banner', hidden: true }, [
+    icon('bell'),
+    h('span', {}, 'Включите уведомления о сообщениях и звонках'),
+    h('button', { type: 'button', class: 'vl-btn vl-btn--primary vl-btn--sm' }, 'Включить'),
+    h('button', { type: 'button', class: 'vl-icon-btn', 'aria-label': 'Скрыть' }, [icon('xmark')])
+  ])
+  const [, , enableBtn, hideBtn] = notifBanner.children
+  enableBtn.addEventListener('click', async () => {
+    const res = await requestNotificationPermission()
+    if (res === 'granted') toast('Уведомления включены', 'success')
+    renderNotifBanner()
+  })
+  hideBtn.addEventListener('click', () => { try { localStorage.setItem('vl:notifBannerHidden', '1') } catch {} renderNotifBanner() })
+  function renderNotifBanner() {
+    let hidden = false
+    try { hidden = localStorage.getItem('vl:notifBannerHidden') === '1' } catch {}
+    notifBanner.hidden = hidden || !notificationsNeedPermission()
+  }
+
+  // ---- Панель звонка (как «Голосовая связь подключена» в Дискорде) ----
+  const callTitle = h('button', { type: 'button', class: 'vl-callbar__title' })
+  const callSub = h('div', { class: 'vl-callbar__sub' })
+  const callMic = h('button', { type: 'button', class: 'vl-icon-btn', title: 'Микрофон', 'aria-label': 'Микрофон' }, [icon('microphone')])
+  const callLeave = h('button', { type: 'button', class: 'vl-icon-btn is-danger', title: 'Завершить звонок', 'aria-label': 'Завершить звонок' }, [icon('phone-slash')])
+  const callBar = h('div', { class: 'vl-callbar', hidden: true }, [
+    h('div', { class: 'vl-callbar__info' }, [callTitle, callSub]),
+    callMic, callLeave
+  ])
+  callTitle.addEventListener('click', () => { if (window.VL.state.roomCode) navigate('/room/' + window.VL.state.roomCode) })
+  callMic.addEventListener('click', () => { if (window.VL.toggleMic) window.VL.toggleMic() })
+  callLeave.addEventListener('click', () => { if (window.VL.leaveCall) window.VL.leaveCall() })
+
+  function renderCallBar() {
+    const active = inCall()
+    callBar.hidden = !active
+    if (!active) return
+    const vl = window.VL
+    const live = document.body.classList.contains('in-call')
+    const conv = callState.conversationId && store.conversations.get(callState.conversationId)
+    callTitle.textContent = callState.outgoingCallId ? 'Вызов…' : live ? 'Звонок подключён' : 'Подключение…'
+    callTitle.classList.toggle('is-live', live && !callState.outgoingCallId)
+    callSub.textContent = conv && conv.peer ? displayName(conv.peer) : `Комната ${vl.state.roomCode || ''}`
+    const micOn = !!vl.state.micEnabled
+    callMic.classList.toggle('is-off', !micOn)
+    callMic.replaceChildren(icon(micOn ? 'microphone' : 'microphone-slash'))
+    callMic.title = micOn ? 'Выключить микрофон' : 'Включить микрофон'
+  }
+
+  // ---- Профиль внизу ----
+  const meAvatarSlot = h('span', { class: 'vl-me__ava' })
+  const meName = h('div', { class: 'vl-me__name' })
+  const meSub = h('div', { class: 'vl-me__sub' })
+  const meBtn = h('button', { type: 'button', class: 'vl-me__btn', title: 'Статус' }, [meAvatarSlot, h('div', { class: 'vl-me__text' }, [meName, meSub])])
+  const logoutBtn = h('button', { type: 'button', class: 'vl-icon-btn', title: 'Выйти из аккаунта', 'aria-label': 'Выйти из аккаунта' }, [icon('right-from-bracket')])
+  const mePanel = h('div', { class: 'vl-me' }, [meBtn, logoutBtn])
+  meBtn.addEventListener('click', () => {
+    const item = (status, label, cls) => ({ label: (store.myStatus === status ? '✓ ' : '') + label, icon: cls, onClick: () => setStatus(status) })
+    showMenu([
+      item('online', 'В сети', 'circle'),
+      item('idle', 'Отошёл', 'moon'),
+      item('dnd', 'Не беспокоить', 'circle-minus'),
+      'sep',
+      { label: 'Скопировать юзернейм', icon: 'at', onClick: async () => { const ok = await window.VL.copyToClipboard(store.me.username); toast(ok ? 'Скопировано' : 'Не удалось скопировать', ok ? 'success' : 'error') } }
+    ], meBtn)
+  })
+  logoutBtn.addEventListener('click', () => logout())
+
+  function renderMe() {
+    if (!store.me) return
+    const p = { status: store.connected ? store.myStatus : 'offline', inCall: false }
+    meAvatarSlot.replaceChildren(avatar(store.me, { size: 32, presence: p }))
+    meName.textContent = displayName(store.me)
+    meSub.textContent = store.connected ? (STATUS_LABELS[store.myStatus] || 'В сети') : 'Подключение…'
+  }
+
+  // ---- Список личек ----
+  function renderDms() {
+    const convs = sortedConversations()
+    const activeId = route.name === 'dm' ? route.id : route.name === 'room' ? callState.conversationId : null
+    const nodes = []
+    for (const conv of convs) {
+      const peer = conv.peer || (conv.members || []).find((u) => u.id !== store.me.id) || { id: 0, username: '?' }
+      const p = presenceOf(peer.id)
+      const typing = store.typing.get(conv.id)
+      const isTyping = typing && [...typing.values()].some((t) => t > Date.now())
+      const sub = isTyping ? 'печатает…' : conv.lastMessage ? (conv.lastMessage.authorId === store.me.id ? 'Вы: ' : '') + messagePreview(conv.lastMessage) : presenceText(p)
+      const close = h('button', { type: 'button', class: 'vl-dm__close', title: 'Закрыть', 'aria-label': 'Закрыть личку' }, [icon('xmark')])
+      const item = h('a', {
+        href: '/dm/' + conv.id,
+        role: 'listitem',
+        class: `vl-dm${conv.id === activeId ? ' is-active' : ''}${conv.unread ? ' is-unread' : ''}${conv.muted ? ' is-muted' : ''}`
+      }, [
+        avatar(peer, { size: 32, presence: p }),
+        h('div', { class: 'vl-dm__text' }, [
+          h('div', { class: 'vl-dm__row' }, [h('span', { class: 'vl-dm__name' }, displayName(peer)), h('span', { class: 'vl-dm__time' }, timeShort(conv.lastMessageAt))]),
+          h('div', { class: `vl-dm__sub${isTyping ? ' is-typing' : ''}` }, sub)
+        ]),
+        conv.unread ? h('span', { class: 'vl-badge' }, conv.unread > 99 ? '99+' : String(conv.unread)) : null,
+        close
+      ])
+      item.addEventListener('click', (e) => {
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return
+        e.preventDefault()
+        navigate('/dm/' + conv.id)
+      })
+      close.addEventListener('click', async (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        try {
+          await api.updateConversation(conv.id, { hidden: true })
+          store.conversations.delete(conv.id)
+          renderDms()
+          if (route.name === 'dm' && route.id === conv.id) navigate('/friends')
+        } catch (err) { toast(err.message, 'error') }
+      })
+      item.addEventListener('contextmenu', (e) => {
+        e.preventDefault()
+        showMenu([
+          { label: conv.muted ? 'Включить уведомления' : 'Без звука', icon: conv.muted ? 'bell' : 'bell-slash', onClick: () => api.updateConversation(conv.id, { muted: !conv.muted }).catch((er) => toast(er.message, 'error')) },
+          { label: 'Позвонить', icon: 'phone', onClick: () => import('./call-invite.js').then((m) => { navigate('/dm/' + conv.id); m.startCall(conv.id) }) },
+          'sep',
+          { label: 'Закрыть личку', icon: 'xmark', onClick: () => close.click() }
+        ], e)
+      })
+      nodes.push(item)
+    }
+    if (!nodes.length) {
+      if (!store.conversationsLoaded) {
+        for (let i = 0; i < 5; i++) nodes.push(h('div', { class: 'vl-dm is-skeleton' }, [h('span', { class: 'vl-skel vl-skel--circle' }), h('span', { class: 'vl-skel vl-skel--line' })]))
+      } else {
+        nodes.push(h('div', { class: 'vl-side__empty' }, 'Здесь появятся ваши переписки'))
+      }
+    }
+    dmList.replaceChildren(...nodes)
+  }
+
+  function renderNav() {
+    const n = incomingCount()
+    friendsBadge.hidden = !n
+    friendsBadge.textContent = String(n)
+    navFriends.classList.toggle('is-active', route.name === 'friends')
+    // Звонок из лички подсвечивает личку, а не «Звонок по коду»
+    navLobby.classList.toggle('is-active', route.name === 'lobby' || (route.name === 'room' && !callState.conversationId))
+  }
+
+  // ---- Выбор друга для новой лички ----
+  function openPicker() {
+    const input = h('input', { type: 'text', class: 'vl-input', placeholder: 'Имя или юзернейм друга', autocomplete: 'off' })
+    const list = h('div', { class: 'vl-picker__list' })
+    const close = h('button', { type: 'button', class: 'vl-icon-btn', 'aria-label': 'Закрыть' }, [icon('xmark')])
+    const card = h('div', { class: 'vl-modal vl-picker', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Новое сообщение' }, [
+      h('div', { class: 'vl-picker__head' }, [h('h3', { class: 'vl-modal__title' }, 'Написать другу'), close]),
+      input, list
+    ])
+    const overlay = h('div', { class: 'vl-modal-overlay' }, [card])
+    let results = []
+    function render() {
+      const q = input.value.trim().toLowerCase()
+      results = friendsBy('friend').map((f) => f.user)
+        .filter((u) => !q || displayName(u).toLowerCase().includes(q) || u.username.toLowerCase().includes(q))
+        .sort((a, b) => displayName(a).localeCompare(displayName(b), 'ru'))
+      list.replaceChildren(...(results.length ? results.map((u, i) => {
+        const row = h('button', { type: 'button', class: `vl-picker__row${i === 0 ? ' is-first' : ''}` }, [
+          avatar(u, { size: 32, presence: presenceOf(u.id) }),
+          h('span', { class: 'vl-picker__name' }, displayName(u)),
+          h('span', { class: 'vl-picker__user' }, '@' + u.username)
+        ])
+        row.addEventListener('click', () => { done(); openDmWith(u.id) })
+        return row
+      }) : [h('div', { class: 'vl-side__empty' }, friendsBy('friend').length ? 'Никого не нашлось' : 'Пока нет друзей — добавьте кого-нибудь во вкладке «Друзья»')]))
+    }
+    function done() { overlay.remove(); document.removeEventListener('keydown', onKey, true) }
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); done() }
+      if (e.key === 'Enter' && results[0]) { e.preventDefault(); done(); openDmWith(results[0].id) }
+    }
+    input.addEventListener('input', render)
+    close.addEventListener('click', done)
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) done() })
+    document.addEventListener('keydown', onKey, true)
+    document.body.appendChild(overlay)
+    render()
+    input.focus()
+  }
+
+  root.replaceChildren(
+    h('div', { class: 'vl-side__head' }, [finder]),
+    scroller,
+    notifBanner,
+    callBar,
+    mePanel
+  )
+
+  unsub.push(on('conversations', renderDms), on('presence', () => { renderDms(); renderMe() }), on('typing-any', renderDms))
+  unsub.push(on('friends', renderNav), on('unread', renderNav), on('connection', renderMe), on('status', renderMe))
+  unsub.push(on('call-changed', () => { renderCallBar(); renderNav(); renderDms() }))
+  const onCallUi = () => renderCallBar()
+  window.addEventListener('vl-call-state', onCallUi)
+  window.addEventListener('vl-mic-state', onCallUi)
+  const callTimer = setInterval(renderCallBar, 1500) // подписи «Подключение…/Вызов…»
+
+  renderDms(); renderNav(); renderMe(); renderCallBar(); renderNotifBanner()
+
+  return {
+    setRoute(r) { route = r; renderDms(); renderNav() },
+    refreshCall: renderCallBar,
+    destroy() {
+      unsub.forEach((u) => u())
+      window.removeEventListener('vl-call-state', onCallUi)
+      window.removeEventListener('vl-mic-state', onCallUi)
+      clearInterval(callTimer)
+      root.replaceChildren()
+    }
+  }
+}

@@ -1,5 +1,5 @@
 // ===================== Электрон: главный процесс =====================
-const { app, BrowserWindow, ipcMain, desktopCapturer, session, screen, Menu, globalShortcut, clipboard } = require('electron')
+const { app, BrowserWindow, ipcMain, desktopCapturer, session, screen, Menu, globalShortcut, clipboard, Tray, Notification, nativeImage, powerMonitor } = require('electron')
 const path = require('path')
 const fs = require('fs')
 
@@ -12,6 +12,21 @@ const SERVER_URL = process.env.ZVONKI_SERVER_URL || 'https://voicelobby.online'
 try {
   app.setPath('userData', path.join(app.getPath('appData'), 'Звонки'))
 } catch (e) {}
+
+// ---- Только одна копия приложения ----
+// Второй запуск (ярлык, автозапуск, ссылка voicelobby://) не открывает новое окно, а
+// показывает уже работающее и передаёт ему ссылку.
+const gotSingleLock = app.requestSingleInstanceLock()
+if (!gotSingleLock) {
+  app.quit()
+}
+
+// Ссылки вида voicelobby://dm/12 или voicelobby://room/abc123
+const PROTOCOL = 'voicelobby'
+// Путь к самому .exe: у portable-сборки process.execPath указывает на распакованную во временную
+// папку копию, настоящий файл — в PORTABLE_EXECUTABLE_FILE
+const EXE_PATH = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath
+const START_HIDDEN = process.argv.includes('--hidden')
 
 // ---- GPU / аппаратное ускорение кодирования видео (для плавной демонстрации экрана, как в Discord) ----
 app.commandLine.appendSwitch('enable-accelerated-video-encode')
@@ -40,6 +55,8 @@ const ALLOWED_PERMISSIONS = [
 
 let mainWindow = null
 let pickerWindow = null
+let tray = null
+let isQuitting = false
 
 // ---- Состояние оверлея для рисования поверх любых приложений ----
 let overlayWindow = null
@@ -49,6 +66,8 @@ let activeShortcuts = []       // горячие клавиши, которые 
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
+    // При автозапуске с Windows окно не показываем — приложение сидит в трее
+    show: !START_HIDDEN,
     width: 1280,
     height: 820,
     minWidth: 900,
@@ -96,9 +115,304 @@ function createMainWindow() {
     if (boost) {
       mainWindow.webContents.executeJavaScript(boost).catch(() => {})
     }
+    // Ссылка, с которой запустили приложение, — после загрузки сайта
+    if (pendingDeepLink) {
+      mainWindow.webContents.send('social-deep-link', pendingDeepLink)
+      pendingDeepLink = null
+    }
   })
 
+  // Крестик не закрывает приложение, а прячет его в трей: соединение с сервером продолжает
+  // работать, сообщения и звонки приходят. Выход — через меню иконки в трее.
+  mainWindow.on('close', (e) => {
+    if (isQuitting) return
+    e.preventDefault()
+    mainWindow.hide()
+    showTrayHintOnce()
+  })
+  mainWindow.on('focus', () => { try { mainWindow.flashFrame(false) } catch (err) {} })
+
   mainWindow.on('closed', () => { mainWindow = null })
+}
+
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) { createMainWindow(); return }
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  if (!mainWindow.isVisible()) mainWindow.show()
+  mainWindow.focus()
+}
+
+function sendToMain(channel, payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload)
+}
+
+// ===================== Настройки .exe (автозапуск и т.п.) =====================
+const SETTINGS_PATH = () => path.join(app.getPath('userData'), 'desktop-settings.json')
+function readSettings() {
+  try { return JSON.parse(fs.readFileSync(SETTINGS_PATH(), 'utf8')) } catch (e) { return {} }
+}
+function writeSettings(patch) {
+  const next = { ...readSettings(), ...patch }
+  try { fs.writeFileSync(SETTINGS_PATH(), JSON.stringify(next, null, 2)) } catch (e) {}
+  return next
+}
+
+// ---- Автозапуск с Windows ----
+// Включён по умолчанию (как у Дискорда); выключается галочкой в меню трея. В режиме разработки
+// (electron .) не трогаем, иначе в автозагрузку попал бы electron.exe.
+function applyAutostart(enabled) {
+  if (!app.isPackaged) return
+  try {
+    app.setLoginItemSettings({ openAtLogin: !!enabled, path: EXE_PATH, args: ['--hidden'] })
+  } catch (e) {}
+}
+function autostartEnabled() {
+  const s = readSettings()
+  return s.autostart !== false
+}
+
+// ---- Ссылки voicelobby:// ----
+let pendingDeepLink = null
+function registerProtocol() {
+  try {
+    if (process.defaultApp && process.argv.length >= 2) {
+      app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [path.resolve(process.argv[1])])
+    } else {
+      app.setAsDefaultProtocolClient(PROTOCOL, EXE_PATH, [])
+    }
+  } catch (e) {}
+}
+function findDeepLink(argv) {
+  return (argv || []).find((a) => typeof a === 'string' && a.toLowerCase().startsWith(PROTOCOL + '://')) || null
+}
+function openDeepLink(url) {
+  if (!url) return
+  showMainWindow()
+  if (mainWindow && !mainWindow.webContents.isLoading()) sendToMain('social-deep-link', url)
+  else pendingDeepLink = url
+}
+
+// ===================== Трей и счётчик непрочитанных =====================
+let unreadCount = 0
+let callActive = false
+const ICON_PATH = path.join(__dirname, 'icon.ico')
+
+function trayMenu() {
+  return Menu.buildFromTemplate([
+    { label: 'Открыть Voice Lobby', click: showMainWindow },
+    { type: 'separator' },
+    {
+      label: muteAccelerator ? `Микрофон вкл/выкл (${muteAccelerator.replace('Control', 'Ctrl')})` : 'Микрофон вкл/выкл',
+      enabled: callActive,
+      click: () => sendToMain('toggle-mute')
+    },
+    {
+      label: 'Запускать вместе с Windows',
+      type: 'checkbox',
+      checked: autostartEnabled(),
+      enabled: app.isPackaged,
+      click: (item) => { writeSettings({ autostart: item.checked }); applyAutostart(item.checked) }
+    },
+    { type: 'separator' },
+    { label: 'Выйти', click: () => { isQuitting = true; app.quit() } }
+  ])
+}
+
+function createTray() {
+  if (tray) return
+  try {
+    tray = new Tray(ICON_PATH)
+  } catch (e) {
+    tray = null
+    return
+  }
+  tray.setToolTip('Voice Lobby')
+  tray.setContextMenu(trayMenu())
+  tray.on('click', showMainWindow)
+  tray.on('double-click', showMainWindow)
+}
+
+function refreshTray() {
+  if (!tray) return
+  tray.setToolTip(unreadCount ? `Voice Lobby — непрочитанных: ${unreadCount}` : 'Voice Lobby')
+  tray.setContextMenu(trayMenu())
+}
+
+function showTrayHintOnce() {
+  const s = readSettings()
+  if (s.trayHintShown || !tray) return
+  writeSettings({ trayHintShown: true })
+  try {
+    tray.displayBalloon({
+      iconType: 'info',
+      title: 'Voice Lobby работает в трее',
+      content: 'Сообщения и звонки продолжат приходить. Выйти можно через меню этой иконки.'
+    })
+  } catch (e) {}
+}
+
+ipcMain.on('social-badge', (_e, data) => {
+  unreadCount = Math.max(0, Number(data && data.count) || 0)
+  try { app.setBadgeCount(unreadCount) } catch (e) {}
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    // Красный кружок с числом поверх иконки на панели задач (Windows)
+    try {
+      const img = unreadCount && data.overlay ? nativeImage.createFromDataURL(data.overlay) : null
+      mainWindow.setOverlayIcon(img && !img.isEmpty() ? img : null, unreadCount ? `Непрочитанных: ${unreadCount}` : '')
+    } catch (e) {}
+  }
+  if (tray) {
+    try {
+      const img = unreadCount && data.tray ? nativeImage.createFromDataURL(data.tray) : null
+      tray.setImage(img && !img.isEmpty() ? img.resize({ width: 32, height: 32 }) : ICON_PATH)
+    } catch (e) {}
+  }
+  refreshTray()
+})
+
+// ===================== Уведомления Windows =====================
+// Ссылки на уведомления держим, пока они живы: иначе сборщик мусора забирает объект и клик
+// по уведомлению уже никуда не ведёт.
+const liveNotifications = new Set()
+ipcMain.on('social-notify', (_e, data) => {
+  if (!Notification.isSupported()) {
+    if (mainWindow && !mainWindow.isFocused()) try { mainWindow.flashFrame(true) } catch (err) {}
+    return
+  }
+  const n = new Notification({
+    title: String(data.title || 'Voice Lobby').slice(0, 120),
+    body: String(data.body || '').slice(0, 300),
+    icon: ICON_PATH,
+    silent: true // звук играет сама страница, двойной не нужен
+  })
+  liveNotifications.add(n)
+  const drop = () => liveNotifications.delete(n)
+  n.on('click', () => {
+    drop()
+    showMainWindow()
+    if (data.route) sendToMain('social-navigate', data.route)
+  })
+  n.on('close', drop)
+  n.on('failed', drop)
+  n.show()
+  if (mainWindow && !mainWindow.isFocused()) try { mainWindow.flashFrame(true) } catch (err) {}
+})
+
+// ===================== Окно входящего звонка =====================
+let callWindow = null
+let callWindowCallId = null
+
+function showIncomingCall(data) {
+  const callId = String((data && data.callId) || '')
+  if (!callId) return
+  callWindowCallId = callId
+  const payload = {
+    callId,
+    name: String(data.name || 'Звонок').slice(0, 60),
+    initials: String(data.initials || '?').slice(0, 3),
+    color: /^hsl\([\d.\s%]+\)$|^#[0-9a-f]{3,8}$/i.test(String(data.color || '')) ? String(data.color) : '#0458cf'
+  }
+  if (!callWindow || callWindow.isDestroyed()) {
+    const { workArea } = screen.getPrimaryDisplay()
+    const width = 360
+    const height = 96
+    callWindow = new BrowserWindow({
+      width,
+      height,
+      x: workArea.x + workArea.width - width - 16,
+      y: workArea.y + workArea.height - height - 16,
+      frame: false,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
+      alwaysOnTop: true,
+      skipTaskbar: false,
+      show: false,
+      backgroundColor: '#15181e',
+      title: 'Входящий звонок',
+      icon: ICON_PATH,
+      webPreferences: {
+        preload: path.join(__dirname, 'call-preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        // Мелодия должна играть без клика по окну
+        autoplayPolicy: 'no-user-gesture-required'
+      }
+    })
+    callWindow.setAlwaysOnTop(true, 'screen-saver')
+    callWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+    callWindow.loadFile(path.join(__dirname, 'call.html'))
+    callWindow.webContents.once('did-finish-load', () => {
+      if (!callWindow || callWindow.isDestroyed()) return
+      callWindow.webContents.send('call-data', callWindow.__payload)
+      callWindow.showInactive()
+    })
+    callWindow.on('closed', () => { callWindow = null; callWindowCallId = null })
+  } else {
+    callWindow.webContents.send('call-data', payload)
+    callWindow.showInactive()
+  }
+  callWindow.__payload = payload
+  // Мигание на панели задач, пока не ответили
+  if (mainWindow && !mainWindow.isDestroyed()) try { mainWindow.flashFrame(true) } catch (e) {}
+}
+
+function hideIncomingCall(callId) {
+  if (callId && callWindowCallId && callId !== callWindowCallId) return
+  if (callWindow && !callWindow.isDestroyed()) callWindow.close()
+  callWindow = null
+  callWindowCallId = null
+  if (mainWindow && !mainWindow.isDestroyed()) try { mainWindow.flashFrame(false) } catch (e) {}
+}
+
+ipcMain.on('incoming-call-show', (_e, data) => showIncomingCall(data || {}))
+ipcMain.on('incoming-call-hide', (_e, callId) => hideIncomingCall(String(callId || '')))
+ipcMain.on('incoming-call-action', (_e, data) => {
+  const callId = String((data && data.callId) || '')
+  const action = data && data.action === 'accept' ? 'accept' : 'decline'
+  hideIncomingCall(callId)
+  if (action === 'accept') showMainWindow()
+  sendToMain('incoming-call-action', { callId, action })
+})
+
+// ===================== Микрофон горячей клавишей (работает при свёрнутом окне) =====================
+// Клавиша забирается у системы только на время звонка: вне звонка она не должна мешать другим
+// программам.
+let muteAccelerator = null
+function setCallActive(active) {
+  callActive = !!active
+  if (callActive && !muteAccelerator) {
+    for (const accel of ['Control+Alt+M', 'Alt+Shift+M']) {
+      try {
+        if (globalShortcut.register(accel, () => sendToMain('toggle-mute'))) { muteAccelerator = accel; break }
+      } catch (e) {}
+    }
+  } else if (!callActive && muteAccelerator) {
+    try { globalShortcut.unregister(muteAccelerator) } catch (e) {}
+    muteAccelerator = null
+  }
+  refreshTray()
+}
+ipcMain.on('social-call-state', (_e, active) => setCallActive(!!active))
+
+// ===================== «Отошёл» по простою системы =====================
+const IDLE_SECONDS = 10 * 60
+let idleState = false
+function setIdle(idle) {
+  if (idle === idleState) return
+  idleState = idle
+  sendToMain('idle-change', idle)
+}
+function watchIdle() {
+  setInterval(() => {
+    try { setIdle(powerMonitor.getSystemIdleTime() >= IDLE_SECONDS) } catch (e) {}
+  }, 30000)
+  try {
+    powerMonitor.on('lock-screen', () => setIdle(true))
+    powerMonitor.on('unlock-screen', () => setIdle(false))
+    powerMonitor.on('resume', () => setIdle(false))
+  } catch (e) {}
 }
 
 // ===================== Оверлей для рисования поверх экрана =====================
@@ -468,8 +782,28 @@ function registerShortcut(candidates, handler, label) {
   return null
 }
 
+// Второй запуск: показать окно и передать ссылку voicelobby://, если она есть
+app.on('second-instance', (_e, argv) => {
+  const link = findDeepLink(argv)
+  if (link) openDeepLink(link)
+  else showMainWindow()
+})
+// macOS присылает ссылки отдельным событием
+app.on('open-url', (e, url) => { e.preventDefault(); openDeepLink(url) })
+app.on('before-quit', () => { isQuitting = true })
+
 app.whenReady().then(() => {
+  if (!gotSingleLock) return
+  // Нужен Windows, чтобы уведомления показывались от имени приложения (совпадает с appId сборки)
+  try { app.setAppUserModelId('com.zvonki.desktop') } catch (e) {}
+  pendingDeepLink = findDeepLink(process.argv)
+  registerProtocol()
+  const settings = readSettings()
+  if (settings.autostart === undefined) writeSettings({ autostart: true })
+  applyAutostart(autostartEnabled())
   createMainWindow()
+  createTray()
+  watchIdle()
 
   // ---- Глобальные горячие клавиши рисования ----
   // Работают из любого приложения, даже когда наше окно свёрнуто.
@@ -512,7 +846,8 @@ app.whenReady().then(() => {
   }, { useSystemPicker: false })
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
+    if (!mainWindow) createMainWindow()
+    else showMainWindow()
   })
 })
 
@@ -520,6 +855,7 @@ app.on('will-quit', () => {
   globalShortcut.unregisterAll()
 })
 
+// Главное окно при закрытии прячется в трей, поэтому сюда попадаем только при настоящем выходе
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  if (process.platform !== 'darwin' || isQuitting) app.quit()
 })

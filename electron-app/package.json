@@ -26,6 +26,9 @@
       "src/**/*",
       "package.json"
     ],
+    "protocols": [
+      { "name": "Voice Lobby", "schemes": ["voicelobby"] }
+    ],
     "win": {
       "icon": "build/icon.ico",
       "target": [
