@@ -3114,16 +3114,73 @@ body.pip-body > .room-screen { height: 100%; }
 .ctl-ico__cut { stroke: #000; stroke-width: 5.5; }
 .ctrl-btn.off .ctl-ico__slash,
 .ctrl-btn.off .ctl-ico__cut { stroke-dashoffset: 0; }
+@media (prefers-reduced-motion: reduce) { .ctrl-btn:hover .ctl-ico { animation: none; } }
 
-.leave-ico { width: 1.25em; height: 1.25em; display: block; flex-shrink: 0; transform-origin: 50% 60%; }
-@keyframes leave-ico-ring {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-14deg); }
-  75% { transform: rotate(14deg); }
+.leave-ico { width: 22px; height: 22px; display: block; flex-shrink: 0; transform-origin: 50% 55%; }
+/* Один раз при каждом наведении: три затухающих качания (вариант «качнуть») */
+@keyframes leave-ico-rock {
+  0% { transform: rotate(0deg); }
+  20% { transform: rotate(-16deg); }
+  45% { transform: rotate(12deg); }
+  70% { transform: rotate(-6deg); }
+  100% { transform: rotate(0deg); }
 }
 .leave-btn:hover .leave-ico,
-.leave-btn:focus-visible .leave-ico { animation: leave-ico-ring 0.5s ease-in-out infinite; }
+.leave-btn:focus-visible .leave-ico { animation: leave-ico-rock 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1; }
+/* Микрофон и камера: один раз «пульс» при наведении */
+@keyframes ctl-ico-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.18); }
+  70% { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+.ctrl-btn:hover .ctl-ico { animation: ctl-ico-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1) 1; }
 @media (prefers-reduced-motion: reduce) {
   .leave-btn:hover .leave-ico, .leave-btn:focus-visible .leave-ico { animation: none; }
   .ctl-ico__slash, .ctl-ico__cut { transition: none; }
+}
+
+/* ═══════════════ Панель звонка P3: всё в одной капсуле, без красных обводок ═══════════════
+   «Выйти» — последняя кнопка капсулы после тонкого разделителя: сплошная красная, только трубка.
+   У кнопок капсулы рамок нет: состояние — заливкой (выключено — тёмно-красная). */
+.controls-sep {
+  width: 1px;
+  height: 28px;
+  margin: 0 4px;
+  background: rgba(242, 245, 249, 0.12);
+  flex-shrink: 0;
+}
+.controls-pill .ctrl-btn,
+.controls-pill .ctrl-btn.off,
+.controls-pill .ctrl-btn.danger,
+.controls-pill .ctrl-btn.active { border-color: transparent; }
+.controls-pill .ctrl-btn:not(.active):not(.off):not(.danger) { background: rgba(242, 245, 249, 0.07); }
+.controls-pill .ctrl-btn.off,
+.controls-pill .ctrl-btn.danger { background: #3a1a1c; }
+
+.controls-pill .leave-btn {
+  --ank-fill: #b8382c; /* при наведении чуть темнее, как в Discord */
+  width: auto;
+  height: 52px;
+  min-height: 52px;
+  margin: 0;
+  padding: 0 26px;
+  gap: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--danger);
+  color: #fff;
+  box-shadow: none;
+}
+.controls-pill .leave-btn:hover,
+.controls-pill .leave-btn:focus-visible { background: var(--danger); color: #fff; box-shadow: none; }
+@media (max-width: 600px) {
+  .controls-pill .leave-btn { height: 48px; min-height: 48px; padding: 0 20px; }
+}
+@media (max-width: 380px) {
+  .controls-pill .leave-btn { height: 44px; min-height: 44px; padding: 0 16px; }
+  .controls-sep { margin: 0 2px; }
+}
+@media (max-height: 480px) and (orientation: landscape) {
+  .controls-pill .leave-btn { height: 44px; min-height: 44px; }
 }
