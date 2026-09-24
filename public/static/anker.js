@@ -3,7 +3,7 @@
 
    Принцип: скрипт НИЧЕГО не рендерит сам и не трогает бизнес-логику app.js.
    Он только «дооснащает» уже отрисованные узлы:
-     · кнопки   — магнит к курсору (без перекатывающейся подписи);
+     · кнопки   — магнит к курсору и заливка кругом от точки наведения;
      · поля     — всплывающая подпись, подчёркивание, печатающаяся подсказка,
                   подсветка при ошибке;
      · экраны   — однократное появление блоков, параллакс, знак продукта.
@@ -59,6 +59,60 @@
     if (btn.matches(BTN_SKIP)) return
     btn.classList.add('ank-btn')
     attachMagnet(btn)
+    attachFill(btn)
+  }
+
+  // Заливка от курсора: при входе мыши из точки входа вырастает круг и заполняет кнопку
+  // цветом её наведённого состояния (--ank-fill в style.css); при уходе круг сжимается
+  // в точку выхода. Только мышь: на телефоне наведения нет.
+  // Круг лежит в .ank-fill (inset: 0, overflow: hidden) — сама кнопка не обрезается,
+  // бейджи вроде счётчика демонстраций остаются снаружи.
+  var FILL_MS = 420
+  function attachFill(btn) {
+    if (!fine() || calm()) return
+    var st = btn.__ankFill
+    if (!st) {
+      var wrap = make('span', 'ank-fill')
+      wrap.setAttribute('aria-hidden', 'true')
+      var dot = make('span', 'ank-fill__dot')
+      wrap.appendChild(dot)
+      st = btn.__ankFill = { wrap: wrap, dot: dot, t0: 0 }
+
+      var place = function (e) {
+        var r = btn.getBoundingClientRect()
+        var x = e.clientX - r.left, y = e.clientY - r.top
+        var rad = Math.hypot(Math.max(x, r.width - x), Math.max(y, r.height - y)) + 2
+        dot.style.left = (x - rad).toFixed(1) + 'px'
+        dot.style.top = (y - rad).toFixed(1) + 'px'
+        dot.style.width = dot.style.height = (rad * 2).toFixed(1) + 'px'
+      }
+      // Мгновенно поставить круг в состояние scale (без анимации)
+      var jump = function (scale) {
+        dot.classList.add('is-instant')
+        dot.style.transform = 'scale(' + scale + ')'
+        void dot.offsetWidth
+        dot.classList.remove('is-instant')
+      }
+      btn.addEventListener('pointerenter', function (e) {
+        if (e.pointerType && e.pointerType !== 'mouse') return
+        if (btn.disabled) return
+        place(e)
+        jump(0)
+        dot.style.transform = 'scale(1)'
+        st.t0 = performance.now()
+      }, { passive: true })
+      btn.addEventListener('pointerleave', function (e) {
+        if (e.pointerType && e.pointerType !== 'mouse') return
+        // Круг уже заполнил кнопку — переносим его центр в точку выхода (визуально
+        // ничего не меняется: он по-прежнему покрывает всё) и сжимаем туда.
+        // Если ушли раньше, чем круг дорос, — просто сжимаем на месте.
+        if (performance.now() - st.t0 >= FILL_MS) { place(e); jump(1) }
+        dot.style.transform = 'scale(0)'
+      }, { passive: true })
+    }
+    // app.js меняет подпись через textContent — это стирает заливку; возвращаем её
+    if (st.wrap.parentNode !== btn) btn.insertBefore(st.wrap, btn.firstChild)
+    btn.classList.add('has-fill')
   }
 
   // Магнит: кнопка слегка тянется к курсору и упруго возвращается на место.

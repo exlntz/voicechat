@@ -2872,3 +2872,46 @@ body.pip-body > .room-screen { height: 100%; }
     color: #fff;
   }
 }
+
+/* ═══════════════ Заливка кнопок от курсора (anker.js, attachFill) ═══════════════
+   При наведении мышью из точки входа растёт круг цвета «наведённой» кнопки, при уходе —
+   сжимается в точку выхода. Прежняя мгновенная смена фона при :hover для таких кнопок
+   отключена (фон ждёт «вечность»), иначе круга не было бы видно; фокус с клавиатуры
+   (:focus-visible) по-прежнему красит кнопку сразу. */
+.auth-submit-btn, .lobby-card > button { --ank-fill: var(--accent-hover); }
+.auth-ghost-btn { --ank-fill: #fff; }
+.lobby-logout-btn, .leave-btn { --ank-fill: var(--danger); }
+.join-toggle-btn { --ank-fill: var(--surface-3); }
+.join-toggle-btn.on { --ank-fill: #143063; }
+.ctrl-btn { --ank-fill: rgba(242, 245, 249, 0.10); }
+.ctrl-btn.active { --ank-fill: var(--accent-hover); }
+.ctrl-btn.danger, .ctrl-btn.off { --ank-fill: var(--danger); }
+
+.has-fill { position: relative; isolation: isolate; }
+.ank-fill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+.ank-fill__dot {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--ank-fill, rgba(242, 245, 249, 0.10));
+  transform: scale(0);
+  transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+.ank-fill__dot.is-instant { transition: none; }
+@media (hover: hover) {
+  .has-fill:hover:not(:focus-visible) {
+    transition-property: background, background-color, color, border-color, box-shadow, transform;
+    transition-duration: 0s, 0s, 0.3s, 0.3s, 0.3s, 0.18s;
+    transition-delay: 99999s, 99999s, 0s, 0s, 0s, 0s;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ank-fill { display: none; }
+}
