@@ -1111,19 +1111,20 @@ async function enterRoom(joinData) {
   // Скрываем кнопку целиком, если API физически отсутствует.
   const canScreenShare = !!(navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === 'function')
 
-  const divider1 = el('div', { class: 'ctrl-divider' })
-  const leaveBtn = el('button', { class: 'leave-btn' }, [el('i', { class: 'fas fa-phone-slash' }), ' Выйти'])
+  // Панель парит поверх сцены: кнопки звонка — в «капсуле», выход — отдельная красная кнопка
+  const controlsPill = el('div', { class: 'controls-pill' })
+  const leaveBtn = el('button', { class: 'leave-btn', title: 'Выйти из звонка', 'aria-label': 'Выйти из звонка' }, [el('i', { class: 'fas fa-phone-slash' })])
 
-  controls.appendChild(micBtn)
-  controls.appendChild(camBtn)
-  if (canScreenShare) controls.appendChild(screenBtn)
-  controls.appendChild(settingsBtn)
-  controls.appendChild(popInBtn)
-  controls.appendChild(divider1)
+  controlsPill.appendChild(micBtn)
+  controlsPill.appendChild(camBtn)
+  if (canScreenShare) controlsPill.appendChild(screenBtn)
+  controlsPill.appendChild(settingsBtn)
+  controlsPill.appendChild(popInBtn)
+  controls.appendChild(controlsPill)
   controls.appendChild(leaveBtn)
   screen.appendChild(controls)
   // Кнопки звонка проявляются по очереди слева направо
-  Array.from(controls.children).forEach((b, i) => playEnter(b, 80 + i * 50))
+  Array.from(controlsPill.children).concat([leaveBtn]).forEach((b, i) => playEnter(b, 80 + i * 50))
 
   root.appendChild(screen)
 

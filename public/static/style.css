@@ -1324,7 +1324,7 @@ button {
    Класс снимается по окончании — повторно при перестройке сетки не играет. */
 .tile.is-entering,
 .solo-invite.is-entering,
-.controls-bar > .is-entering {
+.controls-bar .is-entering {
   animation: vl-enter .6s var(--ease) both;
   animation-delay: var(--enter-delay, 0ms);
 }
@@ -1333,7 +1333,7 @@ button {
   to { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .tile.is-entering, .solo-invite.is-entering, .controls-bar > .is-entering { animation: none; }
+  .tile.is-entering, .solo-invite.is-entering, .controls-bar .is-entering { animation: none; }
 }
 
 .tile.speaking {
@@ -1741,30 +1741,74 @@ body.inapp-fullscreen { overflow: hidden; }
 .room-main.is-spotlight .sidebar-participants .tile {
   aspect-ratio: 16/10;
   cursor: pointer;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  background: #1a1d24;
+  border: 1px solid rgba(242, 245, 249, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+  transition: border-color .2s var(--ease), box-shadow .2s var(--ease), transform .2s var(--ease);
 }
-.room-main.is-spotlight .sidebar-participants .tile:hover { border-color: var(--border-strong); }
-.room-main.is-spotlight .sidebar-participants .tile.speaking:hover { border-color: var(--accent-soft); }
+.room-main.is-spotlight .sidebar-participants .tile:hover { border-color: rgba(242, 245, 249, 0.22); transform: translateY(-1px); }
+.room-main.is-spotlight .sidebar-participants .tile.speaking { border-color: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent-soft), 0 14px 34px rgba(0, 0, 0, 0.5); }
+.room-main.is-spotlight .sidebar-participants .no-video-placeholder { background: #1a1d24; }
 /* В миниатюре — только имя и аватар: громкость и кнопки доступны у главного */
 .room-main.is-spotlight .sidebar-participants .volume-control,
 .room-main.is-spotlight .sidebar-participants .tile-fullscreen-btn,
 .room-main.is-spotlight .sidebar-participants .tile-kick-btn { display: none; }
 .room-main.is-spotlight .sidebar-participants .avatar-circle { width: 40px; font-size: 15px; box-shadow: none; }
-.room-main.is-spotlight .sidebar-participants .tile-label { bottom: 6px; left: 6px; max-width: calc(100% - 12px); padding: 3px 7px; font-size: 12px; gap: 6px; }
+/* Имя в миниатюре — без плашки, прямо на картинке */
+.room-main.is-spotlight .sidebar-participants .tile-label {
+  bottom: 8px;
+  left: 10px;
+  max-width: calc(100% - 20px);
+  padding: 0;
+  background: none;
+  border: 0;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  font-size: 12px;
+  font-weight: 500;
+  gap: 6px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+.room-main.is-spotlight .sidebar-participants .tile-label i { font-size: 11px; }
 
 /* ---- Панель управления звонком ---- */
+/* Панель парит поверх сцены по центру снизу: кнопки звонка в полупрозрачной
+   «капсуле», выход — отдельная красная круглая кнопка. Сцена под неё не ужимается
+   (в режиме «главный на весь экран» видео идёт до самого низа). */
+.room-screen { position: relative; }
 .controls-bar {
-  flex: 0 0 auto; /* панель кнопок не сжимается, когда сцена перестраивается */
+  position: absolute;
+  /* центр без transform: anker.js при появлении ставит панелям transform: none */
+  left: 0;
+  right: 0;
+  width: fit-content;
+  margin: 0 auto;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  padding: 14px 16px;
-  padding-bottom: calc(14px + env(safe-area-inset-bottom));
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  white-space: nowrap;
 }
+.controls-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px;
+  background: rgba(15, 17, 21, 0.72);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  backdrop-filter: blur(16px) saturate(1.2);
+  border: 1px solid rgba(242, 245, 249, 0.10);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+/* Вне режима «главный на весь экран» (один, демонстрации) сцена не заходит под панель */
+.room-main:not(.is-spotlight) { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
 
 /* Круглая кнопка управления */
 .ctrl-btn {
@@ -1814,6 +1858,38 @@ body.inapp-fullscreen { overflow: hidden; }
 }
 
 .ctrl-divider { width: 1px; height: 32px; background: var(--border); margin: 0 6px; }
+
+.controls-pill .ctrl-btn {
+  width: 44px;
+  height: 44px;
+  font-size: 15px;
+  border-color: transparent;
+  background: rgba(242, 245, 249, 0.07);
+}
+.controls-pill .ctrl-btn:hover,
+.controls-pill .ctrl-btn:focus-visible { background: rgba(242, 245, 249, 0.15); border-color: transparent; }
+.controls-pill .ctrl-btn.active { background: var(--accent); border-color: var(--accent); }
+.controls-pill .ctrl-btn.active:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.controls-pill .ctrl-btn.off,
+.controls-pill .ctrl-btn.danger { background: var(--danger-wash); border-color: rgba(217, 74, 61, 0.55); }
+.controls-pill .ctrl-btn.off:hover,
+.controls-pill .ctrl-btn.danger:hover { background: var(--danger); border-color: var(--danger); }
+
+/* Выход — красный круг рядом с капсулой */
+.controls-bar .leave-btn {
+  width: 58px;
+  height: 58px;
+  min-height: 58px;
+  padding: 0;
+  border-radius: 50%;
+  border: 0;
+  background: var(--danger);
+  color: #fff;
+  font-size: 19px;
+  box-shadow: 0 12px 28px rgba(217, 74, 61, 0.42);
+}
+.controls-bar .leave-btn:hover,
+.controls-bar .leave-btn:focus-visible { background: #e55a4d; color: #fff; box-shadow: 0 12px 32px rgba(217, 74, 61, 0.55); }
 
 /* Кнопка завершения звонка */
 .leave-btn {
@@ -2578,6 +2654,24 @@ body.inapp-fullscreen { overflow: hidden; }
   .controls-bar { gap: 8px; }
   .ctrl-btn { width: 44px; height: 44px; }
   .leave-btn { padding: 0 14px; height: 44px; min-height: 44px; }
+  .controls-pill { gap: 6px; padding: 6px; }
+  .controls-pill .ctrl-btn { width: 40px; height: 40px; }
+  .controls-bar .leave-btn { width: 50px; height: 50px; min-height: 50px; }
+}
+
+/* Узкий экран: у главного подпись и кнопки поднимаются над плавающей панелью */
+@media (max-width: 860px) {
+  .stage.stage-spotlight .tile.is-main .tile-label,
+  .stage.stage-spotlight .tile.is-main .tile-fullscreen-btn,
+  .stage.stage-spotlight .tile.is-main .tile-kick-btn { bottom: calc(88px + env(safe-area-inset-bottom)); }
+}
+/* Низкий ландшафт телефона: панель ниже и плотнее */
+@media (max-height: 480px) and (orientation: landscape) {
+  .controls-bar { bottom: calc(10px + env(safe-area-inset-bottom)); }
+  .controls-pill { padding: 5px; gap: 6px; }
+  .controls-pill .ctrl-btn { width: 38px; height: 38px; font-size: 14px; }
+  .controls-bar .leave-btn { width: 48px; height: 48px; min-height: 48px; font-size: 16px; }
+  .room-main:not(.is-spotlight) { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 }
 
 /* ═══════════════ Звонок в отдельном окне ═══════════════
@@ -2601,8 +2695,12 @@ body.inapp-fullscreen { overflow: hidden; }
 .room-screen.is-compact .stage.stage-solo .tile.camera-tile { min-height: 0; max-height: none; }
 .room-screen.is-compact .controls-bar {
   gap: 6px;
-  padding: 6px 8px;
+  bottom: 8px;
 }
+.room-screen.is-compact .controls-pill { padding: 4px; gap: 4px; }
+.room-screen.is-compact .controls-pill .ctrl-btn { width: 32px; height: 32px; font-size: 13px; }
+.room-screen.is-compact .controls-bar .leave-btn { width: 40px; height: 40px; min-height: 40px; font-size: 14px; }
+.room-screen.is-compact .room-main:not(.is-spotlight) { padding-bottom: 52px; }
 .room-screen.is-compact .ctrl-btn {
   width: 38px;
   height: 38px;
