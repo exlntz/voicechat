@@ -2974,8 +2974,13 @@ body.pip-body > .room-screen { height: 100%; }
 }
 .room-topbar .ctrl-btn:hover { background: rgba(15, 17, 21, 0.82); }
 
-/* Миниатюры справа начинаются ниже кнопок шапки */
+/* Миниатюры справа начинаются ниже кнопок шапки — и при «главном на весь экран»,
+   и при демонстрации (там колонка камер справа — обычная, не spotlight). На узком
+   экране при демонстрации камеры идут полосой снизу, отступ им не нужен. */
 .room-main.is-spotlight .sidebar-participants { padding-top: 76px; }
+@media (min-width: 861px) {
+  .sidebar-participants { padding-top: 76px; }
+}
 
 @media (max-width: 860px) {
   .room-main.is-spotlight .sidebar-participants { padding-top: 0; top: 70px; max-height: calc(100% - 88px); }
