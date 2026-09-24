@@ -1780,7 +1780,7 @@ body.inapp-fullscreen { overflow: hidden; }
   bottom: calc(18px + env(safe-area-inset-bottom));
   z-index: 20;
   display: flex;
-  align-items: center;
+  align-items: stretch; /* «Выйти» — ровно по высоте капсулы */
   justify-content: center;
   gap: 12px;
   padding: 0;
@@ -1865,8 +1865,15 @@ body.inapp-fullscreen { overflow: hidden; }
 .controls-pill .ctrl-btn.danger { background: var(--danger-wash); border-color: rgba(217, 74, 61, 0.55); }
 .controls-pill .ctrl-btn.off:hover,
 .controls-pill .ctrl-btn.danger:hover { background: var(--danger); border-color: var(--danger); }
-/* «Выйти» — овальная, в тон круглым кнопкам капсулы */
-.controls-bar .leave-btn { border-radius: var(--radius-pill); }
+/* «Выйти» — овальная, в тон круглым кнопкам капсулы; высота — как у капсулы
+   (тянется по ней во всех размерах), ширина компактнее */
+.controls-bar .leave-btn {
+  height: auto;
+  min-height: 0;
+  padding: 0 22px;
+  gap: 9px;
+  border-radius: var(--radius-pill);
+}
 
 
 /* Кнопка завершения звонка */
