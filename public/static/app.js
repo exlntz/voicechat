@@ -1145,21 +1145,32 @@ async function enterRoom(joinData) {
     try { closeParticipantsPanel() } catch {}
   }
 
+  // Стили в окно звонка. Свои таблицы (style.css и т.п.) копируем текстом — они применяются
+  // сразу, без загрузки; иначе звонок первое мгновение виден без оформления (белый фон, огромный
+  // логотип, полосы прокрутки). Чужие таблицы (иконки Font Awesome с CDN) текстом не читаются —
+  // подключаем ссылкой и ждём загрузки (не дольше 1,5 с). Промис — когда всё готово.
   function copyStylesInto(doc) {
+    const base = doc.createElement('style')
+    base.textContent = 'html,body{margin:0;height:100%;overflow:hidden;background:#0f1115}'
+    doc.head.appendChild(base)
+    const pending = []
     for (const sheet of Array.from(document.styleSheets)) {
-      if (sheet.href) {
+      let text = null
+      try { text = Array.from(sheet.cssRules, (r) => r.cssText).join('\n') } catch {}
+      if (text !== null) {
+        const style = doc.createElement('style')
+        style.textContent = text
+        doc.head.appendChild(style)
+      } else if (sheet.href) {
         const link = doc.createElement('link')
         link.rel = 'stylesheet'
         link.href = sheet.href
+        pending.push(new Promise((resolve) => { link.onload = resolve; link.onerror = resolve }))
         doc.head.appendChild(link)
-        continue
       }
-      try {
-        const style = doc.createElement('style')
-        style.textContent = Array.from(sheet.cssRules, (r) => r.cssText).join('\n')
-        doc.head.appendChild(style)
-      } catch {}
     }
+    const timeout = new Promise((resolve) => setTimeout(resolve, 1500))
+    return Promise.race([Promise.all(pending), timeout])
   }
 
   async function openCallPip() {
@@ -1174,10 +1185,12 @@ async function enterRoom(joinData) {
     }
     closeRoomPopups()
     pipWindow = w
-    copyStylesInto(w.document)
     w.document.title = 'Voice Lobby — звонок'
     w.document.documentElement.classList.add('pip-doc')
     w.document.body.classList.add('pip-body')
+    // Звонок переносим только когда окно уже оформлено
+    await copyStylesInto(w.document)
+    if (pipWindow !== w) return // окно успели закрыть, пока грузились стили
 
     pipPlaceholder = el('div', { class: 'pip-placeholder' }, [
       el('div', { class: 'pip-placeholder__card' }, [
