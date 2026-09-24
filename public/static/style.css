@@ -3186,8 +3186,9 @@ body.pip-body > .room-screen { height: 100%; }
 }
 
 /* Демонстрация и настройки: тоже одна короткая анимация при каждом наведении.
-   Демонстрация — значок экрана подпрыгивает; настройки — шестерёнка поворачивается
-   на четверть оборота с мягкой остановкой. */
+   Демонстрация — значок экрана подпрыгивает; настройки — шестерёнка делает полный
+   оборот с лёгким проскоком. Ровно 360°: конечный кадр совпадает с исходным для
+   шестерёнки с любым числом зубьев, поэтому после анимации нет «перескока». */
 .ctrl-btn--screen i,
 .ctrl-btn--settings i { display: inline-block; }
 @keyframes ctl-screen-hop {
@@ -3199,11 +3200,11 @@ body.pip-body > .room-screen { height: 100%; }
 }
 @keyframes ctl-gear-turn {
   0% { transform: rotate(0deg); }
-  70% { transform: rotate(100deg); }
-  100% { transform: rotate(90deg); }
+  75% { transform: rotate(372deg); }
+  100% { transform: rotate(360deg); }
 }
 .ctrl-btn--screen:hover i { animation: ctl-screen-hop 0.5s ease-out 1; }
-.ctrl-btn--settings:hover i { animation: ctl-gear-turn 0.55s cubic-bezier(0.22, 1, 0.36, 1) 1; }
+.ctrl-btn--settings:hover i { animation: ctl-gear-turn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 1; transform-origin: 50% 50%; }
 @media (prefers-reduced-motion: reduce) {
   .ctrl-btn--screen:hover i, .ctrl-btn--settings:hover i { animation: none; }
 }
