@@ -1750,8 +1750,8 @@ async function enterRoom(joinData) {
     }
     tile.addEventListener('dblclick', () => toggleTileFullscreen(tile))
     // Кастомное контекстное меню (ПКМ) вместо стандартного браузерного.
-    // Для своей демонстрации - действия над стримом (стоп/смена источника/звук/отдельное окно).
-    // Для чужой демонстрации - просмотровые опции (отдельное окно + громкости).
+    // Для своей демонстрации - действия над стримом (стоп/смена источника/качество/звук).
+    // Для чужой демонстрации - регуляторы громкости.
     tile.addEventListener('contextmenu', (e) => {
       e.preventDefault()
       e.stopPropagation()
@@ -1895,25 +1895,16 @@ async function enterRoom(joinData) {
         checked: state.screenShareAudioShared,
         onClick: () => { toggleScreenShareAudio(); openScreenContextMenu(x, y, ctx) }
       }))
-      items.push(ctxItem({
-        icon: 'fas fa-up-right-from-square', label: 'Стрим в отдельном окне',
-        onClick: () => { closeScreenContextMenu(); openScreenSharePiP(ctx.video) }
-      }))
+      // «Стрим в отдельном окне» убран: есть общая кнопка «Звонок в отдельном окне» в топбаре.
       // Подменю "Другие настройки" -> "Оптимизировать: движение/чёткость" убрано: выбор был
       // непонятным, а для звонка всегда нужен один и тот же режим (motion - плавность).
       // Значение зафиксировано в SCREEN_SHARE_CONTENT_HINT и применяется при старте демонстрации.
     } else {
-      // Чужая демонстрация - просмотровые действия + два регулятора громкости.
+      // Чужая демонстрация - два регулятора громкости.
       // "Качество приёма" (какой simulcast-слой видео подписываться) специально не выведено в меню -
       // это техническая настройка, которую обычный пользователь практически никогда не станет
       // трогать руками, поэтому вместо селектора мы просто всегда принудительно запрашиваем
       // максимальное качество (см. forceHighRemoteScreenQuality(), вызывается при подписке на трек).
-      items.push(ctxItem({
-        icon: 'fas fa-up-right-from-square', label: 'Стрим в отдельном окне',
-        onClick: () => { closeScreenContextMenu(); openScreenSharePiP(ctx.video) }
-      }))
-      items.push(el('div', { class: 'screen-ctx-divider' }))
-
       // Громкость звука самой демонстрации (то, что играет с устройства демонстрирующего - музыка,
       // видео и т.п.) и громкость голоса самого участника (его микрофон) - это две независимые
       // аудио-дорожки LiveKit (ScreenShareAudio и Microphone), поэтому у них отдельные слайдеры.
@@ -2503,40 +2494,6 @@ async function enterRoom(joinData) {
     showToast(state.screenShareAudioShared ? 'Звук стрима включён' : 'Звук стрима выключен')
   }
 
-  // ---- "Стрим в отдельном окне" - Document Picture-in-Picture API ----
-  // Поддерживается в Chromium (обычный браузер на его основе, а также сам Electron - тоже Chromium),
-  // позволяет вынести произвольный <video> в отдельное всегда-поверх-окно, которое можно двигать
-  // независимо от основного окна приложения/вкладки.
-  async function openScreenSharePiP(video) {
-    if (!('documentPictureInPicture' in window)) {
-      showToast('Режим "отдельное окно" не поддерживается этим браузером', 'warning')
-      return
-    }
-    try {
-      const pipWindow = await window.documentPictureInPicture.requestWindow({
-        width: video.videoWidth || 960,
-        height: video.videoHeight || 540
-      })
-      // Копируем базовые стили, чтобы видео заполняло PiP-окно целиком
-      const style = pipWindow.document.createElement('style')
-      style.textContent = 'html,body{margin:0;background:#000;height:100%;} video{width:100%;height:100%;object-fit:contain;display:block;}'
-      pipWindow.document.head.appendChild(style)
-
-      const originalParent = video.parentElement
-      const placeholder = document.createComment('pip-placeholder')
-      originalParent.insertBefore(placeholder, video)
-      pipWindow.document.body.appendChild(video)
-
-      pipWindow.addEventListener('pagehide', () => {
-        // Возвращаем видео обратно в основной документ, когда PiP-окно закрыто
-        placeholder.replaceWith(video)
-      }, { once: true })
-    } catch (e) {
-      showToast('Не удалось открыть отдельное окно', 'error')
-      console.error(e)
-    }
-  }
-
   screenBtn.addEventListener('click', async () => {
     if (screenShareBusy) return // клик во время уже идущего старта/остановки - игнорируем, чтобы не запустить процесс дважды
     if (isScreenSharing) await stopScreenShare()
@@ -2780,14 +2737,68 @@ async function enterRoom(joinData) {
     return true
   }
 
-  function participantRow(name, isLocal, isHost, micMuted) {
+  function participantRow(name, isLocal, isHost, micMuted, identity) {
     const children = [
       el('div', { class: 'avatar-circle' }, initials(name)),
-      el('span', {}, name + (isLocal ? ' (Вы)' : ''))
+      el('span', { class: 'panel-participant__name' }, name + (isLocal ? ' (Вы)' : ''))
     ]
     if (isHost) children.push(el('i', { class: 'fas fa-crown host-crown', title: 'Создатель комнаты' }))
     if (micMuted) children.push(el('i', { class: 'fas fa-microphone-slash', title: 'Микрофон выключен', style: 'color:var(--danger-soft)' }))
-    return el('div', { class: 'panel-participant' }, children)
+    const row = el('div', { class: 'panel-participant' }, [el('div', { class: 'panel-participant__top' }, children)])
+    if (!isLocal) row.appendChild(participantVolumeSlider(identity))
+    return row
+  }
+
+  // Громкость голоса собеседника прямо в списке участников. Тот же p.setVolume(Microphone),
+  // что и у регулятора на тайле, поэтому значение берём с тайла и синхронизируем обратно —
+  // оба регулятора всегда показывают одно и то же. Иконка слева — быстрый мьют/возврат.
+  const PANEL_VOLUME_MAX = 150
+  function participantVolumeSlider(identity) {
+    const camTileRef = cameraTilesMap.get(identity)
+    const tileInput = camTileRef && camTileRef.volumeCtl ? camTileRef.volumeCtl.querySelector('input[type="range"]') : null
+    const p = room.getParticipantByIdentity(identity)
+    let initial = 100
+    if (tileInput) initial = Number(tileInput.value)
+    else if (p && typeof p.getVolume === 'function') initial = Math.round((p.getVolume(LK.Track.Source.Microphone) ?? 1) * 100)
+    let lastNonZero = initial > 0 ? initial : 100
+
+    const icon = el('i', { class: 'fas fa-volume-high' })
+    const muteBtn = el('button', { class: 'pvol__mute', type: 'button', title: 'Выключить звук', 'aria-label': 'Выключить звук' }, [icon])
+    const slider = el('input', {
+      class: 'pvol__range', type: 'range', min: '0', max: String(PANEL_VOLUME_MAX), step: '1',
+      value: String(initial), 'aria-label': 'Громкость участника'
+    })
+    const valueLabel = el('span', { class: 'pvol__value tnum' })
+    const wrap = el('div', { class: 'pvol' }, [muteBtn, el('div', { class: 'pvol__track' }, [slider, el('span', { class: 'pvol__mark', title: '100%' })]), valueLabel])
+    wrap.style.setProperty('--pvol-mark', `${(100 / PANEL_VOLUME_MAX) * 100}%`)
+
+    function render(val) {
+      wrap.style.setProperty('--pvol-fill', `${(val / PANEL_VOLUME_MAX) * 100}%`)
+      wrap.classList.toggle('is-muted', val === 0)
+      wrap.classList.toggle('is-boost', val > 100)
+      valueLabel.textContent = `${val}%`
+      icon.className = val === 0 ? 'fas fa-volume-xmark' : val < 50 ? 'fas fa-volume-low' : 'fas fa-volume-high'
+      const t = val === 0 ? 'Включить звук' : 'Выключить звук'
+      muteBtn.title = t
+      muteBtn.setAttribute('aria-label', t)
+    }
+    function apply(val) {
+      slider.value = String(val)
+      render(val)
+      if (val > 0) lastNonZero = val
+      const v = val / 100
+      const part = room.getParticipantByIdentity(identity)
+      if (part) part.setVolume(v, LK.Track.Source.Microphone)
+      const ref = cameraTilesMap.get(identity)
+      if (ref && ref.volumeCtl) syncVolumeControlUI(ref.volumeCtl, v)
+    }
+
+    slider.addEventListener('input', () => apply(Number(slider.value)))
+    muteBtn.addEventListener('click', () => apply(Number(slider.value) === 0 ? lastNonZero : 0))
+    // Двойной клик по дорожке — вернуть 100%
+    slider.addEventListener('dblclick', () => apply(100))
+    render(initial)
+    return wrap
   }
 
   function openParticipantsPanel() {
@@ -2806,7 +2817,7 @@ async function enterRoom(joinData) {
     room.remoteParticipants.forEach((p) => {
       const micPub = p.getTrackPublication(LK.Track.Source.Microphone)
       const micMuted = !micPub || micPub.isMuted
-      panel.appendChild(participantRow(p.name || p.identity, false, isParticipantHost(p), micMuted))
+      panel.appendChild(participantRow(p.name || p.identity, false, isParticipantHost(p), micMuted, p.identity))
     })
 
     const overlay = el('div', { class: 'panel-overlay' }, [panel])
