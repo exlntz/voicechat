@@ -514,43 +514,6 @@ button {
 @keyframes pl-jump { 0% { transform: translateY(0px); } 7% { transform: translateY(0px); } 14% { transform: translateY(0px); } 21% { transform: translateY(0px); } 28% { transform: translateY(0px); } 35% { transform: translateY(0px); } 44% { transform: translateY(0px); } 54% { transform: translateY(-9px); } 62% { transform: translateY(0px); } 72% { transform: translateY(-9px); } 80% { transform: translateY(0px); } 92% { transform: translateY(0px); } 100% { transform: translateY(0px); } }
 @keyframes pl-squash { 0%, 38%, 56%, 90%, 100% { transform: scale(1); } 44% { transform: scale(1.06, 0.93); } 50% { transform: scale(0.97, 1.03); } 94% { transform: scale(1.04, 0.96); } }
 
-/* След за курсором: тонкая синяя лента и мягкое пятно (только мышь, без reduced-motion) */
-.ank-pointer {
-  position: fixed;
-  inset: 0;
-  z-index: 2000;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.45s var(--ease);
-}
-.ank-pointer.is-on { opacity: 1; }
-.ank-pointer.is-off { opacity: 0 !important; }
-.ank-pointer svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-.ank-pointer line {
-  stroke: var(--accent-soft);
-  stroke-linecap: round;
-  fill: none;
-  transition: stroke 0.4s var(--ease);
-}
-.ank-pointer.is-hot line { stroke: #fff; }
-.ank-aura {
-  position: absolute;
-  left: 0; top: 0;
-  width: 320px; height: 320px;
-  margin: -160px 0 0 -160px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(110, 168, 245, 0.12) 0%, rgba(4, 88, 207, 0.08) 34%, transparent 70%);
-  transition: opacity 0.4s var(--ease);
-}
-.ank-pointer.is-hot .ank-aura { background: radial-gradient(circle, rgba(110, 168, 245, 0.18) 0%, rgba(4, 88, 207, 0.10) 34%, transparent 70%); }
-@media (hover: none), (pointer: coarse) { .ank-pointer { display: none; } }
-
 /* Появление блоков: короткий однократный проезд снизу со сдвигом по индексу */
 .rv {
   opacity: 0;
@@ -568,7 +531,6 @@ button {
     transition-duration: 0.001ms !important;
   }
   .rv { opacity: 1; transform: none; }
-  .ank-pointer { display: none; }
   /* Знак — всегда статичный кадр открытого ноутбука */
   .ank-sigil *, .ank-pulse * { animation: none !important; }
 }

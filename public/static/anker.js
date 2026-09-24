@@ -6,8 +6,8 @@
      · кнопки   — двойной перекатывающийся лейбл, точка-маркер, магнит к курсору;
      · поля     — всплывающая подпись, подчёркивание, печатающаяся подсказка,
                   подсветка при ошибке;
-     · экраны   — однократное появление блоков, параллакс, знак продукта;
-     · курсор   — мягкий след за мышью.
+     · экраны   — однократное появление блоков, параллакс, знак продукта.
+   Анимации за курсором (след, свечение) нет — убрана по решению владельца.
 
    Служебных надписей (техническая сноска о хранении пароля, номера разделов,
    таймер сеанса и часы) здесь больше нет: интерфейс показывает пользователю
@@ -318,157 +318,6 @@
     return d
   }
 
-  /* ─────────────── 4. След за курсором ─────────────── */
-
-  // Вместо кольца вокруг стрелки — сужающийся синий след (без свечения: пятно света убрано).
-  // След — цепочка узлов, каждый догоняет предыдущий, поэтому движение выходит
-  // плавным и слегка запаздывающим; толщина и яркость растут со скоростью мыши.
-  //
-  // Раньше цепочка рисовалась восьмью SVG-линиями, и каждый кадр у них
-  // переписывалось по шесть атрибутов — вектор перестраивался и перерисовывался
-  // на CPU. Сейчас след собран из точек, которые двигаются только transform:
-  // translate3d()+scale() — это работа композитора, без layout и paint.
-  var NODES = 9
-  var trail = null
-
-  function initTrail() {
-    if (trail || !fine() || calm()) return
-
-    // Свои стили для точек. Правила старой SVG-ленты (.ank-pointer svg / line)
-    // в style.css просто перестали к чему-либо применяться.
-    var st = make('style', null, [
-      '.ank-pointer .ank-dot{position:absolute;top:0;left:0;width:12px;height:12px;',
-      'margin:-6px 0 0 -6px;border-radius:50%;background:var(--accent-soft, #2f6fd0);',
-      'opacity:0;transform:translate3d(-9999px,-9999px,0);',
-      'will-change:transform, opacity;pointer-events:none;contain:layout style paint}',
-      '.ank-pointer.is-hot .ank-dot{background:#fff}'
-    ].join(''))
-    document.head.appendChild(st)
-
-    trail = make('div', 'ank-pointer')
-    trail.setAttribute('aria-hidden', 'true')
-
-    var dots = []
-    for (var i = 0; i < NODES; i++) dots.push(make('i', 'ank-dot'))
-    // С конца цепочки к голове: голова должна лежать сверху.
-    for (var j = NODES - 1; j >= 0; j--) trail.appendChild(dots[j])
-    document.body.appendChild(trail)
-
-    var tx = window.innerWidth / 2, ty = window.innerHeight / 2
-    var px = tx, py = ty            // прошлая позиция мыши — для скорости
-    var speed = 0
-    var nx = [], ny = [], op = []
-    for (var k = 0; k < NODES; k++) { nx.push(tx); ny.push(ty); op.push(-1) }
-
-    var raf = 0
-    var on = false                  // курсор в окне
-    var muted = false               // след скрыт (видео, ползунки, меню)
-    var stale = false               // позиции устарели, нужно собрать цепочку у курсора
-    var target = null               // последний элемент под мышью
-    var targetDirty = false
-
-    function resetChain() {
-      for (var i2 = 0; i2 < NODES; i2++) { nx[i2] = tx; ny[i2] = ty }
-      px = tx; py = ty; speed = 0
-    }
-
-    function start() {
-      if (raf || document.hidden) return
-      raf = requestAnimationFrame(loop)
-    }
-
-    function stop() {
-      if (raf) cancelAnimationFrame(raf)
-      raf = 0
-    }
-
-    // Дорогие closest() считаем не чаще раза в кадр и только при смене цели.
-    function syncClasses() {
-      if (!target || !target.closest) return
-      var mute = target.closest('.tile, video, input[type="range"], .screen-ctx-menu, .screen-ctx-submenu, select')
-      muted = !!mute
-      trail.classList.toggle('is-off', muted)
-      trail.classList.toggle('is-hot', !muted && !!target.closest('a, button, label, .room-code-badge, input'))
-    }
-
-    function loop() {
-      raf = 0
-
-      if (targetDirty) {
-        targetDirty = false
-        var wasMuted = muted
-        syncClasses()
-        if (wasMuted && !muted) { stale = true }
-      }
-      // Над видео и меню след не виден — крутить цикл незачем (главный выигрыш
-      // в звонке: курсор почти всегда над плитками).
-      if (muted || !on) return
-
-      if (stale) { stale = false; resetChain() }
-
-      // мгновенная скорость, сглаженная по кадрам
-      var vx = tx - px, vy = ty - py
-      px = tx; py = ty
-      var v = Math.min(Math.sqrt(vx * vx + vy * vy), 90)
-      speed += (v - speed) * 0.18
-
-      // голова цепочки догоняет мышь, остальные — предыдущий узел
-      nx[0] += (tx - nx[0]) * 0.34
-      ny[0] += (ty - ny[0]) * 0.34
-      var rest = Math.abs(tx - nx[0]) + Math.abs(ty - ny[0])
-      for (var i3 = 1; i3 < NODES; i3++) {
-        var kk = 0.4 - i3 * 0.012
-        nx[i3] += (nx[i3 - 1] - nx[i3]) * kk
-        ny[i3] += (ny[i3 - 1] - ny[i3]) * kk
-        rest += Math.abs(nx[i3 - 1] - nx[i3]) + Math.abs(ny[i3 - 1] - ny[i3])
-      }
-
-      // Одна запись transform на точку; opacity правим только при заметном изменении.
-      var thick = 0.45 + speed / 260
-      var bright = Math.min(1, 0.42 + speed / 16)
-      for (var d = 0; d < NODES; d++) {
-        var s = Math.max(0.18, 1 - d * 0.085) * thick
-        dots[d].style.transform = 'translate3d(' + nx[d].toFixed(1) + 'px,' + ny[d].toFixed(1) +
-          'px,0) scale(' + s.toFixed(3) + ')'
-        var o = Math.max(0.05, 0.62 - d * 0.066) * bright
-        if (Math.abs(o - op[d]) > 0.015) { op[d] = o; dots[d].style.opacity = o.toFixed(3) }
-      }
-
-      // Цепочка догнала курсор — гасим цикл до следующего движения мыши.
-      if (rest < 0.6 && speed < 0.4) return
-      raf = requestAnimationFrame(loop)
-    }
-
-    // Обработчик движения только складывает данные: ни чтения, ни записи стилей.
-    window.addEventListener('pointermove', function (e) {
-      if (e.pointerType && e.pointerType !== 'mouse') return
-      tx = e.clientX; ty = e.clientY
-      if (!on) { on = true; stale = true; trail.classList.add('is-on') }
-      if (e.target !== target) { target = e.target; targetDirty = true }
-      start()
-    }, { passive: true })
-
-    var hide = function () {
-      on = false
-      stale = true
-      trail.classList.remove('is-on')
-      stop()
-    }
-    window.addEventListener('blur', hide)
-    document.addEventListener('mouseleave', hide)
-    // В фоновой вкладке/свёрнутом окне анимация не нужна вообще.
-    document.addEventListener('visibilitychange', function () {
-      if (document.hidden) { stale = true; stop() }
-    })
-    // Переключили prefers-reduced-motion на «меньше движения» — снимаем след.
-    if (calmQuery.addEventListener) {
-      calmQuery.addEventListener('change', function () {
-        if (calm()) { hide(); trail.style.display = 'none' }
-        else trail.style.display = ''
-      })
-    }
-  }
-
   /* ─────────────── 5. Появление блоков и параллакс ─────────────── */
 
   // fadeOnly: только проявление без сдвига — для экрана звонка, где проезд
@@ -572,7 +421,6 @@
 
   function enhance(scope) {
     var ctx = scope && scope.nodeType === 1 ? scope : document
-    initTrail()
 
     $$(BTN_SEL, ctx).forEach(enhanceButton)
     if (ctx.matches && ctx.matches(BTN_SEL)) enhanceButton(ctx)
