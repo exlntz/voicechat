@@ -3056,6 +3056,17 @@ body.pip-body > .room-screen { height: 100%; }
 .conn-card__dot { width: 10px; height: 10px; border-radius: 50%; background: var(--q); flex-shrink: 0; }
 .conn-card__row { display: flex; justify-content: space-between; gap: 16px; }
 .conn-card__row[hidden] { display: none; }
+/* Предупреждение «Видео снижено: …» — только когда браузер действительно урезал качество */
+.conn-card__warn {
+  margin-top: 2px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(227, 193, 79, 0.12);
+  color: #f3c566;
+  font-size: 13px;
+  white-space: normal;
+}
+.conn-card__warn[hidden] { display: none; }
 .conn-card__val { color: var(--text); font-variant-numeric: tabular-nums; }
 /* На телефоне центр шапки не обрезаем, иначе карточка не видна */
 @media (max-width: 600px) {

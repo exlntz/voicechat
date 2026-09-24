@@ -1045,10 +1045,17 @@ async function enterRoom(joinData) {
   const connVideo = el('span', { class: 'conn-card__val' }, '—')
   // Строка про видео есть только при включённой камере — иначе её просто нет
   const connVideoRow = el('div', { class: 'conn-card__row', hidden: '' }, [el('span', {}, 'Ваше видео'), connVideo])
+  // Демонстрация экрана — только пока вы её ведёте
+  const connScreen = el('span', { class: 'conn-card__val' }, '—')
+  const connScreenRow = el('div', { class: 'conn-card__row', hidden: '' }, [el('span', {}, 'Демонстрация'), connScreen])
+  // Браузер сам урезал качество — только когда это правда происходит, с причиной
+  const connLimitRow = el('div', { class: 'conn-card__warn', hidden: '' })
   const connCard = el('div', { class: 'conn-card', role: 'tooltip' }, [
     el('div', { class: 'conn-card__head' }, [el('span', { class: 'conn-card__dot' }), connTitle]),
     el('div', { class: 'conn-card__row' }, [el('span', {}, 'Пинг'), connPing]),
-    connVideoRow
+    connVideoRow,
+    connScreenRow,
+    connLimitRow
   ])
   const roomStatus = el('span', { class: 'room-status', role: 'status', tabindex: '0' }, [statusDot, connBars, statusText, callTimer, connCard])
   roomInfo.appendChild(roomStatus)
@@ -1347,20 +1354,32 @@ async function enterRoom(joinData) {
     if (rtt === null) report.forEach((r) => { if (rtt === null && r.type === 'remote-inbound-rtp' && typeof r.roundTripTime === 'number') rtt = r.roundTripTime })
     return rtt
   }
+  // qualityLimitationReason из outbound-rtp: браузер сам снизил разрешение/частоту кадров
+  const LIMIT_REASON = { bandwidth: 'слабый интернет', cpu: 'не хватает процессора' }
+  const fmtVideo = (v) => v ? `${v.h}p` + (v.fps ? ` · ${Math.round(v.fps)} к/с` : '') : '—'
   async function readConnStats() {
     let rtt = null
     let video = null
+    let shareVid = null
+    const limits = {} // camera / screen → причина снижения
     const lp = room.localParticipant
     for (const pub of lp.trackPublications.values()) {
       const sender = pub.track && pub.track.sender
       if (!sender) continue
       const rep = await sender.getStats()
       if (rtt === null) rtt = pairRtt(rep)
-      if (pub.source === LK.Track.Source.Camera) {
-        rep.forEach((r) => {
-          if (r.type === 'outbound-rtp' && r.frameHeight && (!video || r.frameHeight > video.h)) video = { h: r.frameHeight, fps: r.framesPerSecond }
-        })
-      }
+      const kind = pub.source === LK.Track.Source.Camera ? 'camera' : pub.source === LK.Track.Source.ScreenShare ? 'screen' : ''
+      if (!kind) continue
+      rep.forEach((r) => {
+        if (r.type !== 'outbound-rtp') return
+        if (LIMIT_REASON[r.qualityLimitationReason] && !limits[kind]) limits[kind] = r.qualityLimitationReason
+        if (!r.frameHeight) return
+        const cur = kind === 'camera' ? video : shareVid
+        if (!cur || r.frameHeight > cur.h) {
+          const v = { h: r.frameHeight, fps: r.framesPerSecond }
+          if (kind === 'camera') video = v; else shareVid = v
+        }
+      })
     }
     // Своих треков нет (всё выключено) — пинг по входящему соединению
     if (rtt === null) {
@@ -1375,7 +1394,18 @@ async function enterRoom(joinData) {
     }
     connPing.textContent = rtt === null ? '—' : `${Math.round(rtt * 1000)} мс`
     connVideoRow.hidden = !lp.isCameraEnabled
-    if (lp.isCameraEnabled) connVideo.textContent = video ? `${video.h}p` + (video.fps ? ` · ${Math.round(video.fps)} к/с` : '') : '—'
+    if (lp.isCameraEnabled) connVideo.textContent = fmtVideo(video)
+    connScreenRow.hidden = !lp.isScreenShareEnabled
+    if (lp.isScreenShareEnabled) connScreen.textContent = fmtVideo(shareVid)
+    // «Видео снижено: слабый интернет» / «Демонстрация снижена: не хватает процессора»
+    const camLimit = lp.isCameraEnabled && limits.camera
+    const scrLimit = lp.isScreenShareEnabled && limits.screen
+    let limitText = ''
+    if (camLimit && scrLimit && camLimit === scrLimit) limitText = `Видео и демонстрация снижены: ${LIMIT_REASON[camLimit]}`
+    else if (camLimit) limitText = `Видео снижено: ${LIMIT_REASON[camLimit]}`
+    else if (scrLimit) limitText = `Демонстрация снижена: ${LIMIT_REASON[scrLimit]}`
+    connLimitRow.hidden = !limitText
+    connLimitRow.textContent = limitText
   }
   let connStatsTimer = 0
   function startConnStats() {
