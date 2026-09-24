@@ -55,6 +55,8 @@ function createMainWindow() {
     minHeight: 600,
     backgroundColor: '#0f1115',
     autoHideMenuBar: true,
+    // Иконка окна и панели задач — логотип «Живой голос» (тот же файл, что у .exe: build/icon.ico)
+    icon: path.join(__dirname, 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
