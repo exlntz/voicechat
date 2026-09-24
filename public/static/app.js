@@ -1316,12 +1316,26 @@ async function enterRoom(joinData) {
       btnIcon.className = 'fas fa-check'
       btnLabel.textContent = 'Ссылка скопирована'
       showToast('Ссылка на звонок скопирована', 'success')
+      // Под курсором кнопка остаётся зелёной сколько угодно; назад в «Скопировать ссылку»
+      // она возвращается только через 2,2 с после того, как курсор с неё ушёл
+      // (раньше отсчёт шёл от клика, и к моменту ухода курсора зелёный уже заканчивался).
+      clearTimeout(soloCopyTimer)
+      if (!copyHovered) scheduleCopyReset()
+    })
+
+    let copyHovered = false
+    function scheduleCopyReset() {
       clearTimeout(soloCopyTimer)
       soloCopyTimer = setTimeout(() => {
         copyBtn.classList.remove('is-copied')
         btnIcon.className = 'fas fa-link'
         btnLabel.textContent = 'Скопировать ссылку'
       }, 2200)
+    }
+    copyBtn.addEventListener('pointerenter', () => { copyHovered = true; clearTimeout(soloCopyTimer) })
+    copyBtn.addEventListener('pointerleave', () => {
+      copyHovered = false
+      if (copyBtn.classList.contains('is-copied')) scheduleCopyReset()
     })
 
     soloInviteCard = el('div', { class: 'solo-invite' }, [
