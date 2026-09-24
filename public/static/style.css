@@ -3072,3 +3072,22 @@ body.pip-body > .room-screen { height: 100%; }
 @media (max-width: 600px) {
   .room-topbar .room-info { overflow: visible; }
 }
+
+/* ═══════════════ Производительность: без размытия поверх видео ═══════════════
+   backdrop-filter над <video> заставляет браузер заново размывать область на КАЖДОМ кадре
+   видео под ним и выводит видео из аппаратного оверлея Chrome — при демонстрации 60 к/с
+   на весь экран это давало заметные лаги. Всё, что лежит поверх плиток (панель кнопок,
+   кнопки шапки, подписи и кнопки плиток), — без размытия, на почти непрозрачной подложке.
+   Размытие осталось только у окна настроек (оно открывается поверх и ненадолго). */
+.controls-pill,
+.room-topbar .ctrl-btn,
+.tile .tile-label,
+.tile-kick-btn,
+.volume-control {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+.controls-pill { background: rgba(15, 17, 21, 0.9); }
+.room-topbar .ctrl-btn { background: rgba(15, 17, 21, 0.78); }
+.room-topbar .ctrl-btn:hover { background: rgba(15, 17, 21, 0.92); }
+.tile .tile-label { background: rgba(6, 8, 12, 0.86); }
