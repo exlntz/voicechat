@@ -99,13 +99,7 @@
                      num(opts.videoEncoding && opts.videoEncoding.maxFramerate)
         } catch (e) { askedFps = 0 }
         var fps = askedFps || TARGET_FPS
-        // Сайт сам считает битрейт от разрешения (до 25 Мбит/с для 4K60) — не срезаем его
-        var askedBitrate = 0
-        try {
-          askedBitrate = num(opts.screenShareEncoding && opts.screenShareEncoding.maxBitrate) ||
-                         num(opts.videoEncoding && opts.videoEncoding.maxBitrate)
-        } catch (e) { askedBitrate = 0 }
-        var bitrate = Math.max(askedBitrate, bitrateFor(fps))
+        var bitrate = bitrateFor(fps)
         opts.simulcast = false
         opts.degradationPreference = 'maintain-framerate'
         opts.screenShareEncoding = { maxFramerate: fps, maxBitrate: bitrate, priority: 'high' }

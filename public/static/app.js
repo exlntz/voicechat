@@ -2469,6 +2469,19 @@ async function enterRoom(joinData) {
   // при публикации срезает битрейт до 8 Мбит/с, а здесь мы возвращаем полный.
   function tuneScreenSender(track, fps) {
     const sender = track && track.sender
+    if (IS_ELECTRON) {
+      // .exe: как было — меняем только частоту кадров и битрейт 4/6/8 Мбит/с
+      if (!sender || typeof sender.getParameters !== 'function') return
+      try {
+        const params = sender.getParameters()
+        if (params.encodings && params.encodings.length) {
+          const br = fps <= 15 ? 4_000_000 : fps <= 30 ? 6_000_000 : 8_000_000
+          params.encodings.forEach((enc) => { enc.maxFramerate = fps; enc.maxBitrate = br })
+          Promise.resolve(sender.setParameters(params)).catch(() => {})
+        }
+      } catch {}
+      return
+    }
     if (!sender || typeof sender.getParameters !== 'function') return
     try {
       const params = sender.getParameters()
@@ -2549,6 +2562,12 @@ async function enterRoom(joinData) {
       // Значение берём из выбора в меню ПКМ (state.screenShareFps, по умолчанию 60).
       const fps = state.screenShareFps
       const hint = SCREEN_SHARE_CONTENT_HINT
+      // .exe: ровно прежняя, проверенная схема — 1080p, 60 FPS, 8 Мбит/с; кодирование на
+      // видеокарте и параметры публикации задаёт сам .exe (флаги Chromium + site-boost.js).
+      // Сайт: родное разрешение до 4K и параметры в screenShareEncoding (иначе LiveKit
+      // подставлял свой пресет 1080p / 15 FPS / ~2,5 Мбит/с).
+      const capSize = IS_ELECTRON ? { width: 1920, height: 1080 } : screenCaptureSize()
+      const capBitrate = IS_ELECTRON ? 8_000_000 : screenBitrate(capSize.width, capSize.height, fps)
       const pub = await room.localParticipant.setScreenShareEnabled(true, {
         video: { displaySurface: 'monitor' },
         // ВАЖНО ("баг: сам себя слышно, если включен звук на демке"): при захвате системного звука
@@ -2561,21 +2580,15 @@ async function enterRoom(joinData) {
         // браузерах констрейнт просто игнорируется, без ошибки).
         audio: { restrictOwnAudio: true }, // всегда запрашиваем звук - живое вкл/выкл делается позже мьютом трека, не пересозданием
         systemAudio: 'include',
-        // Родное разрешение экрана до 4K (раньше захват был прибит к 1920×1080)
-        resolution: { ...screenCaptureSize(), frameRate: fps },
+        resolution: { ...capSize, frameRate: fps },
         contentHint: hint
       }, {
         // ВАЖНО: для демонстрации LiveKit берёт параметры ТОЛЬКО из screenShareEncoding,
-        // videoEncoding для неё игнорируется. Раньше здесь был только videoEncoding, и на сайте
-        // срабатывал встроенный пресет LiveKit — 1080p, 15 FPS, ~2,5 Мбит/с (в .exe его
-        // перекрывал site-boost.js). Передаём оба поля.
-        screenShareEncoding: { maxBitrate: screenBitrate(screenCaptureSize().width, screenCaptureSize().height, fps), maxFramerate: fps, priority: 'high' },
-        videoEncoding: { maxBitrate: screenBitrate(screenCaptureSize().width, screenCaptureSize().height, fps), maxFramerate: fps, priority: 'high' },
-        // degradationPreference по умолчанию для ScreenShare = "maintain-resolution" - при перегрузке
-        // CPU/сети WebRTC-энкодер режет именно FPS, сохраняя разрешение, отсюда и проседание до 40-50
-        // на 60 FPS. Для плавности важнее стабильный FPS, чем максимальная резкость - переключаем на
-        // "balanced", чтобы энкодер мог слегка снизить резкость/битрейт, но удерживал частоту кадров.
+        // videoEncoding для неё игнорируется. В .exe оба поля потом перезаписывает site-boost.js.
+        screenShareEncoding: { maxBitrate: capBitrate, maxFramerate: fps, priority: 'high' },
+        videoEncoding: { maxBitrate: capBitrate, maxFramerate: fps, priority: 'high' },
         // Плавность важнее: при нехватке ресурсов энкодер снижает разрешение, а не FPS
+        // (в .exe то же самое выставляет site-boost.js)
         degradationPreference: 'maintain-framerate',
         simulcast: false,
         // H264 имеет аппаратное ускорение кодирования на Windows (наша целевая платформа для Electron) -
@@ -2598,7 +2611,7 @@ async function enterRoom(joinData) {
             await msTrack.applyConstraints({ frameRate: { ideal: fps, min: Math.min(fps, 30) } }).catch(() => {})
           }
         }
-        tuneScreenSender(pub.track, fps)
+        if (!IS_ELECTRON) tuneScreenSender(pub.track, fps)
       } catch {}
 
       isScreenSharing = true
