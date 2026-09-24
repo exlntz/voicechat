@@ -2551,3 +2551,80 @@ body.inapp-fullscreen { overflow: hidden; }
   .ctrl-btn { width: 44px; height: 44px; }
   .leave-btn { padding: 0 14px; height: 44px; min-height: 44px; }
 }
+
+/* ═══════════════ Звонок в отдельном окне ═══════════════
+   .is-compact — звонок в маленьком окне: PiP-окно браузера (.in-pip) или ужатое окно .exe.
+   Остаются только плитки и кнопки; шапка, боковая колонка камер и приглашение прячутся. */
+.ctrl-btn--pop-in { display: none; }
+.room-screen.is-compact .ctrl-btn--pop-in { display: flex; }
+.room-screen.in-pip .ctrl-btn--settings { display: none; } /* настройки открылись бы в основном окне */
+
+.room-screen.is-compact .room-topbar,
+.room-screen.is-compact .solo-invite,
+.room-screen.is-compact .ctrl-divider { display: none; }
+.room-screen.is-compact .sidebar-participants { display: none !important; }
+.room-screen.is-compact .stage,
+.room-screen.is-compact .stage.stage-solo {
+  padding: 6px;
+  gap: 6px;
+  max-width: none;
+}
+.room-screen.is-compact .stage.stage-solo { grid-template-columns: minmax(0, 1fr); }
+.room-screen.is-compact .stage.stage-solo .tile.camera-tile { min-height: 0; max-height: none; }
+.room-screen.is-compact .controls-bar {
+  gap: 6px;
+  padding: 6px 8px;
+}
+.room-screen.is-compact .ctrl-btn {
+  width: 38px;
+  height: 38px;
+  font-size: 14px;
+}
+.room-screen.is-compact .leave-btn {
+  height: 38px;
+  min-height: 38px;
+  padding: 0 12px;
+  gap: 7px;
+  font-size: 13px;
+}
+
+/* Документ PiP-окна: во всю высоту, без прокрутки */
+html.pip-doc, body.pip-body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); }
+body.pip-body > .room-screen { height: 100%; }
+
+/* Заглушка в основном окне, пока звонок в отдельном */
+.pip-placeholder {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg);
+}
+.pip-placeholder__card {
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  padding: 36px 32px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 16px);
+}
+.pip-placeholder__icon { font-size: 28px; color: var(--accent-soft); }
+.pip-placeholder__title { margin: 0; font-size: 20px; color: var(--text); }
+.pip-placeholder__text { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text-dim); }
+.pip-placeholder__btn {
+  margin-top: 6px;
+  height: 44px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: var(--radius, 10px);
+  background: var(--accent);
+  color: #fff;
+  font: 600 15px/1 var(--font);
+  cursor: pointer;
+}
+.pip-placeholder__btn:hover, .pip-placeholder__btn:focus-visible { background: var(--accent-hover); }

@@ -14,5 +14,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Копирование в системный буфер обмена через главный процесс.
   // В .exe navigator.clipboard.writeText() отклонялся, и код комнаты не копировался -
   // app.js сначала пробует этот мост и только потом стандартный Clipboard API.
-  writeClipboard: (text) => ipcRenderer.invoke('clipboard-write', String(text == null ? '' : text))
+  writeClipboard: (text) => ipcRenderer.invoke('clipboard-write', String(text == null ? '' : text)),
+  // «Звонок в отдельном окне»: окно приложения ужимается в угол экрана и встаёт поверх
+  // остальных программ (true) или возвращается к прежнему размеру и положению (false)
+  setMiniMode: (on) => ipcRenderer.invoke('set-mini-mode', !!on)
 })

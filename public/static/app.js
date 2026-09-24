@@ -1053,7 +1053,21 @@ async function enterRoom(joinData) {
   }
   topbar.appendChild(roomInfo)
 
-  const topRight = el('div', {})
+  const topRight = el('div', { style: 'display:flex;align-items:center;gap:8px' })
+  // «Звонок в отдельном окне»: в браузере — Document Picture-in-Picture (окно поверх всех
+  // программ, как в Google Meet), в .exe — само окно приложения ужимается и встаёт поверх
+  // остальных (electronAPI.setMiniMode). Где ни то ни другое недоступно, кнопки нет.
+  const canMiniWindow = !!(window.electronAPI && typeof window.electronAPI.setMiniMode === 'function')
+  // В Electron объект documentPictureInPicture есть, но окно не открывается («no window»),
+  // поэтому в .exe — только мини-режим; старые сборки без него кнопку просто не показывают.
+  const canPipWindow = !IS_ELECTRON && 'documentPictureInPicture' in window
+  const popOutBtn = el('button', {
+    class: 'ctrl-btn',
+    style: 'width:40px;height:40px;font-size:14px',
+    title: 'Звонок в отдельном окне поверх других программ',
+    'aria-label': 'Звонок в отдельном окне'
+  }, [el('i', { class: 'fas fa-up-right-from-square' })])
+  if (canMiniWindow || canPipWindow) topRight.appendChild(popOutBtn)
   const participantsBtn = el('button', {
     class: 'ctrl-btn',
     // 40px, а не 36px - минимальный рекомендуемый размер тач-таргета на телефоне
@@ -1083,7 +1097,13 @@ async function enterRoom(joinData) {
   screenBtn.appendChild(screenCountBadge)
   // Кнопка настроек устройств — сразу справа от демонстрации: микрофон, камера
   // и динамики переключаются прямо во время звонка через всплывающую панель ниже.
-  const settingsBtn = el('button', { class: 'ctrl-btn', title: 'Настройки устройств' }, [el('i', { class: 'fas fa-gear' })])
+  const settingsBtn = el('button', { class: 'ctrl-btn ctrl-btn--settings', title: 'Настройки устройств' }, [el('i', { class: 'fas fa-gear' })])
+  // Видна только в отдельном окне: возвращает звонок в основное окно
+  const popInBtn = el('button', {
+    class: 'ctrl-btn ctrl-btn--pop-in',
+    title: 'Вернуть звонок в основное окно',
+    'aria-label': 'Вернуть звонок в основное окно'
+  }, [el('i', { class: 'fas fa-down-left-and-up-right-to-center' })])
 
   // Демонстрация экрана через getDisplayMedia() не поддерживается в большинстве мобильных
   // браузеров (iOS Safari/Chrome, Android Chrome вне десктоп-режима) - без проверки пользователь
@@ -1098,6 +1118,7 @@ async function enterRoom(joinData) {
   controls.appendChild(camBtn)
   if (canScreenShare) controls.appendChild(screenBtn)
   controls.appendChild(settingsBtn)
+  controls.appendChild(popInBtn)
   controls.appendChild(divider1)
   controls.appendChild(leaveBtn)
   screen.appendChild(controls)
@@ -1105,6 +1126,116 @@ async function enterRoom(joinData) {
   Array.from(controls.children).forEach((b, i) => playEnter(b, 80 + i * 50))
 
   root.appendChild(screen)
+
+  // ---- Звонок в отдельном окне ----
+  // pipWindow — окно Document Picture-in-Picture, куда целиком переезжает .room-screen
+  // (узлы переносятся, а не копируются: обработчики, <video> и LiveKit продолжают работать).
+  // miniWindow — режим .exe, где главное окно само становится маленьким и поверх всех.
+  let pipWindow = null
+  let pipPlaceholder = null
+  let miniWindow = false
+  // Пока звонок в PiP, основная вкладка обычно скрыта, а в скрытой вкладке браузер не крутит
+  // requestAnimationFrame — пересчёт раскладки (новый участник, демка) не случился бы до
+  // возвращения. Поэтому кадр просим у того окна, где сейчас звонок.
+  const roomFrame = (cb) => (pipWindow || window).requestAnimationFrame(cb)
+  // Панели настроек/участников объявлены ниже, после подключения к комнате: если нажать кнопку
+  // ещё во время «Подключение…», обращение к ним бросило бы ReferenceError — глушим.
+  function closeRoomPopups() {
+    try { closeDevicePopup() } catch {}
+    try { closeParticipantsPanel() } catch {}
+  }
+
+  function copyStylesInto(doc) {
+    for (const sheet of Array.from(document.styleSheets)) {
+      if (sheet.href) {
+        const link = doc.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = sheet.href
+        doc.head.appendChild(link)
+        continue
+      }
+      try {
+        const style = doc.createElement('style')
+        style.textContent = Array.from(sheet.cssRules, (r) => r.cssText).join('\n')
+        doc.head.appendChild(style)
+      } catch {}
+    }
+  }
+
+  async function openCallPip() {
+    if (pipWindow) { try { pipWindow.focus() } catch {} return }
+    let w
+    try {
+      w = await window.documentPictureInPicture.requestWindow({ width: 440, height: 340 })
+    } catch (e) {
+      console.error(e)
+      showToast('Не удалось открыть отдельное окно', 'error')
+      return
+    }
+    closeRoomPopups()
+    pipWindow = w
+    copyStylesInto(w.document)
+    w.document.title = 'Voice Lobby — звонок'
+    w.document.documentElement.classList.add('pip-doc')
+    w.document.body.classList.add('pip-body')
+
+    pipPlaceholder = el('div', { class: 'pip-placeholder' }, [
+      el('div', { class: 'pip-placeholder__card' }, [
+        el('i', { class: 'fas fa-up-right-from-square pip-placeholder__icon', 'aria-hidden': 'true' }),
+        el('h2', { class: 'pip-placeholder__title' }, 'Звонок открыт в отдельном окне'),
+        el('p', { class: 'pip-placeholder__text' }, 'Окно звонка остаётся поверх других программ — можно спокойно переключаться.'),
+        el('button', { type: 'button', class: 'pip-placeholder__btn', onclick: () => closeCallPip() }, 'Вернуть звонок сюда')
+      ])
+    ])
+    screen.replaceWith(pipPlaceholder)
+    screen.classList.add('is-compact', 'in-pip')
+    w.document.body.appendChild(screen)
+
+    w.addEventListener('resize', scheduleRelayout)
+    w.addEventListener('pagehide', onCallPipClosed, { once: true })
+    // Кадр, запрошенный у основной вкладки, может не прийти, пока она скрыта — не ждём его
+    relayoutRAF = null
+    relayout()
+  }
+
+  function closeCallPip() {
+    if (pipWindow) { try { pipWindow.close() } catch {} }
+  }
+
+  // Окно закрыли (крестиком, кнопкой «вернуть» или при выходе из звонка) — звонок возвращается
+  // на место заглушки. Если заглушки в документе уже нет (вышли в лобби), экран просто убираем.
+  function onCallPipClosed() {
+    pipWindow = null
+    screen.classList.remove('is-compact', 'in-pip')
+    if (pipPlaceholder && pipPlaceholder.isConnected) {
+      pipPlaceholder.replaceWith(screen)
+      relayoutRAF = null
+      relayout()
+    } else {
+      screen.remove()
+    }
+    pipPlaceholder = null
+  }
+
+  async function setMiniWindow(on) {
+    if (miniWindow === on) return
+    miniWindow = on
+    if (on) closeRoomPopups()
+    screen.classList.toggle('is-compact', on)
+    try { await window.electronAPI.setMiniMode(on) } catch (e) { console.error(e) }
+    scheduleRelayout()
+  }
+
+  popOutBtn.addEventListener('click', () => {
+    try { popOutBtn.blur() } catch {}
+    if (canMiniWindow) setMiniWindow(true)
+    else openCallPip()
+  })
+  popInBtn.addEventListener('click', () => {
+    if (pipWindow) closeCallPip()
+    else if (miniWindow) setMiniWindow(false)
+  })
+
   resetPageScroll()
   // Клавиатура на мобильных закрывается с анимацией — добиваем сброс, когда она уехала
   setTimeout(resetPageScroll, 350)
@@ -1262,7 +1393,7 @@ async function enterRoom(joinData) {
   let relayoutRAF = null
   function scheduleRelayout() {
     if (relayoutRAF) return
-    relayoutRAF = requestAnimationFrame(() => {
+    relayoutRAF = roomFrame(() => {
       relayoutRAF = null
       // ВАЖНО ("баг: полный экран открывается на 1мс и закрывается"): по спецификации Fullscreen
       // API перемещение элемента в DOM принудительно завершает fullscreen, а requestFullscreen()
@@ -2637,6 +2768,8 @@ async function enterRoom(joinData) {
 
   function cleanupAndGoLobby() {
     clearInterval(screenTilesReconcileInterval)
+    closeCallPip()
+    if (miniWindow) setMiniWindow(false)
     setCallActive(false)
     try { room.disconnect() } catch {}
     document.querySelectorAll('audio').forEach((a) => a.remove())

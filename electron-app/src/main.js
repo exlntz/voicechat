@@ -84,6 +84,7 @@ function createMainWindow() {
   // Флаги Chromium выше снимают лимит рендера, но этого НЕ достаточно для 60 FPS в стриме:
   // потолок также задают constraints захвата и параметры публикации LiveKit (пресеты 15/30 FPS).
   mainWindow.webContents.on('did-finish-load', () => {
+    setMiniMode(false)
     let boost = ''
     try {
       boost = fs.readFileSync(path.join(__dirname, 'site-boost.js'), 'utf8')
@@ -400,6 +401,46 @@ ipcMain.handle('choose-screen-source', async () => {
 // Самый надёжный путь для .exe: пишем через нативный clipboard главного процесса, минуя
 // разрешения и требования к "жесту пользователя" у navigator.clipboard в рендерере.
 // На сайте этот мост отсутствует, и app.js сам падает обратно на navigator.clipboard.
+// ---- «Звонок в отдельном окне» (мини-режим главного окна) ----
+// Окно запоминает прежние размер/положение, ужимается в правый нижний угол текущего монитора
+// и встаёт поверх остальных программ. Выход — возврат ровно туда, где было.
+let miniState = null
+const MINI_SIZE = { width: 440, height: 340 }
+
+function setMiniMode(on) {
+  if (!mainWindow || mainWindow.isDestroyed()) return false
+  if (on && !miniState) {
+    miniState = {
+      bounds: mainWindow.getBounds(),
+      maximized: mainWindow.isMaximized(),
+      fullscreen: mainWindow.isFullScreen()
+    }
+    if (miniState.fullscreen) mainWindow.setFullScreen(false)
+    if (miniState.maximized) mainWindow.unmaximize()
+    const { workArea } = screen.getDisplayMatching(miniState.bounds)
+    const margin = 16
+    mainWindow.setMinimumSize(320, 240)
+    mainWindow.setBounds({
+      x: workArea.x + workArea.width - MINI_SIZE.width - margin,
+      y: workArea.y + workArea.height - MINI_SIZE.height - margin,
+      width: MINI_SIZE.width,
+      height: MINI_SIZE.height
+    })
+    mainWindow.setAlwaysOnTop(true, 'floating')
+  } else if (!on && miniState) {
+    const prev = miniState
+    miniState = null
+    mainWindow.setAlwaysOnTop(false)
+    mainWindow.setMinimumSize(900, 600)
+    mainWindow.setBounds(prev.bounds)
+    if (prev.maximized) mainWindow.maximize()
+    if (prev.fullscreen) mainWindow.setFullScreen(true)
+  }
+  return true
+}
+
+ipcMain.handle('set-mini-mode', (_e, on) => setMiniMode(!!on))
+
 ipcMain.handle('clipboard-write', (_e, text) => {
   try {
     clipboard.writeText(String(text == null ? '' : text))
