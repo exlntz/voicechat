@@ -3,7 +3,7 @@
 
    Принцип: скрипт НИЧЕГО не рендерит сам и не трогает бизнес-логику app.js.
    Он только «дооснащает» уже отрисованные узлы:
-     · кнопки   — двойной перекатывающийся лейбл, точка-маркер, магнит к курсору;
+     · кнопки   — магнит к курсору (без перекатывающейся подписи);
      · поля     — всплывающая подпись, подчёркивание, печатающаяся подсказка,
                   подсветка при ошибке;
      · экраны   — однократное появление блоков, параллакс, знак продукта.
@@ -48,54 +48,15 @@
 
   /* ─────────────── 1. Кнопки ─────────────── */
 
-  // Кнопки, которые оформляем «как на витрине»: текст перекатывается, точка раздувается.
+  // Кнопки, которые оформляем: класс .ank-btn и «магнит» к курсору. Перекатывающейся
+  // подписи (текст уезжает вверх, снизу выезжает копия) больше нет — подпись кнопки
+  // остаётся обычным текстом, её по-прежнему меняет только app.js.
   var BTN_SEL = '.auth-submit-btn, .auth-ghost-btn, .lobby-logout-btn, .leave-btn, .join-toggle-btn, .lobby-card > button'
   // Кнопки, которые нельзя трогать: их подпись/содержимое меняет сам app.js или они иконочные
   var BTN_SKIP = '.password-toggle-btn, .tile-fullscreen-btn, .tile-kick-btn, .panel-close, .auth-switch-link, .screen-ctx-item, .solo-copy-btn'
 
   function enhanceButton(btn) {
     if (btn.matches(BTN_SKIP)) return
-
-    // Собираем текстовую подпись из «чужих» узлов (иконки .fa оставляем на месте)
-    var own = $('.btn__x b', btn)
-    var plain = ''
-    var drop = []
-    Array.prototype.forEach.call(btn.childNodes, function (n) {
-      if (n.nodeType === 3) {
-        if (n.textContent.trim()) plain += n.textContent
-        drop.push(n)
-      } else if (n.nodeType === 1 && n.tagName === 'SPAN' && !n.hasAttribute('data-ank') &&
-                 !n.className && !n.children.length && n.textContent.trim()) {
-        // Забираем только «безымянные» подписи: у служебных span-ов (бейдж счётчика
-        // демонстраций, метка FPS) есть класс — их трогать нельзя.
-        plain += n.textContent
-        drop.push(n)
-      }
-    })
-    plain = plain.trim()
-
-    if (!plain) {
-      // Уже оснащена и подпись не менялась — выходим
-      if (own) { attachMagnet(btn); return }
-      // Иконочная кнопка (например .ctrl-btn) — только курсор и магнит
-      btn.classList.add('ank-btn')
-      attachMagnet(btn)
-      return
-    }
-
-    // Подпись изменилась (app.js подставил «Вход...») — пересобираем внутренности
-    $$('.btn__x', btn).forEach(function (n) { n.remove() })
-    drop.forEach(function (n) { n.remove() })
-
-    var roll = make('span', 'btn__x')
-    var a = mark(document.createElement('b'))
-    a.textContent = plain
-    var b = mark(document.createElement('b'))
-    b.textContent = plain
-    b.setAttribute('aria-hidden', 'true')
-    roll.appendChild(a)
-    roll.appendChild(b)
-    btn.appendChild(roll)
     btn.classList.add('ank-btn')
     attachMagnet(btn)
   }

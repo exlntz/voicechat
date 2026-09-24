@@ -145,46 +145,18 @@ h1, h2, h3, h4 { font-family: var(--font); font-weight: 650; letter-spacing: -0.
 
 /* ═══════════════ АТОМЫ: кнопки ═══════════════
    Один визуальный язык: скруглённые плашки, синяя заливка у главного действия,
-   hairline у второстепенных. Внутренности (.btn__x с двойным лейблом)
-   навешивает anker.js; без него кнопка остаётся статичной, но полностью рабочей. */
+   hairline у второстепенных. Подпись — обычный текст, без анимации. */
 
 button {
   font-family: var(--font);
   color: inherit;
 }
 
-/* Двойной лейбл: при наведении верхняя строка уезжает вверх, нижняя встаёт на её место */
-.btn__x {
-  /* --roll — целое число пикселей: при дробной высоте строки вторая копия
-     лейбла подглядывает из-под края на экранах с DPR 2 */
-  --roll: 20px;
-  display: grid;
-  grid-auto-rows: var(--roll);
-  height: var(--roll);
-  overflow: hidden;
-  align-items: center;
-  justify-items: center;
-  text-align: center;
-  pointer-events: none;
-}
-.btn__x b {
-  display: block;
-  font-weight: inherit;
-  white-space: nowrap;
-  line-height: var(--roll);
-  transition: transform 0.44s var(--ease-io);
-}
-.ank-btn:hover .btn__x b,
-.ank-btn:focus-visible .btn__x b { transform: translateY(calc(-1 * var(--roll))); }
-
 .ank-btn {
   position: relative;
   will-change: transform;
   text-align: center;
 }
-.ank-btn:has(.btn__x) { justify-content: center; }
-.lobby-logout-btn .btn__x,
-.btn-secondary .btn__x { --roll: 18px; }
 
 /* ═══════════════ АТОМЫ: поля ввода ═══════════════
    Поле — подчёркнутая строка: подпись всплывает над ней, при фокусе
