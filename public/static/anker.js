@@ -320,7 +320,7 @@
 
   /* ─────────────── 4. След за курсором ─────────────── */
 
-  // Вместо кольца вокруг стрелки — сужающийся синий след и мягкое свечение.
+  // Вместо кольца вокруг стрелки — сужающийся синий след (без свечения: пятно света убрано).
   // След — цепочка узлов, каждый догоняет предыдущий, поэтому движение выходит
   // плавным и слегка запаздывающим; толщина и яркость растут со скоростью мыши.
   //
@@ -341,15 +341,12 @@
       'margin:-6px 0 0 -6px;border-radius:50%;background:var(--accent-soft, #2f6fd0);',
       'opacity:0;transform:translate3d(-9999px,-9999px,0);',
       'will-change:transform, opacity;pointer-events:none;contain:layout style paint}',
-      '.ank-pointer.is-hot .ank-dot{background:#fff}',
-      '.ank-pointer .ank-aura{will-change:transform}'
+      '.ank-pointer.is-hot .ank-dot{background:#fff}'
     ].join(''))
     document.head.appendChild(st)
 
     trail = make('div', 'ank-pointer')
     trail.setAttribute('aria-hidden', 'true')
-    var aura = make('span', 'ank-aura')
-    trail.appendChild(aura)
 
     var dots = []
     for (var i = 0; i < NODES; i++) dots.push(make('i', 'ank-dot'))
@@ -360,8 +357,6 @@
     var tx = window.innerWidth / 2, ty = window.innerHeight / 2
     var px = tx, py = ty            // прошлая позиция мыши — для скорости
     var speed = 0
-    var ang = 0                     // последний вектор движения
-    var ax = tx, ay = ty            // пятно идёт мягче самой ленты
     var nx = [], ny = [], op = []
     for (var k = 0; k < NODES; k++) { nx.push(tx); ny.push(ty); op.push(-1) }
 
@@ -374,7 +369,7 @@
 
     function resetChain() {
       for (var i2 = 0; i2 < NODES; i2++) { nx[i2] = tx; ny[i2] = ty }
-      ax = tx; ay = ty; px = tx; py = ty; speed = 0
+      px = tx; py = ty; speed = 0
     }
 
     function start() {
@@ -416,7 +411,6 @@
       px = tx; py = ty
       var v = Math.min(Math.sqrt(vx * vx + vy * vy), 90)
       speed += (v - speed) * 0.18
-      if (v > 0.5) ang = Math.atan2(vy, vx) * 180 / Math.PI
 
       // голова цепочки догоняет мышь, остальные — предыдущий узел
       nx[0] += (tx - nx[0]) * 0.34
@@ -439,14 +433,6 @@
         var o = Math.max(0.05, 0.62 - d * 0.066) * bright
         if (Math.abs(o - op[d]) > 0.015) { op[d] = o; dots[d].style.opacity = o.toFixed(3) }
       }
-
-      // пятно света: мягче и с лёгким растяжением по вектору движения
-      ax += (tx - ax) * 0.09
-      ay += (ty - ay) * 0.09
-      rest += Math.abs(tx - ax) + Math.abs(ty - ay)
-      var stretch = Math.min(speed / 150, 0.34)
-      aura.style.transform = 'translate3d(' + ax.toFixed(1) + 'px,' + ay.toFixed(1) + 'px,0) rotate(' +
-        ang.toFixed(1) + 'deg) scale(' + (1 + stretch).toFixed(3) + ',' + (1 - stretch * 0.62).toFixed(3) + ')'
 
       // Цепочка догнала курсор — гасим цикл до следующего движения мыши.
       if (rest < 0.6 && speed < 0.4) return
