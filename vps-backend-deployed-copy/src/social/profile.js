@@ -1,9 +1,7 @@
 // ===================== Профиль: юзернейм и «был в сети» =====================
 // Юзернейм хранится без «@» (по нему входят в аккаунт); «@» дорисовывает интерфейс.
 // Смена юзернейма сразу видна друзьям и собеседникам: им уходит событие user.update.
-import { publicUser, rateLimit } from './db.js'
-
-const USERNAME_RE = /^[A-Za-z0-9_-]{3,24}$/
+import { publicUser, rateLimit, USER_COLS, USERNAME_RE, USERNAME_HINT } from './db.js'
 
 export function cleanUsername(raw) {
   return String(raw || '').trim().replace(/^@+/, '')
@@ -11,7 +9,7 @@ export function cleanUsername(raw) {
 
 export function registerProfileRoutes(app, { db, hub }) {
   const q = {
-    user: db.prepare('SELECT id, username, display_name, show_last_seen FROM users WHERE id = ?'),
+    user: db.prepare(`SELECT ${USER_COLS}, show_last_seen FROM users WHERE id = ?`),
     byLower: db.prepare('SELECT id FROM users WHERE username_lower = ?'),
     setUsername: db.prepare('UPDATE users SET username = ?, username_lower = ? WHERE id = ?'),
     setShowLastSeen: db.prepare('UPDATE users SET show_last_seen = ? WHERE id = ?'),
@@ -31,7 +29,7 @@ export function registerProfileRoutes(app, { db, hub }) {
   function check(me, raw) {
     const username = cleanUsername(raw)
     if (!USERNAME_RE.test(username)) {
-      return { valid: false, available: false, username, message: '3–24 символа: английские буквы, цифры, _ и -' }
+      return { valid: false, available: false, username, message: USERNAME_HINT }
     }
     const taken = q.byLower.get(username.toLowerCase())
     if (taken && Number(taken.id) !== me) return { valid: true, available: false, username, message: 'Этот юзернейм уже занят' }
@@ -76,11 +74,17 @@ export function registerProfileRoutes(app, { db, hub }) {
       q.setShowLastSeen.run(body.showLastSeen ? 1 : 0, me)
     }
 
-    const profile = profileOf(me)
-    if (changedUser) {
-      const ids = q.audience.all(me, me, me, me, me).map((r) => Number(r.id))
-      hub.publish([me, ...ids], 'user.update', { user: profile.user })
-    }
-    return c.json(profile)
+    if (changedUser) broadcastUser(me)
+    return c.json(profileOf(me))
   })
+
+  // Разослать свежий вид пользователя (юзернейм, аватарка, фон) ему самому, друзьям и собеседникам
+  function broadcastUser(userId) {
+    const profile = profileOf(userId)
+    if (!profile) return
+    const ids = q.audience.all(userId, userId, userId, userId, userId).map((r) => Number(r.id))
+    hub.publish([userId, ...ids], 'user.update', { user: profile.user })
+  }
+
+  return { broadcastUser, profileOf }
 }

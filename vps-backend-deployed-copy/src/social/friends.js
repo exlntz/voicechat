@@ -4,17 +4,17 @@
 //   accepted                       -> друзья у обоих
 //   blocked, requested_by = я      -> у меня в «Заблокированных»; у него связи нет вовсе
 //                                     (заблокированный не должен узнать о блокировке)
-import { publicUser, getUserById, pairKey, toInt, rateLimit } from './db.js'
+import { publicUser, getUserById, pairKey, toInt, rateLimit, USER_COLS } from './db.js'
 
 export function registerFriendRoutes(app, { db, hub }) {
   const getRow = db.prepare('SELECT * FROM friendships WHERE user_a = ? AND user_b = ?')
   const insertRow = db.prepare('INSERT INTO friendships (user_a, user_b, status, requested_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
   const updateRow = db.prepare('UPDATE friendships SET status = ?, requested_by = ?, updated_at = ? WHERE user_a = ? AND user_b = ?')
   const deleteRow = db.prepare('DELETE FROM friendships WHERE user_a = ? AND user_b = ?')
-  const listRows = db.prepare(`SELECT f.*, u.id AS uid, u.username, u.display_name
+  const listRows = db.prepare(`SELECT f.*, u.id AS uid, u.username, u.display_name, u.avatar_file, u.banner_file, u.banner_kind
     FROM friendships f JOIN users u ON u.id = CASE WHEN f.user_a = ? THEN f.user_b ELSE f.user_a END
     WHERE f.user_a = ? OR f.user_b = ?`)
-  const byUsername = db.prepare('SELECT id, username, display_name FROM users WHERE username_lower = ?')
+  const byUsername = db.prepare(`SELECT ${USER_COLS} FROM users WHERE username_lower = ?`)
 
   function row(me, other) {
     const [a, b] = pairKey(me, other)
@@ -67,7 +67,7 @@ export function registerFriendRoutes(app, { db, hub }) {
     const me = Number(c.get('user').id)
     const friends = []
     for (const r of listRows.all(me, me, me)) {
-      const entry = entryFor(me, publicUser({ id: r.uid, username: r.username, display_name: r.display_name }), r)
+      const entry = entryFor(me, publicUser({ ...r, id: r.uid }), r)
       if (entry) friends.push(entry)
     }
     return c.json({ friends })
@@ -173,6 +173,28 @@ export function registerFriendRoutes(app, { db, hub }) {
     deleteRow.run(...pairKey(me, other))
     notifyBoth(me, other)
     return c.json({ ok: true })
+  })
+
+  // Карточка профиля (открывается из чата и списка друзей): видна, если есть связь
+  // (друг, заявка) или общая личка. Для заблокировавшего — как будто пользователя нет.
+  const sharedConv = db.prepare(`SELECT 1 FROM conversation_members a JOIN conversation_members b
+    ON b.conversation_id = a.conversation_id WHERE a.user_id = ? AND b.user_id = ? LIMIT 1`)
+  app.get('/api/users/:id{[0-9]+}', (c) => {
+    const me = Number(c.get('user').id)
+    const other = toInt(c.req.param('id'))
+    const user = other && getUserById(db, other)
+    if (!user) return c.json({ error: 'not_found', message: 'Пользователь не найден' }, 404)
+    if (other === me) return c.json({ user, status: 'self', since: null, presence: hub.presenceOf(me) })
+    const r = row(me, other)
+    const status = relationFor(me, r)
+    if (r && r.status === 'blocked' && status === null) return c.json({ error: 'not_found', message: 'Пользователь не найден' }, 404)
+    if (!status && !sharedConv.get(me, other)) return c.json({ error: 'not_found', message: 'Пользователь не найден' }, 404)
+    return c.json({
+      user,
+      status: status || 'none',
+      since: status === 'friend' ? Number(r.updated_at) : null,
+      presence: status === 'friend' ? hub.presenceOf(other) : { status: 'offline', inCall: false }
+    })
   })
 
   return { isBlockedBetween, areFriends }

@@ -12,11 +12,12 @@ import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { totalmem, freemem, loadavg, cpus } from 'node:os'
-import { initSocialSchema } from './social/db.js'
+import { initSocialSchema, USERNAME_RE as SOCIAL_USERNAME_RE, USERNAME_HINT, publicUser } from './social/db.js'
 import { createHub } from './social/events.js'
 import { registerFriendRoutes } from './social/friends.js'
 import { registerChatRoutes } from './social/chats.js'
 import { registerProfileRoutes } from './social/profile.js'
+import { registerMediaRoutes } from './social/media.js'
 
 const scrypt = promisify(scryptCb)
 
@@ -78,7 +79,8 @@ const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 дней
 // строго ASCII: латинские буквы, цифры, _ и -. Отображаемое имя (display_name) - отдельное поле,
 // его пользователь видит везде в интерфейсе (тайлы участников, юзербар), и оно может быть на
 // любом языке, включая кириллицу (та же логика разрешённых символов, что раньше была у логина).
-const USERNAME_RE = /^[A-Za-z0-9_-]{3,24}$/
+// Юзернейм начинается с буквы (правило и миграция старых — в social/db.js)
+const USERNAME_RE = SOCIAL_USERNAME_RE
 const DISPLAY_NAME_RE = /^[\p{L}\p{N}_\- ]{1,40}$/u
 
 async function hashPassword(password) {
@@ -104,7 +106,7 @@ function createSession(userId) {
 function getUserByToken(token) {
   if (!token) return null
   const row = db.prepare(
-    'SELECT u.id as id, u.username as username, u.display_name as displayName, s.expires_at as expiresAt FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?'
+    'SELECT u.id as id, u.username as username, u.display_name as display_name, u.avatar_file as avatar_file, u.banner_file as banner_file, u.banner_kind as banner_kind, s.expires_at as expiresAt FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?'
   ).get(token)
   if (!row) return null
   if (new Date(row.expiresAt).getTime() < Date.now()) {
@@ -112,7 +114,7 @@ function getUserByToken(token) {
     return null
   }
   // У пользователей, зарегистрированных до появления display_name, поле будет NULL - подставляем username
-  return { id: row.id, username: row.username, displayName: row.displayName || row.username }
+  return publicUser(row)
 }
 
 function setSessionCookie(c, token) {
@@ -186,8 +188,10 @@ function createCallRoom() {
   return { roomCode, hostSecret }
 }
 const friends = registerFriendRoutes(app, { db, hub })
-const chats = registerChatRoutes(app, { db, hub, friends, createCallRoom })
-registerProfileRoutes(app, { db, hub })
+const profile = registerProfileRoutes(app, { db, hub })
+// Файлы (вложения, аватарки, фоны) лежат рядом с базой: data/uploads/
+const media = registerMediaRoutes(app, { db, dataDir: dirname(DB_PATH), profile })
+const chats = registerChatRoutes(app, { db, hub, friends, media, createCallRoom })
 hub.mount(app)
 
 // ---------- API: регистрация ----------
@@ -200,7 +204,7 @@ app.post('/api/auth/register', async (c) => {
   const password = typeof body.password === 'string' ? body.password : ''
 
   if (!USERNAME_RE.test(username)) {
-    return c.json({ error: 'invalid_username', message: 'Юзернейм: 3-24 символа, только англ. буквы/цифры/_/-' }, 400)
+    return c.json({ error: 'invalid_username', message: 'Юзернейм: ' + USERNAME_HINT }, 400)
   }
   if (!DISPLAY_NAME_RE.test(displayName)) {
     return c.json({ error: 'invalid_display_name', message: 'Имя: 1-40 символов (буквы любого языка, цифры, пробел, _/-)' }, 400)
@@ -243,7 +247,10 @@ app.post('/api/auth/login', async (c) => {
   }
 
   const usernameLower = username.toLowerCase()
-  const row = db.prepare('SELECT id, username, display_name as displayName, password_hash, password_salt FROM users WHERE username_lower = ?').get(usernameLower)
+  const findUser = db.prepare('SELECT id, username, display_name, avatar_file, banner_file, banner_kind, password_hash, password_salt FROM users WHERE username_lower = ?')
+  // Старые юзернеймы, начинавшиеся с цифры или «_», переименованы в user_… — пускаем и по старому
+  const findLegacy = db.prepare('SELECT id, username, display_name, avatar_file, banner_file, banner_kind, password_hash, password_salt FROM users WHERE legacy_username_lower = ?')
+  const row = findUser.get(usernameLower) || (/^[^a-z]/.test(usernameLower) ? findLegacy.get(usernameLower) : null)
   if (!row) {
     return c.json({ error: 'invalid_credentials', message: 'Неверный логин или пароль' }, 401)
   }
@@ -255,7 +262,7 @@ app.post('/api/auth/login', async (c) => {
 
   const token = createSession(row.id)
   setSessionCookie(c, token)
-  return c.json({ user: { id: row.id, username: row.username, displayName: row.displayName || row.username } })
+  return c.json({ user: publicUser(row) })
 })
 
 // ---------- API: выход ----------

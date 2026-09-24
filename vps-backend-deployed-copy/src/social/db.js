@@ -67,16 +67,100 @@ export function initSocialSchema(db) {
   // ALTER падает, если колонка уже есть, — это нормально при повторном запуске.
   try { db.exec('ALTER TABLE users ADD COLUMN last_seen INTEGER') } catch {}
   try { db.exec('ALTER TABLE users ADD COLUMN show_last_seen INTEGER NOT NULL DEFAULT 1') } catch {}
+
+  // Аватарка и фон профиля (картинка, GIF или видео) — ссылки на files.id
+  try { db.exec('ALTER TABLE users ADD COLUMN avatar_file TEXT') } catch {}
+  try { db.exec('ALTER TABLE users ADD COLUMN banner_file TEXT') } catch {}
+  try { db.exec('ALTER TABLE users ADD COLUMN banner_kind TEXT') } catch {}
+
+  // Настройки чата для себя: закреплён в списке (время закрепления), история очищена до id,
+  // обои (id готовых или file:<id> своей картинки)
+  try { db.exec('ALTER TABLE conversation_members ADD COLUMN pinned_at INTEGER') } catch {}
+  try { db.exec('ALTER TABLE conversation_members ADD COLUMN cleared_before INTEGER NOT NULL DEFAULT 0') } catch {}
+  try { db.exec('ALTER TABLE conversation_members ADD COLUMN wallpaper TEXT') } catch {}
+  // Пересланное: {userId, name} автора оригинала
+  try { db.exec('ALTER TABLE messages ADD COLUMN forward TEXT') } catch {}
+
+  // Загруженные файлы. purpose: attachment | avatar | banner | wallpaper;
+  // kind: image | video | audio | voice | file. Файл лежит на диске под своим id.
+  db.exec(`CREATE TABLE IF NOT EXISTS files (
+    id TEXT PRIMARY KEY,
+    owner_id INTEGER NOT NULL,
+    purpose TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    mime TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    meta TEXT,
+    created_at INTEGER NOT NULL
+  )`)
+  // Вложения сообщения (одно сообщение — до 10 файлов; при пересылке файл не копируется)
+  db.exec(`CREATE TABLE IF NOT EXISTS message_files (
+    message_id INTEGER NOT NULL,
+    file_id TEXT NOT NULL,
+    position INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (message_id, file_id)
+  )`)
+  db.exec('CREATE INDEX IF NOT EXISTS idx_message_files_file ON message_files(file_id)')
+  // «Удалить у меня»: сообщение остаётся у собеседника, но не показывается этому пользователю
+  db.exec(`CREATE TABLE IF NOT EXISTS message_hidden (
+    user_id INTEGER NOT NULL,
+    message_id INTEGER NOT NULL,
+    PRIMARY KEY (user_id, message_id)
+  )`)
+  // Закреплённые сообщения чата (общие для обоих собеседников)
+  db.exec(`CREATE TABLE IF NOT EXISTS pins (
+    conversation_id INTEGER NOT NULL,
+    message_id INTEGER NOT NULL,
+    pinned_by INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (conversation_id, message_id)
+  )`)
+
+  fixLegacyUsernames(db)
+}
+
+// Юзернейм начинается с буквы. Старые, начинающиеся с цифры, «_» или «-», получают приставку
+// user_ (при совпадении — ещё и номер). Выполняется при каждом старте, но меняет только такие.
+export const USERNAME_RE = /^[A-Za-z][A-Za-z0-9_-]{2,23}$/
+export const USERNAME_HINT = '3–24 символа: английские буквы, цифры, _ и -, первая — буква'
+function fixLegacyUsernames(db) {
+  // Старое имя запоминаем: по нему по-прежнему можно войти
+  try { db.exec('ALTER TABLE users ADD COLUMN legacy_username_lower TEXT') } catch {}
+  const bad = db.prepare("SELECT id, username FROM users WHERE substr(username, 1, 1) NOT GLOB '[A-Za-z]'").all()
+  if (!bad.length) return
+  const exists = db.prepare('SELECT 1 FROM users WHERE username_lower = ?')
+  const update = db.prepare('UPDATE users SET username = ?, username_lower = ?, legacy_username_lower = ? WHERE id = ?')
+  for (const row of bad) {
+    let next = 'user_' + row.username
+    let n = 1
+    while (exists.get(next.toLowerCase())) next = `user_${row.username}_${++n}`
+    update.run(next, next.toLowerCase(), String(row.username).toLowerCase(), row.id)
+    console.log(`[social] юзернейм ${row.username} -> ${next}`)
+  }
 }
 
 // Публичный вид пользователя — без хешей и прочего
+export const USER_COLS = 'id, username, display_name, avatar_file, banner_file, banner_kind'
+export function fileUrl(id) {
+  return id ? `/api/files/${id}` : null
+}
 export function publicUser(row) {
   if (!row) return null
-  return { id: Number(row.id), username: row.username, displayName: row.display_name || row.displayName || row.username }
+  return {
+    id: Number(row.id),
+    username: row.username,
+    displayName: row.display_name || row.displayName || row.username,
+    avatarUrl: fileUrl(row.avatar_file),
+    bannerUrl: fileUrl(row.banner_file),
+    bannerKind: row.banner_file ? (row.banner_kind || 'image') : null
+  }
 }
 
+let userStmt = null
 export function getUserById(db, id) {
-  return publicUser(db.prepare('SELECT id, username, display_name FROM users WHERE id = ?').get(id))
+  if (!userStmt) userStmt = db.prepare(`SELECT ${USER_COLS} FROM users WHERE id = ?`)
+  return publicUser(userStmt.get(id))
 }
 
 export function pairKey(a, b) {
