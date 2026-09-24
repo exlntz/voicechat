@@ -3220,4 +3220,12 @@ body.pip-body > .room-screen { height: 100%; }
   100% { transform: rotate(0deg) scale(1); }
 }
 .solo-copy-btn:not(.is-copied):hover i { animation: solo-link-tug 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1; }
-@media (prefers-reduced-motion: reduce) { .solo-copy-btn:hover i { animation: none; } }
+/* После копирования галочка «впрыгивает»: из поворота и нуля — с лёгким перелётом */
+@keyframes solo-check-pop {
+  0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+  55% { transform: scale(1.3) rotate(8deg); opacity: 1; }
+  80% { transform: scale(0.92) rotate(0deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+.solo-copy-btn.is-copied i { animation: solo-check-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) 1; }
+@media (prefers-reduced-motion: reduce) { .solo-copy-btn:hover i, .solo-copy-btn.is-copied i { animation: none; } }
