@@ -51,9 +51,9 @@
   // Кнопки, которые оформляем: класс .ank-btn и «магнит» к курсору. Перекатывающейся
   // подписи (текст уезжает вверх, снизу выезжает копия) больше нет — подпись кнопки
   // остаётся обычным текстом, её по-прежнему меняет только app.js.
-  var BTN_SEL = '.auth-submit-btn, .auth-ghost-btn, .lobby-logout-btn, .leave-btn, .join-toggle-btn, .lobby-card > button'
+  var BTN_SEL = '.auth-submit-btn, .auth-ghost-btn, .lobby-logout-btn, .leave-btn, .join-toggle-btn, .lobby-card > button, .solo-copy-btn'
   // Кнопки, которые нельзя трогать: их подпись/содержимое меняет сам app.js или они иконочные
-  var BTN_SKIP = '.password-toggle-btn, .tile-fullscreen-btn, .tile-kick-btn, .panel-close, .auth-switch-link, .screen-ctx-item, .solo-copy-btn'
+  var BTN_SKIP = '.password-toggle-btn, .tile-fullscreen-btn, .tile-kick-btn, .panel-close, .auth-switch-link, .screen-ctx-item'
 
   function enhanceButton(btn) {
     if (btn.matches(BTN_SKIP)) return

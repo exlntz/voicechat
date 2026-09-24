@@ -2878,7 +2878,8 @@ body.pip-body > .room-screen { height: 100%; }
    сжимается в точку выхода. Прежняя мгновенная смена фона при :hover для таких кнопок
    отключена (фон ждёт «вечность»), иначе круга не было бы видно; фокус с клавиатуры
    (:focus-visible) по-прежнему красит кнопку сразу. */
-.auth-submit-btn, .lobby-card > button { --ank-fill: var(--accent-hover); }
+.auth-submit-btn, .lobby-card > button, .solo-copy-btn { --ank-fill: var(--accent-hover); }
+.solo-copy-btn.is-copied { --ank-fill: var(--success); }
 .auth-ghost-btn { --ank-fill: #fff; }
 .lobby-logout-btn, .leave-btn { --ank-fill: var(--danger); }
 .join-toggle-btn { --ank-fill: var(--surface-3); }
