@@ -12,6 +12,10 @@ final class CallModel: ObservableObject {
 
     @Published var micOn: Bool
     @Published var camOn: Bool
+    /// Идёт моя демонстрация экрана (расширение ReplayKit)
+    @Published private(set) var screenOn = false
+    /// Сообщение поверх звонка (ошибки демонстрации и т. п.)
+    @Published var banner: String?
     @Published private(set) var statusText = "Подключение…"
     @Published private(set) var statusKind: StatusKind = .connecting
     /// Кто сейчас главный: последний говоривший собеседник (как на сайте)
@@ -25,6 +29,7 @@ final class CallModel: ObservableObject {
     private var ended = false
     private var pendingSpeaker: String?
     private var speakerTask: Task<Void, Never>?
+    private var bannerTask: Task<Void, Never>?
 
     init(info: JoinInfo, micOn: Bool, camOn: Bool) {
         self.info = info
@@ -41,6 +46,11 @@ final class CallModel: ObservableObject {
     /// Собеседники в порядке имён — стабильный порядок миниатюр
     var remotes: [RemoteParticipant] {
         room.remoteParticipants.values.sorted { $0.displayName.localizedCompare($1.displayName) == .orderedAscending }
+    }
+
+    /// Собеседник, который сейчас показывает экран (его демонстрация — на главном месте)
+    var screenSharer: RemoteParticipant? {
+        remotes.first { $0.firstScreenShareVideoTrack != nil }
     }
 
     /// Главный: последний говоривший собеседник, иначе первый собеседник; nil — я один
@@ -60,10 +70,19 @@ final class CallModel: ObservableObject {
                 DispatchQueue.main.async { self?.roomDidChange() }
             }
             .store(in: &bag)
+        // Демонстрация запускается и останавливается из системного окна ReplayKit —
+        // состояние кнопки берём у LiveKit
+        BroadcastManager.shared.isBroadcastingPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] on in self?.screenOn = on }
+            .store(in: &bag)
 
         do {
             let options = RoomOptions(
                 defaultCameraCaptureOptions: CameraCaptureOptions(position: .front),
+                // Весь экран телефона: на iOS 16–26 — через расширение ReplayKit,
+                // на iOS 27+ LiveKit сам берёт ScreenCaptureKit (расширение не нужно)
+                defaultScreenShareCaptureOptions: ScreenShareCaptureOptions(useBroadcastExtension: true),
                 adaptiveStream: true,
                 dynacast: true
             )
@@ -101,9 +120,56 @@ final class CallModel: ObservableObject {
         _ = try? await capturer.switchCameraPosition()
     }
 
+    /// Демонстрация экрана телефона: системное окно ReplayKit → расширение → звонок
+    func toggleScreenShare() async {
+        if screenOn {
+            BroadcastManager.shared.requestStop()
+            _ = try? await room.localParticipant.setScreenShare(enabled: false)
+            return
+        }
+        if let problem = Self.screenShareProblem() {
+            show(problem)
+            return
+        }
+        do {
+            _ = try await room.localParticipant.setScreenShare(enabled: true)
+        } catch {
+            show("Не удалось начать демонстрацию экрана: \(error.localizedDescription)")
+        }
+    }
+
+    /// Почему демонстрация не сможет работать (nil — всё готово)
+    static func screenShareProblem() -> String? {
+        // iOS 27+: ScreenCaptureKit внутри приложения — ни расширение, ни App Group не нужны
+        if #available(iOS 27, *) { return nil }
+        guard let ext = InfoOverrides.screenSharingExtension else {
+            return "Демонстрация недоступна: в приложении нет расширения для записи экрана."
+        }
+        guard let group = InfoOverrides.appGroup else {
+            return "Демонстрация недоступна: не задан App Group (расширение \(ext))."
+        }
+        if FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group) == nil {
+            return "Демонстрация недоступна: нет доступа к App Group «\(group)». "
+                + "SideStore не выдал приложению общую папку с расширением — переустановите приложение через SideStore. "
+                + "Расширение: \(ext)."
+        }
+        return nil
+    }
+
+    func show(_ message: String) {
+        banner = message
+        bannerTask?.cancel()
+        bannerTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 9_000_000_000)
+            guard !Task.isCancelled else { return }
+            self?.banner = nil
+        }
+    }
+
     func leave() async {
         ended = true
         speakerTask?.cancel()
+        if screenOn { BroadcastManager.shared.requestStop() }
         await room.disconnect()
         UIApplication.shared.isIdleTimerDisabled = false
     }
@@ -112,6 +178,7 @@ final class CallModel: ObservableObject {
         guard !ended else { return }
         ended = true
         speakerTask?.cancel()
+        if screenOn { BroadcastManager.shared.requestStop() }
         UIApplication.shared.isIdleTimerDisabled = false
         let room = self.room
         Task { await room.disconnect() }
@@ -134,6 +201,9 @@ final class CallModel: ObservableObject {
         default:
             setStatus("Подключение…", .connecting)
         }
+        // Демонстрация: через расширение (iOS 16–26) или ScreenCaptureKit (iOS 27+)
+        let sharing = BroadcastManager.shared.isBroadcasting || room.localParticipant.isScreenShareEnabled()
+        if screenOn != sharing { screenOn = sharing }
         updateSpeaker()
     }
 

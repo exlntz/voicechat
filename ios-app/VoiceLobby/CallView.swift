@@ -111,19 +111,31 @@ struct CallView: View {
 
     @ViewBuilder
     private var stage: some View {
-        if let main = call.mainParticipant {
+        stageContent
+            .overlay(alignment: .top) {
+                if let banner = call.banner {
+                    MessageBox(text: banner)
+                        .padding(.horizontal, 8)
+                        .padding(.top, 8)
+                        .onTapGesture { call.banner = nil }
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .animation(.easeOut(duration: 0.25), value: call.banner)
+    }
+
+    @ViewBuilder
+    private var stageContent: some View {
+        if let sharer = call.screenSharer, let track = sharer.firstScreenShareVideoTrack {
+            // Кто-то показывает экран — демонстрация на главном месте, все камеры миниатюрами
+            ZStack(alignment: .topTrailing) {
+                ScreenTileView(track: track, name: sharer.displayName, bottomInset: controlsInset)
+                thumbColumn(call.remotes + [room.localParticipant])
+            }
+        } else if let main = call.mainParticipant {
             ZStack(alignment: .topTrailing) {
                 TileView(participant: main, isLocal: false, style: .main, bottomInset: controlsInset)
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 10) {
-                        ForEach(thumbnails(main: main), id: \.viewID) { p in
-                            TileView(participant: p, isLocal: p === room.localParticipant, style: .thumb)
-                                .frame(width: 96, height: 128)
-                        }
-                    }
-                    .padding(10)
-                }
-                .frame(width: 116)
+                thumbColumn(thumbnails(main: main))
             }
         } else {
             VStack(spacing: 10) {
@@ -132,6 +144,20 @@ struct CallView: View {
             }
             .padding(.bottom, controlsInset)
         }
+    }
+
+    /// Колонка миниатюр в правом верхнем углу
+    private func thumbColumn(_ list: [Participant]) -> some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 10) {
+                ForEach(list, id: \.viewID) { p in
+                    TileView(participant: p, isLocal: p === room.localParticipant, style: .thumb)
+                        .frame(width: 96, height: 128)
+                }
+            }
+            .padding(10)
+        }
+        .frame(width: 116)
     }
 
     /// Все, кроме главного; своя миниатюра — последней
@@ -143,8 +169,8 @@ struct CallView: View {
     // MARK: - Панель кнопок
 
     private var controls: some View {
-        HStack(spacing: 12) {
-            HStack(spacing: 8) {
+        HStack(spacing: 10) {
+            HStack(spacing: 6) {
                 CtrlButton(icon: call.micOn ? "mic.fill" : "mic.slash.fill",
                            kind: call.micOn ? .active : .off,
                            label: call.micOn ? "Выключить микрофон" : "Включить микрофон") {
@@ -160,8 +186,13 @@ struct CallView: View {
                 }
                 .disabled(!call.camOn)
                 .opacity(call.camOn ? 1 : 0.4)
+                CtrlButton(icon: call.screenOn ? "rectangle.on.rectangle.slash" : "rectangle.on.rectangle",
+                           kind: call.screenOn ? .active : .neutral,
+                           label: call.screenOn ? "Остановить демонстрацию экрана" : "Демонстрация экрана") {
+                    Task { await call.toggleScreenShare() }
+                }
             }
-            .padding(7)
+            .padding(6)
             .background(.ultraThinMaterial, in: Capsule())
             .background(Capsule().fill(Color(hex: 0x0f1115, alpha: 0.72)))
             .overlay(Capsule().strokeBorder(Color.white.opacity(0.10)))
@@ -176,7 +207,7 @@ struct CallView: View {
                 }
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(Theme.dangerSoft)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 18)
                 .frame(height: 50)
                 .background(Capsule().fill(Theme.dangerWash))
                 .background(.ultraThinMaterial, in: Capsule())
@@ -266,6 +297,49 @@ struct TileView: View {
     }
 }
 
+// MARK: - Демонстрация экрана собеседника
+
+struct ScreenTileView: View {
+    let track: VideoTrack
+    let name: String
+    var bottomInset: CGFloat = 0
+
+    var body: some View {
+        ZStack {
+            Color.black
+            SwiftUIVideoView(track, layoutMode: .fit, mirrorMode: .off)
+        }
+        .overlay(alignment: .topLeading) {
+            HStack(spacing: 6) {
+                Circle().fill(Color.white).frame(width: 6, height: 6)
+                Text("LIVE")
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(Capsule().fill(Theme.danger))
+            .padding(12)
+        }
+        .overlay(alignment: .bottomLeading) {
+            HStack(spacing: 8) {
+                Image(systemName: "display")
+                Text("Демонстрация — \(name)").lineLimit(1)
+            }
+            .font(.system(size: 13, weight: .medium))
+            .foregroundColor(Theme.text)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color(hex: 0x06080c, alpha: 0.78)))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.border))
+            .padding(.leading, 14)
+            .padding(.bottom, 14 + bottomInset)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.border))
+    }
+}
+
 // MARK: - Кнопка панели
 
 struct CtrlButton: View {
@@ -279,9 +353,9 @@ struct CtrlButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(foreground)
-                .frame(width: 48, height: 48)
+                .frame(width: 46, height: 46)
                 .background(Circle().fill(fill))
                 .overlay(Circle().strokeBorder(stroke))
         }

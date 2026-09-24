@@ -4,6 +4,11 @@ import SwiftUI
 struct VoiceLobbyApp: App {
     @StateObject private var app = AppModel()
 
+    init() {
+        // До первого обращения LiveKit к Info.plist: реальные App Group и id расширения под SideStore
+        InfoOverrides.install()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

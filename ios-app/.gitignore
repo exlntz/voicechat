@@ -1,6 +1,9 @@
 # Генерируется XcodeGen и сборкой в CI
 VoiceLobby.xcodeproj/
 VoiceLobby/Info.plist
+VoiceLobby/VoiceLobby.entitlements
+BroadcastExtension/Info.plist
+BroadcastExtension/VoiceLobbyBroadcast.entitlements
 build/
 Payload/
 *.ipa

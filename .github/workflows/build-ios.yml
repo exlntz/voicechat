@@ -28,8 +28,8 @@ jobs:
       - name: Забрать код
         uses: actions/checkout@v4
 
-      - name: Инструменты (XcodeGen, xcbeautify)
-        run: brew install xcodegen xcbeautify
+      - name: Инструменты (XcodeGen, xcbeautify, ldid)
+        run: brew install xcodegen xcbeautify ldid
 
       - name: Сгенерировать Xcode-проект
         working-directory: ios-app
@@ -54,8 +54,19 @@ jobs:
       - name: Упаковать .ipa
         working-directory: ios-app
         run: |
+          set -e
           mkdir -p Payload
           cp -R build/Build/Products/Release-iphoneos/VoiceLobby.app Payload/
+          APP=Payload/VoiceLobby.app
+          # Расширение демонстрации экрана должно быть внутри приложения
+          ls -d "$APP"/PlugIns/*.appex
+          # Entitlements (App Group) прошиваем в бинарники: по ним SideStore
+          # регистрирует App Group для приложения и расширения
+          ldid -SVoiceLobby/VoiceLobby.entitlements "$APP/VoiceLobby"
+          for EX in "$APP"/PlugIns/*.appex; do
+            ldid -SBroadcastExtension/VoiceLobbyBroadcast.entitlements "$EX/$(basename "$EX" .appex)"
+          done
+          echo "--- entitlements приложения:"; ldid -e "$APP/VoiceLobby"
           zip -qry VoiceLobby.ipa Payload
           ls -lh VoiceLobby.ipa
 
