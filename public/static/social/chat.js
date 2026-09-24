@@ -12,7 +12,7 @@ import {
 } from './store.js'
 import { api } from './api.js'
 import {
-  h, icon, avatar, setPresenceDot, displayName, presenceText, richText, timeHM, timeLong, dayLabel,
+  h, icon, avatar, setPresenceDot, displayName, presenceText, richText, timeHM, dayLabel,
   dayKey, confirmDialog, showMenu, toast
 } from './ui.js'
 import { startCall, joinCallFromMessage, callState, inCall } from './call-invite.js'
@@ -39,10 +39,10 @@ export function createChatView({ convId, navigate, menuButton }) {
   const animateKeys = new Set()
 
   // ---------- Шапка ----------
-  let headAvatar = avatar(peer, { size: 28, presence: presenceOf(peer.id) })
+  const headAvatar = avatar(peer, { size: 44, presence: presenceOf(peer.id) })
   const headSub = h('span', { class: 'vl-chat__head-sub' })
-  const callBtn = h('button', { type: 'button', class: 'vl-icon-btn vl-icon-btn--lg', title: 'Позвонить', 'aria-label': 'Позвонить' }, [icon('phone')])
-  const muteBtn = h('button', { type: 'button', class: 'vl-icon-btn vl-icon-btn--lg' })
+  const callBtn = h('button', { type: 'button', class: 'vl-round is-lg', title: 'Позвонить', 'aria-label': 'Позвонить' }, [icon('phone')])
+  const muteBtn = h('button', { type: 'button', class: 'vl-round is-lg' })
   callBtn.addEventListener('click', () => {
     if (inCall() && callState.conversationId === convId) { navigate('/room/' + window.VL.state.roomCode); return }
     startCall(convId)
@@ -87,9 +87,11 @@ export function createChatView({ convId, navigate, menuButton }) {
   const input = h('textarea', { class: 'vl-composer__input', rows: '1', maxlength: String(MAX_LEN + 500), placeholder: `Написать @${peer.username || 'собеседнику'}`, 'aria-label': 'Сообщение' })
   const sendBtn = h('button', { type: 'button', class: 'vl-composer__send', title: 'Отправить', 'aria-label': 'Отправить', disabled: true }, [icon('paper-plane')])
   const counter = h('span', { class: 'vl-composer__counter', hidden: true })
-  const composerBox = h('div', { class: 'vl-composer__box' }, [input, counter, sendBtn])
+  // Поле — «таблетка», кнопка отправки — отдельный круг справа
+  const composerBox = h('div', { class: 'vl-composer__box' }, [h('div', { class: 'vl-composer__field' }, [input, counter]), sendBtn])
   const blockedNote = h('div', { class: 'vl-composer__blocked', hidden: true })
-  const typingLine = h('div', { class: 'vl-typing', 'aria-live': 'polite' })
+  // Для экранного диктора: «печатает…» теперь пузырь в ленте, а текст — здесь
+  const typingLine = h('div', { class: 'vl-sr-only', 'aria-live': 'polite' })
   const composer = h('div', { class: 'vl-composer' }, [replyBar, composerBox, blockedNote, typingLine])
 
   const node = h('section', { class: 'vl-view vl-view--chat' }, [header, h('div', { class: 'vl-chat__main' }, [scroller, jumpBtn]), composer])
@@ -150,9 +152,9 @@ export function createChatView({ convId, navigate, menuButton }) {
     replyTo = m ? { id: m.id, authorId: m.authorId, body: m.body } : null
     if (!replyTo) { replyBar.hidden = true; replyBar.replaceChildren(); return }
     const who = replyTo.authorId === me.id ? 'себе' : displayName(userById(replyTo.authorId))
-    const close = h('button', { type: 'button', class: 'vl-icon-btn', 'aria-label': 'Отменить ответ' }, [icon('circle-xmark')])
+    const close = h('button', { type: 'button', class: 'vl-round is-sm is-ghost', 'aria-label': 'Отменить ответ' }, [icon('xmark')])
     close.addEventListener('click', () => setReply(null))
-    replyBar.replaceChildren(h('span', {}, ['Ответ ', h('b', {}, who)]), h('span', { class: 'vl-reply-bar__text' }, String(replyTo.body).slice(0, 120)), close)
+    replyBar.replaceChildren(icon('reply'), h('span', { class: 'vl-reply-bar__body' }, [h('b', {}, replyTo.authorId === me.id ? 'Ответ себе' : `Ответ ${who}`), h('span', { class: 'vl-reply-bar__text' }, String(replyTo.body).replace(/\s+/g, ' ').slice(0, 120))]), close)
     replyBar.hidden = false
     input.focus()
   }
@@ -169,16 +171,16 @@ export function createChatView({ convId, navigate, menuButton }) {
     }
   }
 
+  // «Печатает…» — пузырь с точками в конце ленты (см. renderList)
+  function typingNames() {
+    return typingUsers(convId).filter((id) => id !== me.id).map((id) => displayName(userById(id)))
+  }
   function renderTyping() {
-    const ids = typingUsers(convId).filter((id) => id !== me.id)
-    if (!ids.length) { typingLine.replaceChildren(); typingLine.classList.remove('is-on'); return }
-    const names = ids.map((id) => displayName(userById(id)))
-    typingLine.classList.add('is-on')
-    typingLine.replaceChildren(
-      h('span', { class: 'vl-typing__dots', 'aria-hidden': 'true' }, [h('i'), h('i'), h('i')]),
-      h('b', {}, names.join(', ')),
-      h('span', {}, names.length > 1 ? ' печатают…' : ' печатает…')
-    )
+    const names = typingNames()
+    typingLine.textContent = names.length ? `${names.join(', ')} ${names.length > 1 ? 'печатают' : 'печатает'}` : ''
+    const stick = atBottom
+    renderList()
+    if (stick && positioned) scrollToBottom()
   }
 
   // ---------- Сообщения ----------
@@ -196,7 +198,7 @@ export function createChatView({ convId, navigate, menuButton }) {
   }
 
   function toolButton(iconName, title, onClick, danger = false) {
-    const b = h('button', { type: 'button', class: `vl-msg__tool${danger ? ' is-danger' : ''}`, title, 'aria-label': title }, [icon(iconName)])
+    const b = h('button', { type: 'button', class: `vl-round is-xs is-dark${danger ? ' is-danger-hover' : ''}`, title, 'aria-label': title }, [icon(iconName)])
     b.addEventListener('click', (e) => { e.stopPropagation(); onClick(e) })
     return b
   }
@@ -248,56 +250,40 @@ export function createChatView({ convId, navigate, menuButton }) {
     ])
   }
 
-  function buildReplyLine(m) {
+  // Цитата ответа — внутри пузыря, над текстом
+  function buildQuote(m) {
     const r = m.reply
     const who = r ? authorOf(r) : null
-    const line = h('button', { type: 'button', class: 'vl-msg__reply' }, r && !r.deleted
-      ? [avatar(who, { size: 16 }), h('b', {}, displayName(who)), h('span', {}, r.kind === 'call' ? 'Звонок' : String(r.body).replace(/\s+/g, ' ').slice(0, 140))]
-      : [icon('reply'), h('span', { class: 'is-muted' }, 'Исходное сообщение удалено')])
-    if (r && !r.deleted) line.addEventListener('click', () => scrollToMessage(r.id))
-    return line
+    const quote = h('button', { type: 'button', class: 'vl-quote' }, r && !r.deleted
+      ? [h('b', {}, r.authorId === me.id ? 'Вы' : displayName(who)), h('span', {}, r.kind === 'call' ? 'Звонок' : String(r.body).replace(/\s+/g, ' ').slice(0, 140))]
+      : [h('span', { class: 'is-muted' }, 'Исходное сообщение удалено')])
+    if (r && !r.deleted) quote.addEventListener('click', () => scrollToMessage(r.id))
+    return quote
   }
 
-  function buildMessage(m, grouped, readMark) {
-    const author = authorOf(m)
+  // pos: single | first | middle | last — место в серии подряд идущих сообщений одного автора
+  function buildMessage(m, pos, readMark) {
     const mine = m.authorId === me.id
     const key = m.id ? 'm' + m.id : 'c' + m.clientId
     const editing = editingKey === key
-    const cls = ['vl-msg']
-    if (grouped) cls.push('is-grouped')
+    const cls = ['vl-msg', mine ? 'is-mine' : 'is-theirs', 'pos-' + pos]
     if (m.pending) cls.push('is-pending')
     if (m.failed) cls.push('is-failed')
-    if (m.reply) cls.push('has-reply')
     if (editing) cls.push('is-editing')
     if (animateKeys.has(key)) { cls.push('is-new'); animateKeys.delete(key) }
 
-    const content = []
-    if (m.reply) content.push(buildReplyLine(m))
-    if (!grouped || m.reply) {
-      content.push(h('div', { class: 'vl-msg__head' }, [
-        h('span', { class: 'vl-msg__author' }, displayName(author)),
-        h('time', { class: 'vl-msg__time', datetime: new Date(m.createdAt).toISOString(), title: new Date(m.createdAt).toLocaleString('ru-RU') }, timeLong(m.createdAt))
-      ]))
-    }
+    let bubble
     if (editing) {
-      content.push(buildEditor(m))
+      bubble = buildEditor(m)
     } else {
-      const text = h('div', { class: 'vl-msg__text is-selectable' }, [richText(m.body)])
-      if (m.editedAt) text.appendChild(h('span', { class: 'vl-msg__edited', title: 'Изменено ' + new Date(m.editedAt).toLocaleString('ru-RU') }, ' (изменено)'))
-      content.push(text)
+      const meta = h('span', { class: 'vl-bubble__meta' }, [
+        m.editedAt ? h('span', { title: 'Изменено ' + new Date(m.editedAt).toLocaleString('ru-RU') }, 'изм. ') : null,
+        h('time', { datetime: new Date(m.createdAt).toISOString() }, timeHM(m.createdAt)),
+        m.pending ? icon('clock') : null
+      ])
+      const text = h('div', { class: 'vl-bubble__text is-selectable' }, [richText(m.body), meta])
+      bubble = h('div', { class: 'vl-bubble', title: new Date(m.createdAt).toLocaleString('ru-RU') }, [m.reply ? buildQuote(m) : null, text])
     }
-    if (m.failed) {
-      const retry = h('button', { type: 'button', class: 'vl-linkbtn' }, 'Повторить')
-      const drop = h('button', { type: 'button', class: 'vl-linkbtn' }, 'Удалить')
-      retry.addEventListener('click', () => retryMessage(convId, m.clientId))
-      drop.addEventListener('click', () => discardDraft(convId, m.clientId))
-      content.push(h('div', { class: 'vl-msg__failed' }, [icon('circle-exclamation'), h('span', {}, `${m.failed}. `), retry, ' · ', drop]))
-    }
-    if (readMark) content.push(h('div', { class: 'vl-msg__read' }, [icon('check-double'), 'Прочитано']))
-
-    const gutter = (grouped && !m.reply)
-      ? h('span', { class: 'vl-msg__gutter-time', 'aria-hidden': 'true' }, timeHM(m.createdAt))
-      : avatar(author, { size: 40 })
 
     const tools = []
     if (m.id && !editing) {
@@ -306,11 +292,17 @@ export function createChatView({ convId, navigate, menuButton }) {
       tools.push(toolButton('copy', 'Копировать текст', () => window.VL.copyToClipboard(m.body).then((ok) => toast(ok ? 'Скопировано' : 'Не удалось скопировать', ok ? 'success' : 'error'))))
       if (mine) tools.push(toolButton('trash', 'Удалить', (e) => askDelete(m, e.shiftKey), true))
     }
-    const msg = h('div', { class: cls.join(' '), 'data-key': key }, [
-      h('div', { class: 'vl-msg__gutter' }, [gutter]),
-      h('div', { class: 'vl-msg__content' }, content),
-      tools.length ? h('div', { class: 'vl-msg__tools' }, tools) : null
-    ])
+    const children = [h('div', { class: 'vl-msg__wrap' }, [bubble, tools.length ? h('div', { class: 'vl-msg__tools' }, tools) : null])]
+    if (m.failed) {
+      const retry = h('button', { type: 'button', class: 'vl-linkbtn' }, 'Повторить')
+      const drop = h('button', { type: 'button', class: 'vl-linkbtn' }, 'Удалить')
+      retry.addEventListener('click', () => retryMessage(convId, m.clientId))
+      drop.addEventListener('click', () => discardDraft(convId, m.clientId))
+      children.push(h('div', { class: 'vl-msg__failed' }, [icon('circle-exclamation'), h('span', {}, `${m.failed}.`), retry, drop]))
+    }
+    if (readMark) children.push(h('div', { class: 'vl-msg__read' }, [icon('check-double'), 'Прочитано']))
+
+    const msg = h('div', { class: cls.join(' '), 'data-key': key }, children)
     if (m.id) {
       msg.addEventListener('contextmenu', (e) => {
         if (e.target.closest('a, textarea')) return
@@ -328,30 +320,35 @@ export function createChatView({ convId, navigate, menuButton }) {
     return msg
   }
 
+  // Звонок в ленте — пилюля по центру: зелёная, пока звонок жив, красноватая — пропущенный/отклонён
   function buildCallMessage(m) {
     const author = authorOf(m)
     const mine = m.authorId === me.id
     const status = (m.meta && m.meta.status) || 'ringing'
     let text
-    if (status === 'missed') text = mine ? `${displayName(peer)} не ответил(а) на звонок` : `Пропущенный звонок от ${displayName(author)}`
+    if (status === 'missed') text = mine ? `${displayName(peer)} не ответил(а)` : `Пропущенный звонок от ${displayName(author)}`
     else if (status === 'declined') text = mine ? `${displayName(peer)} отклонил(а) звонок` : 'Вы отклонили звонок'
     else if (status === 'ringing') text = mine ? 'Вы звоните…' : `${displayName(author)} звонит вам…`
     else text = mine ? 'Вы начали звонок' : `${displayName(author)} начал(а) звонок`
     const bad = status === 'missed' || status === 'declined'
-    const children = [
-      h('div', { class: 'vl-msg__gutter' }, [h('span', { class: `vl-call-ico${bad ? ' is-bad' : ''}` }, [icon(bad ? 'phone-slash' : 'phone')])]),
-      h('div', { class: 'vl-msg__content' }, [h('div', { class: 'vl-msg__system' }, [
-        h('span', {}, text),
-        h('time', { class: 'vl-msg__time' }, timeLong(m.createdAt))
-      ])])
-    ]
+    const pill = h('div', { class: `vl-callpill${bad ? ' is-bad' : ''}` }, [
+      icon(bad ? 'phone-slash' : 'phone'),
+      h('span', { class: 'vl-callpill__text' }, text),
+      h('time', { class: 'vl-callpill__time' }, timeHM(m.createdAt))
+    ])
     const here = inCall() && m.meta && window.VL.state.roomCode === m.meta.roomCode
     if (canJoin(m) && !here) {
-      const join = h('button', { type: 'button', class: 'vl-btn vl-btn--success vl-btn--sm' }, [icon('phone'), ' Присоединиться'])
+      const join = h('button', { type: 'button', class: 'vl-btn vl-btn--primary vl-btn--sm vl-btn--pill' }, 'Присоединиться')
       join.addEventListener('click', () => joinCallFromMessage(m))
-      children[1].appendChild(join)
+      pill.appendChild(join)
     }
-    return h('div', { class: `vl-msg vl-msg--call${animateKeys.delete('m' + m.id) ? ' is-new' : ''}`, 'data-key': 'm' + m.id }, children)
+    return h('div', { class: `vl-msg vl-msg--call${animateKeys.delete('m' + m.id) ? ' is-new' : ''}`, 'data-key': 'm' + m.id }, [pill])
+  }
+
+  function buildTyping(names) {
+    return h('div', { class: 'vl-msg is-theirs pos-single is-typing-row', 'aria-hidden': 'true' }, [
+      h('div', { class: 'vl-msg__wrap' }, [h('div', { class: 'vl-bubble is-typing', title: `${names.join(', ')} печатает` }, [h('i'), h('i'), h('i')])])
+    ])
   }
 
   // «Присоединиться» — только пока звонок звонит или в его комнате кто-то есть
@@ -380,7 +377,7 @@ export function createChatView({ convId, navigate, menuButton }) {
 
   function buildIntro() {
     return h('div', { class: 'vl-chat__intro' }, [
-      avatar(peer, { size: 80 }),
+      avatar(peer, { size: 88 }),
       h('h2', {}, displayName(peer)),
       h('div', { class: 'vl-chat__intro-user' }, '@' + peer.username),
       h('p', {}, ['Это начало вашей личной переписки с ', h('b', {}, displayName(peer)), '.'])
@@ -389,13 +386,11 @@ export function createChatView({ convId, navigate, menuButton }) {
 
   function buildSkeleton() {
     const rows = []
-    for (let i = 0; i < 9; i++) {
-      rows.push(h('div', { class: 'vl-msg is-skeleton' }, [
-        h('div', { class: 'vl-msg__gutter' }, [h('span', { class: 'vl-skel vl-skel--circle' })]),
-        h('div', { class: 'vl-msg__content' }, [
-          h('span', { class: 'vl-skel vl-skel--line', style: { width: `${90 + ((i * 37) % 80)}px` } }),
-          h('span', { class: 'vl-skel vl-skel--line', style: { width: `${30 + ((i * 53) % 55)}%` } })
-        ])
+    // Неподвижные бледные пузыри той же формы, что и настоящие, — без мерцания
+    for (let i = 0; i < 8; i++) {
+      const mine = i % 3 === 1
+      rows.push(h('div', { class: `vl-msg ${mine ? 'is-mine' : 'is-theirs'} pos-single is-skeleton` }, [
+        h('div', { class: 'vl-msg__wrap' }, [h('span', { class: 'vl-skel vl-skel--bubble', style: { width: `${120 + ((i * 67) % 220)}px` } })])
       ]))
     }
     return h('div', { class: 'vl-chat__skeleton' }, rows)
@@ -426,29 +421,42 @@ export function createChatView({ convId, navigate, menuButton }) {
       if (first) unreadMarkerId = first.id
     }
 
+    // Серии: сообщение «прилипает» к предыдущему, если тот же автор, тот же день, меньше 7 минут
+    // и между ними нет разделителя «Новые». От этого зависят скругления пузырей.
+    const msgs = chat.list
+    const joins = msgs.map((m, i) => {
+      const p = msgs[i - 1]
+      return !!p && m.kind === 'text' && p.kind === 'text' && p.authorId === m.authorId &&
+        dayKey(p.createdAt) === dayKey(m.createdAt) && m.createdAt - p.createdAt < GROUP_MS &&
+        !p.failed && !(m.id && m.id === unreadMarkerId)
+    })
+
     let prev = null
-    for (const m of chat.list) {
+    msgs.forEach((m, i) => {
       const newDay = !prev || dayKey(prev.createdAt) !== dayKey(m.createdAt)
       if (newDay) {
         const k = 'day-' + dayKey(m.createdAt)
         items.push({ key: k, sig: '1', build: () => h('div', { class: 'vl-day', role: 'separator' }, [h('span', {}, dayLabel(m.createdAt))]) })
       }
       const divider = m.id && m.id === unreadMarkerId
-      if (divider) items.push({ key: 'unread', sig: '1', build: () => h('div', { class: 'vl-unread-divider', role: 'separator' }, [h('span', {}, 'Новые')]) })
+      if (divider) items.push({ key: 'unread', sig: '1', build: () => h('div', { class: 'vl-unread-divider', role: 'separator' }, [h('span', {}, 'Новые сообщения')]) })
       const key = m.id ? 'm' + m.id : 'c' + m.clientId
       if (m.kind === 'call') {
         const here = inCall() && m.meta && window.VL.state.roomCode === m.meta.roomCode
         const live = m.meta && roomLive.get(m.meta.roomCode)
         items.push({ key, sig: `call|${m.meta && m.meta.status}|${here}|${live ? live.count : '?'}`, build: () => buildCallMessage(m) })
       } else {
-        const grouped = !!prev && !newDay && !divider && prev.kind === 'text' && prev.authorId === m.authorId &&
-          m.createdAt - prev.createdAt < GROUP_MS && !prev.failed
+        const jp = joins[i]
+        const jn = !!joins[i + 1]
+        const pos = jp ? (jn ? 'middle' : 'last') : (jn ? 'first' : 'single')
         const read = m.id && m.id === readMarkId
-        const sig = [m.id, m.body, m.editedAt, m.pending ? 1 : 0, m.failed || '', grouped ? 1 : 0, read ? 1 : 0, editingKey === key ? 1 : 0, m.reply ? m.reply.id : ''].join('|')
-        items.push({ key, sig, build: () => buildMessage(m, grouped, read) })
+        const sig = [m.id, m.body, m.editedAt, m.pending ? 1 : 0, m.failed || '', pos, read ? 1 : 0, editingKey === key ? 1 : 0, m.reply ? m.reply.id : ''].join('|')
+        items.push({ key, sig, build: () => buildMessage(m, pos, read) })
       }
       prev = m
-    }
+    })
+    const typers = chat.state === 'empty' ? [] : typingNames()
+    if (typers.length) items.push({ key: 'typing', sig: typers.join(','), build: () => buildTyping(typers) })
 
     let cursor = list.firstChild
     const seen = new Set()
