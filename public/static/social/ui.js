@@ -25,18 +25,72 @@ export function h(tag, attrs = {}, children = []) {
   return node
 }
 
+// ---- Иконки: свои тонкие линии (как микрофон и камера в звонке), имена — как у Font Awesome,
+// чтобы вызовы icon('phone') не менять. Неизвестное имя — старый шрифтовой значок.
+const PHONE = 'M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z'
+// Трубка «положить» — та же, что у кнопки «Выйти» в звонке (Material «call_end»), заливкой
+const HANGUP = 'M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08a.96.96 0 0 1 0-1.36C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.72c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.69-1.36-2.67-1.85a1 1 0 0 1-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z'
+const USERS = '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>'
+const ICONS = {
+  xmark: '<path d="M18 6 6 18M6 6l12 12"/>',
+  phone: `<path d="${PHONE}"/>`,
+  'phone-slash': `<path fill="currentColor" stroke="none" d="${HANGUP}"/>`,
+  'user-group': USERS + '<path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+  'user-plus': USERS + '<path d="M19 8v6M22 11h-6"/>',
+  'user-minus': USERS + '<path d="M22 11h-6"/>',
+  'user-check': USERS + '<path d="m16 11 2 2 4-4"/>',
+  bars: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  'up-right-and-down-left-from-center': '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',
+  'down-left-and-up-right-to-center': '<path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/>',
+  'right-from-bracket': '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+  reply: '<path d="M9 17 4 12l5-5"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  'paper-plane': '<path d="M12 19V5M5 12l7-7 7 7"/>',
+  microphone: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/>',
+  'microphone-slash': '<path d="m2 2 20 20M18.89 13.23A7 7 0 0 0 19 12v-2M5 10v2a7 7 0 0 0 12 5M15 9.34V5a3 3 0 0 0-5.68-1.33M9 9v3a3 3 0 0 0 5.12 2.12M12 19v3"/>',
+  video: '<path d="m16 13 5.2 3.1a.5.5 0 0 0 .8-.4V8.3a.5.5 0 0 0-.8-.4L16 11"/><rect x="2" y="6" width="14" height="12" rx="2"/>',
+  'magnifying-glass': '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  hashtag: '<path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/>',
+  'circle-xmark': '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/>',
+  'circle-exclamation': '<circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>',
+  'check-double': '<path d="M18 6 7 17l-5-5M22 10l-7.5 7.5L13 16"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  'bell-slash': '<path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7M10.3 21a1.94 1.94 0 0 0 3.4 0M2 2l20 20"/>',
+  'arrow-down': '<path d="M12 5v14M19 12l-7 7-7-7"/>',
+  circle: '<circle cx="12" cy="12" r="5" fill="currentColor" stroke="none"/>',
+  moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  'circle-minus': '<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/>',
+  at: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>',
+  message: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  ban: '<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
+  pen: '<path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>',
+  copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  trash: '<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  'ellipsis-vertical': '<path stroke-width="3" d="M12 5h.01M12 12h.01M12 19h.01"/>',
+  ellipsis: '<path stroke-width="3" d="M5 12h.01M12 12h.01M19 12h.01"/>',
+  'hourglass-half': '<path d="M5 22h14M5 2h14M17 22v-4.17a2 2 0 0 0-.59-1.42L12 12l-4.41 4.41A2 2 0 0 0 7 17.83V22M7 2v4.17a2 2 0 0 0 .59 1.42L12 12l4.41-4.41A2 2 0 0 0 17 6.17V2"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'
+}
+
 export function icon(name, extra = '') {
-  return h('i', { class: `fas fa-${name}${extra ? ' ' + extra : ''}`, 'aria-hidden': 'true' })
+  const body = ICONS[name]
+  if (!body) return h('i', { class: `fas fa-${name}${extra ? ' ' + extra : ''}`, 'aria-hidden': 'true' })
+  const t = document.createElement('template')
+  // Разметка — только из таблицы выше (константы), пользовательский текст сюда не попадает
+  t.innerHTML = `<svg class="vl-ico${extra ? ' ' + extra : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`
+  return t.content.firstElementChild
 }
 
 export function displayName(user) {
   return (user && (user.displayName || user.username)) || 'Пользователь'
 }
 
-// Инициалы и цвет аватара — постоянные для пользователя (цвет от id)
+// Аватары нейтральные: одна тёмная подложка для всех, синим — только вы (как в звонке, без радуги)
+let selfId = 0
+export function setSelfId(id) { selfId = Number(id) || 0 }
 export function avatarColor(id) {
-  const hue = (Number(id) * 47) % 360
-  return `hsl(${hue} 42% 40%)`
+  return Number(id) && Number(id) === selfId ? '#0458cf' : '#2a303b'
 }
 
 export function initialsOf(name) {
@@ -52,6 +106,11 @@ export function avatar(user, { size = 32, presence = null } = {}) {
   ])
   if (presence) node.appendChild(h('span', { class: 'vl-presence', dataset: { status: presence.status || 'offline', call: presence.inCall ? '1' : '' } }))
   return node
+}
+
+// Живые полоски «идёт звонок» (как индикатор в капсуле звонка)
+export function waveBars(count = 4) {
+  return h('span', { class: 'vl-wave', 'aria-hidden': 'true' }, Array.from({ length: count }, () => h('i')))
 }
 
 export function setPresenceDot(avatarNode, presence) {
@@ -77,14 +136,6 @@ function sameDay(a, b) {
 export function timeHM(ts) {
   const d = new Date(ts)
   return `${d.getHours()}:${pad(d.getMinutes())}`
-}
-export function timeLong(ts) {
-  const d = new Date(ts)
-  const now = new Date()
-  const y = new Date(now); y.setDate(now.getDate() - 1)
-  if (sameDay(d, now)) return `Сегодня в ${timeHM(ts)}`
-  if (sameDay(d, y)) return `Вчера в ${timeHM(ts)}`
-  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${timeHM(ts)}`
 }
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря']
 export function dayLabel(ts) {

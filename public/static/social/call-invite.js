@@ -167,13 +167,16 @@ function showIncoming(call) {
 
 function renderIncoming(call) {
   const from = call.from || userById(call.from && call.from.id)
-  const acceptBtn = h('button', { type: 'button', class: 'vl-call-btn is-accept', title: 'Принять', 'aria-label': 'Принять звонок' }, [icon('phone')])
-  const declineBtn = h('button', { type: 'button', class: 'vl-call-btn is-decline', title: 'Отклонить', 'aria-label': 'Отклонить звонок' }, [icon('phone-slash')])
+  const acceptBtn = h('button', { type: 'button', class: 'vl-call-btn is-accept', 'aria-label': 'Принять звонок' }, [icon('phone')])
+  const declineBtn = h('button', { type: 'button', class: 'vl-call-btn is-decline', 'aria-label': 'Отклонить звонок' }, [icon('phone-slash')])
   const card = h('div', { class: 'vl-incoming', role: 'alertdialog', 'aria-label': `Входящий звонок от ${displayName(from)}` }, [
-    h('div', { class: 'vl-incoming__ava' }, [avatar(from, { size: 72 })]),
+    h('div', { class: 'vl-incoming__ava' }, [h('span', { class: 'vl-incoming__wave', 'aria-hidden': 'true' }), avatar(from, { size: 88 })]),
     h('div', { class: 'vl-incoming__name' }, displayName(from)),
-    h('div', { class: 'vl-incoming__sub' }, 'Входящий звонок…'),
-    h('div', { class: 'vl-incoming__actions' }, [declineBtn, acceptBtn])
+    h('div', { class: 'vl-incoming__sub' }, 'Звонит вам'),
+    h('div', { class: 'vl-incoming__actions' }, [
+      h('span', { class: 'vl-incoming__act' }, [declineBtn, h('span', {}, 'Отклонить')]),
+      h('span', { class: 'vl-incoming__act' }, [acceptBtn, h('span', {}, 'Принять')])
+    ])
   ])
   const overlay = h('div', { class: 'vl-incoming-wrap' }, [card])
   acceptBtn.addEventListener('click', () => accept(call))

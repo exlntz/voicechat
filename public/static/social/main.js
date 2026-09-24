@@ -16,8 +16,8 @@ import { createSidebar } from './sidebar.js'
 import { createFriendsView } from './friends.js'
 import { createChatView } from './chat.js'
 import { initNotifications, setBaseTitle } from './notify.js'
-import { initCalls, onCallEnded, isSwitching, inCall } from './call-invite.js'
-import { h, icon, toast, displayName } from './ui.js'
+import { initCalls, onCallEnded, isSwitching, inCall, callState } from './call-invite.js'
+import { h, icon, toast, displayName, setSelfId, waveBars } from './ui.js'
 
 const VL = window.VL
 const E = () => window.electronAPI || {}
@@ -98,7 +98,7 @@ function applyRoute(next, { fromApp = false } = {}) {
 }
 
 function menuButton() {
-  const b = h('button', { type: 'button', class: 'vl-icon-btn vl-menu-btn', 'aria-label': 'Открыть список чатов' }, [icon('bars')])
+  const b = h('button', { type: 'button', class: 'vl-round is-ghost vl-menu-btn', 'aria-label': 'Открыть список чатов' }, [icon('bars')])
   b.addEventListener('click', () => body.classList.toggle('vl-drawer-open'))
   return b
 }
@@ -152,22 +152,94 @@ function updateLayout() {
   const showApp = isAppRoute(route)
   const docked = !showApp && hasCallUi()
   body.classList.toggle('vl-show-app', showApp)
+  body.classList.toggle('vl-route-friends', route.name === 'friends')
   body.classList.toggle('vl-call-docked', docked)
+  body.classList.toggle('vl-dock-open', docked && dockOpen)
   const screen = appRoot.querySelector('.room-screen')
   if (screen) screen.classList.toggle('is-docked', docked)
-  renderDockTools(docked)
+  renderDockTools(docked && dockOpen)
+  renderIsland(docked && !dockOpen)
   if (sidebar) sidebar.refreshCall()
+}
+
+// ---------- Звонок поверх чата: капсула или панель с видео ----------
+// По умолчанию звонок из лички — капсула над чатом (как на iPhone): секундомер, микрофон,
+// «показать видео», «развернуть», «положить». Видео открывается панелью над чатом по кнопке.
+// Скрытая панель остаётся в документе с прежним размером (невидимой): звонок и раскладка
+// плиток не пересоздаются, звук идёт как обычно.
+let dockOpen = false
+try { dockOpen = localStorage.getItem('vl:dockOpen') === '1' } catch {}
+function setDockOpen(open) {
+  dockOpen = !!open
+  try { localStorage.setItem('vl:dockOpen', dockOpen ? '1' : '0') } catch {}
+  updateLayout()
 }
 
 let dockTools = null
 function renderDockTools(show) {
   if (!show) { if (dockTools) { dockTools.remove(); dockTools = null } return }
   if (dockTools) return
-  const expand = h('button', { type: 'button', class: 'vl-dock__btn', title: 'Развернуть звонок', 'aria-label': 'Развернуть звонок' }, [icon('up-right-and-down-left-from-center')])
+  const collapse = h('button', { type: 'button', class: 'vl-round is-glass', title: 'Свернуть в капсулу', 'aria-label': 'Свернуть в капсулу' }, [icon('down-left-and-up-right-to-center')])
+  collapse.addEventListener('click', () => setDockOpen(false))
+  const expand = h('button', { type: 'button', class: 'vl-round is-glass', title: 'Развернуть звонок', 'aria-label': 'Развернуть звонок' }, [icon('up-right-and-down-left-from-center')])
   expand.addEventListener('click', () => { if (VL.state.roomCode) navigate('/room/' + VL.state.roomCode) })
-  dockTools = h('div', { class: 'vl-dock__tools' }, [expand])
+  dockTools = h('div', { class: 'vl-dock__tools' }, [collapse, expand])
   mainRoot.appendChild(dockTools)
 }
+
+let island = null
+let islandTimer = 0
+let callStartedAt = 0
+window.addEventListener('vl-call-state', (e) => {
+  if (e.detail && e.detail.active) { if (!callStartedAt) callStartedAt = Date.now() } else if (!inCall()) callStartedAt = 0
+})
+function fmtDuration(ms) {
+  const t = Math.max(0, Math.floor(ms / 1000))
+  const hh = Math.floor(t / 3600)
+  const mm = Math.floor((t % 3600) / 60)
+  const ss = String(t % 60).padStart(2, '0')
+  return hh ? `${hh}:${String(mm).padStart(2, '0')}:${ss}` : `${mm}:${ss}`
+}
+function renderIsland(show) {
+  if (!show) {
+    if (island) { island.remove(); island = null }
+    clearInterval(islandTimer)
+    islandTimer = 0
+    return
+  }
+  if (!island) {
+    const label = h('span', { class: 'vl-island__label' })
+    const mic = h('button', { type: 'button', class: 'vl-round is-sm is-dark' })
+    const video = h('button', { type: 'button', class: 'vl-round is-sm is-dark', title: 'Показать видео', 'aria-label': 'Показать видео' }, [icon('video')])
+    const expand = h('button', { type: 'button', class: 'vl-round is-sm is-dark', title: 'Развернуть звонок', 'aria-label': 'Развернуть звонок' }, [icon('up-right-and-down-left-from-center')])
+    const hang = h('button', { type: 'button', class: 'vl-round is-sm is-danger', title: 'Завершить звонок', 'aria-label': 'Завершить звонок' }, [icon('phone-slash')])
+    mic.addEventListener('click', () => { if (VL.toggleMic) VL.toggleMic() })
+    video.addEventListener('click', () => setDockOpen(true))
+    expand.addEventListener('click', () => { if (VL.state.roomCode) navigate('/room/' + VL.state.roomCode) })
+    hang.addEventListener('click', () => { if (VL.leaveCall) VL.leaveCall() })
+    island = h('div', { class: 'vl-island', role: 'region', 'aria-label': 'Идёт звонок' }, [waveBars(4), label, mic, video, expand, hang])
+    island._label = label
+    island._mic = mic
+    mainRoot.appendChild(island)
+  }
+  const tick = () => {
+    if (!island) return
+    const live = body.classList.contains('in-call')
+    const conv = callState.conversationId && store.conversations.get(callState.conversationId)
+    const who = conv && conv.peer ? displayName(conv.peer) : 'Звонок'
+    const state = callState.outgoingCallId ? 'вызов…' : live && callStartedAt ? fmtDuration(Date.now() - callStartedAt) : 'подключение…'
+    island.classList.toggle('is-live', live && !callState.outgoingCallId)
+    island._label.replaceChildren(h('b', {}, who), ' ', h('span', { class: 'vl-island__time' }, state))
+    const micOn = !!VL.state.micEnabled
+    island._mic.classList.toggle('is-off', !micOn)
+    island._mic.replaceChildren(icon(micOn ? 'microphone' : 'microphone-slash'))
+    island._mic.title = micOn ? 'Выключить микрофон' : 'Включить микрофон'
+    island._mic.setAttribute('aria-label', island._mic.title)
+  }
+  tick()
+  if (!islandTimer) islandTimer = setInterval(tick, 1000)
+}
+window.addEventListener('vl-mic-state', () => { if (island) renderIsland(true) })
 
 // app.js перерисовывает #app-root сам (лобби -> звонок, звонок -> лобби) — держим раскладку в курсе
 new MutationObserver(() => { if (sessionActive) updateLayout() }).observe(appRoot, { childList: true })
@@ -231,6 +303,7 @@ async function startSession(me, prefillRoom = '') {
   if (sessionActive) return
   sessionActive = true
   store.me = { ...me, id: Number(me.id) }
+  setSelfId(store.me.id)
   VL.state.currentUser = me
   body.classList.remove('vl-auth')
   body.classList.add('vl-ready')
@@ -259,7 +332,7 @@ async function endSession({ callServer = false } = {}) {
   await cache.dropCache()
   resetStore()
   try { E().setBadge && E().setBadge(0, null) } catch {}
-  body.classList.remove('vl-ready', 'vl-show-app', 'vl-call-docked', 'vl-drawer-open')
+  body.classList.remove('vl-ready', 'vl-show-app', 'vl-call-docked', 'vl-dock-open', 'vl-route-friends', 'vl-drawer-open')
   body.classList.add('vl-auth')
   history.replaceState({}, '', '/')
   VL.state.currentUser = null

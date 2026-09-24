@@ -1205,6 +1205,11 @@ async function enterRoom(joinData) {
   controlsPill.appendChild(leaveBtn)
   controls.appendChild(controlsPill)
   screen.appendChild(controls)
+  // Основной обработчик «Выйти» навешивается ниже, после подключения. Пока идёт «Подключение…»
+  // (медленная сеть), кнопка тоже должна класть трубку, а не молчать.
+  leaveBtn.addEventListener('click', () => {
+    if (room.state !== LK.ConnectionState.Connected) cleanupAndGoLobby()
+  })
   // Кнопки звонка проявляются по очереди слева направо
   Array.from(controlsPill.children).forEach((b, i) => playEnter(b, 80 + i * 50))
 
