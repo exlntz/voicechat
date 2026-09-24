@@ -12,6 +12,10 @@ import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { totalmem, freemem, loadavg, cpus } from 'node:os'
+import { initSocialSchema } from './social/db.js'
+import { createHub } from './social/events.js'
+import { registerFriendRoutes } from './social/friends.js'
+import { registerChatRoutes } from './social/chats.js'
 
 const scrypt = promisify(scryptCb)
 
@@ -64,6 +68,8 @@ db.exec(`CREATE TABLE IF NOT EXISTS sessions (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   expires_at TEXT NOT NULL
 )`)
+// Друзья, лички, сообщения (см. src/social/db.js)
+initSocialSchema(db)
 
 const SESSION_COOKIE = 'zvonki_session'
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 дней
@@ -166,6 +172,21 @@ function sanitizeName(input, fallbackPrefix) {
 }
 
 const svc = new RoomServiceClient(LIVEKIT_HTTP_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+
+// ---------- Друзья и чаты (src/social/*) ----------
+// hub — реалтайм-события (SSE) и присутствие «в сети / в звонке»
+const hub = createHub(db)
+// Комната для звонка из чата: создаётся заранее, звонящий становится её создателем по hostSecret
+function createCallRoom() {
+  let roomCode = randomId(6)
+  while (db.prepare('SELECT 1 FROM rooms WHERE code = ?').get(roomCode)) roomCode = randomId(6)
+  const hostSecret = randomId(20)
+  db.prepare('INSERT INTO rooms (code, host_secret) VALUES (?, ?)').run(roomCode, hostSecret)
+  return { roomCode, hostSecret }
+}
+const friends = registerFriendRoutes(app, { db, hub })
+const chats = registerChatRoutes(app, { db, hub, friends, createCallRoom })
+hub.mount(app)
 
 // ---------- API: регистрация ----------
 app.post('/api/auth/register', async (c) => {
@@ -330,6 +351,8 @@ app.post('/api/join', async (c) => {
   })
 
   const token = await at.toJwt()
+  // Друзья видят «в звонке» (сам код комнаты им не раскрывается)
+  if (authUser?.id) hub.setInCall(Number(authUser.id), roomCode)
 
   return c.json({
     token,
@@ -494,7 +517,9 @@ app.get('/api/metrics', async (c) => {
     storage = {
       rooms: db.prepare('SELECT COUNT(*) AS n FROM rooms').get().n,
       users: db.prepare('SELECT COUNT(*) AS n FROM users').get().n,
-      sessions: db.prepare('SELECT COUNT(*) AS n FROM sessions').get().n
+      sessions: db.prepare('SELECT COUNT(*) AS n FROM sessions').get().n,
+      conversations: db.prepare('SELECT COUNT(*) AS n FROM conversations').get().n,
+      messages: db.prepare('SELECT COUNT(*) AS n FROM messages').get().n
     }
   } catch {}
 
@@ -523,6 +548,7 @@ app.get('/api/metrics', async (c) => {
     },
     livekit,
     storage,
+    realtime: { ...hub.stats(), ...chats.stats() },
     limits: { maxParticipants: MAX_PARTICIPANTS, maxScreenShares: MAX_SCREEN_SHARES },
     takenAt: new Date().toISOString()
   })
@@ -531,12 +557,17 @@ app.get('/api/metrics', async (c) => {
 // ---------- HTML страницы ----------
 // Рисование поверх демонстрации живёт только в десктопном приложении (прозрачный оверлей
 // поверх всех окон), поэтому на сайте скрипт annotate.js больше не подключается.
+// data-vl-shell включает оболочку «как в Дискорде» (слева лички и друзья, справа чат/звонок):
+// её собирает /static/social/main.js, а app.js в таком режиме не запускается сам.
 function renderPage(title) {
-  return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/><meta name="mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-capable" content="yes"/><meta name="theme-color" content="#0f1115"/><link rel="icon" href="/favicon.ico" sizes="32x32"/><link rel="icon" type="image/svg+xml" href="/static/favicon.svg"/><link rel="apple-touch-icon" href="/apple-touch-icon.png"/><meta name="color-scheme" content="dark"/><title>${title}</title><link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet"/><script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.1/dist/livekit-client.umd.min.js"></script><link href="/static/style.css" rel="stylesheet"/></head><body><div id="app-root"></div><script src="/static/app.js"></script><script src="/static/anker.js"></script></body></html>`
+  return `<!DOCTYPE html><html lang="ru" data-vl-shell="1"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/><meta name="mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-capable" content="yes"/><meta name="theme-color" content="#0f1115"/><link rel="icon" href="/favicon.ico" sizes="32x32"/><link rel="icon" type="image/svg+xml" href="/static/favicon.svg"/><link rel="apple-touch-icon" href="/apple-touch-icon.png"/><meta name="color-scheme" content="dark"/><title>${title}</title><link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet"/><script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.1/dist/livekit-client.umd.min.js"></script><link href="/static/style.css" rel="stylesheet"/><link href="/static/social/social.css" rel="stylesheet"/></head><body><div id="vl-shell"><aside id="vl-sidebar" aria-label="Друзья и личные сообщения"></aside><main id="vl-main"><div id="app-root"></div><div id="vl-view"></div></main></div><script src="/static/app.js"></script><script src="/static/anker.js"></script><script type="module" src="/static/social/main.js"></script></body></html>`
 }
 
 app.get('/', (c) => c.html(renderPage('Voice Lobby')))
 app.get('/room/:code', (c) => c.html(renderPage('Voice Lobby — комната')))
+app.get('/lobby', (c) => c.html(renderPage('Voice Lobby')))
+app.get('/friends', (c) => c.html(renderPage('Voice Lobby — друзья')))
+app.get('/dm/:id', (c) => c.html(renderPage('Voice Lobby — сообщения')))
 
 serve({ fetch: app.fetch, port: PORT }, (info) => {
   console.log(`Zvonki backend listening on http://127.0.0.1:${info.port}`)

@@ -2630,35 +2630,36 @@ body.inapp-fullscreen { overflow: hidden; }
 
 /* ═══════════════ Звонок в отдельном окне ═══════════════
    .is-compact — звонок в маленьком окне: PiP-окно браузера (.in-pip) или ужатое окно .exe.
-   Остаются только плитки и кнопки; шапка, боковая колонка камер и приглашение прячутся. */
+   Остаются только плитки и кнопки; шапка, боковая колонка камер и приглашение прячутся.
+   .is-docked — то же для звонка, который встал панелью над чатом (social/social.css). */
 .ctrl-btn--pop-in { display: none; }
 .room-screen.is-compact .ctrl-btn--pop-in { display: flex; }
 .room-screen.in-pip .ctrl-btn--settings { display: none; } /* настройки открылись бы в основном окне */
 
-.room-screen.is-compact .room-topbar,
-.room-screen.is-compact .solo-invite,
-.room-screen.is-compact .ctrl-divider { display: none; }
-.room-screen.is-compact .sidebar-participants { display: none !important; }
-.room-screen.is-compact .stage,
-.room-screen.is-compact .stage.stage-solo {
+.room-screen:is(.is-compact, .is-docked) .room-topbar,
+.room-screen:is(.is-compact, .is-docked) .solo-invite,
+.room-screen:is(.is-compact, .is-docked) .ctrl-divider { display: none; }
+.room-screen:is(.is-compact, .is-docked) .sidebar-participants { display: none !important; }
+.room-screen:is(.is-compact, .is-docked) .stage,
+.room-screen:is(.is-compact, .is-docked) .stage.stage-solo {
   padding: 6px;
   gap: 6px;
   max-width: none;
 }
-.room-screen.is-compact .stage.stage-solo { grid-template-columns: minmax(0, 1fr); }
-.room-screen.is-compact .stage.stage-solo .tile.camera-tile { min-height: 0; max-height: none; }
-.room-screen.is-compact .controls-bar {
+.room-screen:is(.is-compact, .is-docked) .stage.stage-solo { grid-template-columns: minmax(0, 1fr); }
+.room-screen:is(.is-compact, .is-docked) .stage.stage-solo .tile.camera-tile { min-height: 0; max-height: none; }
+.room-screen:is(.is-compact, .is-docked) .controls-bar {
   gap: 6px;
   bottom: 8px;
 }
-.room-screen.is-compact .controls-pill { padding: 4px; gap: 4px; }
-.room-screen.is-compact .room-main:not(.is-spotlight) { padding-bottom: 58px; }
-.room-screen.is-compact .ctrl-btn {
+.room-screen:is(.is-compact, .is-docked) .controls-pill { padding: 4px; gap: 4px; }
+.room-screen:is(.is-compact, .is-docked) .room-main:not(.is-spotlight) { padding-bottom: 58px; }
+.room-screen:is(.is-compact, .is-docked) .ctrl-btn {
   width: 38px;
   height: 38px;
   font-size: 14px;
 }
-.room-screen.is-compact .leave-btn {
+.room-screen:is(.is-compact, .is-docked) .leave-btn {
   height: 38px;
   min-height: 38px;
   padding: 0 12px;

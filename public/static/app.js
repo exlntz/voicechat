@@ -44,6 +44,17 @@ const SCREEN_SHARE_CONTENT_HINT = 'motion'
 
 const root = document.getElementById('app-root')
 
+// ---- Мост к оболочке «друзья и чаты» (/static/social/main.js) ----
+// Оболочка (слева лички и друзья, справа чат или звонок) — отдельный ES-модуль. app.js по-прежнему
+// сам рисует вход, лобби и звонок, а оболочке отдаёт управляющие функции через window.VL и
+// спрашивает её в ключевых точках (вход, выход, конец звонка). Хуки on* ставит оболочка;
+// если её нет (Cloudflare-версия страницы), всё работает как раньше.
+const VL = (window.VL = window.VL || {})
+function vlNavigate(path) {
+  if (location.pathname !== path) history.pushState({}, '', path)
+  try { window.dispatchEvent(new CustomEvent('vl:navigate', { detail: { path } })) } catch {}
+}
+
 // SVG из разметки (el() создаёт элементы в HTML-пространстве имён, SVG так не собрать)
 function svgIcon(markup) {
   const t = document.createElement('template')
@@ -728,7 +739,8 @@ function renderAuthScreen(afterLoginRoomCode = '') {
       }
 
       state.currentUser = data.user
-      renderLobby(afterLoginRoomCode)
+      if (typeof VL.onLogin === 'function') VL.onLogin(data.user, afterLoginRoomCode)
+      else renderLobby(afterLoginRoomCode)
     } catch (e) {
       showMessage(errorSlot, e.message || 'Ошибка авторизации', 'error')
       submitBtn.disabled = false
@@ -777,7 +789,8 @@ async function renderLobby(prefillRoomCode = '') {
   logoutBtn.addEventListener('click', async () => {
     try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }) } catch {}
     state.currentUser = null
-    renderAuthScreen()
+    if (typeof VL.onLogout === 'function') VL.onLogout()
+    else renderAuthScreen()
   })
   userBar.appendChild(logoutBtn)
   card.appendChild(userBar)
@@ -963,7 +976,11 @@ async function renderLobby(prefillRoomCode = '') {
     }
     stopMicMonitor()
     navigator.mediaDevices.removeEventListener('devicechange', onDeviceChange)
+    if (VL.teardownLobby === stopPreview) VL.teardownLobby = null
   }
+  // Оболочка вызывает это, когда уходит из лобби в чат/друзей: камера превью и индикатор
+  // микрофона не должны работать на скрытом экране
+  VL.teardownLobby = stopPreview
 
   async function doJoin() {
     const roomCode = roomInput.value.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -1000,7 +1017,7 @@ async function renderLobby(prefillRoomCode = '') {
       }
 
       stopPreview()
-      history.pushState({}, '', `/room/${data.roomCode}`)
+      vlNavigate(`/room/${data.roomCode}`)
       await enterRoom(data)
     } catch (e) {
       errorSlot.style.display = 'block'
@@ -1025,6 +1042,14 @@ async function enterRoom(joinData) {
   state.maxScreenShares = maxScreenShares || 2
   state.isHost = !!isHost
   state.hostSecret = hostSecret || null
+  // Звонок уже завершён (выход/обрыв) — повторный вызов очистки ничего не делает
+  let callCleanedUp = false
+  // Объявлен здесь, а не рядом с setInterval ниже: если подключение не удалось, LiveKit шлёт
+  // Disconnected раньше, чем код дошёл до интервала, и очистка падала с ReferenceError
+  let screenTilesReconcileInterval = 0
+  // Положить трубку можно и во время «Подключение…» (оболочка: отклонённый вызов, кнопка слева).
+  // cleanupAndGoLobby — объявление функции ниже, доступно уже здесь.
+  VL.leaveCall = cleanupAndGoLobby
 
   // На телефоне поле кода комнаты остаётся в фокусе: клавиатура закрывается уже после
   // перехода, и браузер оставляет страницу чуть прокрученной — экран звонка «ездил»
@@ -2427,9 +2452,22 @@ async function enterRoom(joinData) {
       })
     })
   } catch (e) {
+    // Трубку положили, пока шло подключение, — это не ошибка
+    if (callCleanedUp) return
     console.error(e)
     showToast('Не удалось подключиться к звонку: ' + e.message, 'error')
-    setTimeout(() => renderLobby(), 1500)
+    // cleanupAndGoLobby() здесь звать нельзя: интервалы и таймер, которые он чистит, объявлены
+    // ниже и ещё не созданы (обращение к ним — ReferenceError)
+    setTimeout(() => {
+      if (callCleanedUp) return
+      callCleanedUp = true
+      setCallActive(false)
+      try { room.disconnect() } catch {}
+      state.room = null
+      state.roomCode = null
+      if (typeof VL.onCallEnded === 'function') VL.onCallEnded()
+      else renderLobby()
+    }, 1500)
     return
   }
 
@@ -2439,7 +2477,10 @@ async function enterRoom(joinData) {
     await room.localParticipant.setMicrophoneEnabled(state.micEnabled)
     micBtn.classList.toggle('active', state.micEnabled)
     micBtn.classList.toggle('off', !state.micEnabled)
+    try { window.dispatchEvent(new CustomEvent('vl-mic-state', { detail: { enabled: state.micEnabled } })) } catch {}
   })
+  // Для оболочки: кнопка микрофона в панели звонка слева и глобальная горячая клавиша .exe
+  VL.toggleMic = () => micBtn.click()
 
   camBtn.addEventListener('click', async () => {
     state.cameraEnabled = !state.cameraEnabled
@@ -3052,9 +3093,14 @@ async function enterRoom(joinData) {
   // Раз в 15 секунд дополнительно сверяем тайлы с фактическим состоянием room - дешёвая операция
   // (просто перебор уже загруженных в память participants/publications, без сетевых запросов),
   // страхует от накопления тайлов-призраков в длительных звонках.
-  const screenTilesReconcileInterval = setInterval(() => { try { reconcileScreenTiles() } catch {} }, 15000)
+  screenTilesReconcileInterval = setInterval(() => { try { reconcileScreenTiles() } catch {} }, 15000)
 
   function cleanupAndGoLobby() {
+    // room.disconnect() ниже сам вызывает RoomEvent.Disconnected, который снова ведёт сюда
+    if (callCleanedUp) return
+    callCleanedUp = true
+    if (VL.leaveCall === cleanupAndGoLobby) VL.leaveCall = null
+    VL.toggleMic = null
     clearInterval(screenTilesReconcileInterval)
     clearInterval(callTimerId)
     stopConnStats()
@@ -3063,6 +3109,9 @@ async function enterRoom(joinData) {
     setCallActive(false)
     try { room.disconnect() } catch {}
     document.querySelectorAll('audio').forEach((a) => a.remove())
+    state.room = null
+    state.roomCode = null
+    if (typeof VL.onCallEnded === 'function') { VL.onCallEnded(); return }
     history.pushState({}, '', '/')
     renderLobby()
   }
@@ -3074,9 +3123,20 @@ async function enterRoom(joinData) {
 }
 
 // ===================== Инициализация =====================
-if (location.pathname.startsWith('/room/')) {
-  const code = location.pathname.split('/room/')[1]
-  renderLobby(code)
+Object.assign(VL, { state, root, el, svgIcon, showToast, initials, copyToClipboard, fetchMe, renderAuthScreen, renderLobby, enterRoom, getPref, setPref, vlNavigate })
+
+function bootClassic() {
+  if (location.pathname.startsWith('/room/')) {
+    const code = location.pathname.split('/room/')[1]
+    renderLobby(code)
+  } else {
+    renderLobby()
+  }
+}
+// В режиме оболочки запуск делает social/main.js (модули выполняются после обычных скриптов).
+// Если модуль не загрузился (сеть, очень старый браузер) — через 4 с запускаемся по-старому.
+if (document.documentElement.dataset.vlShell) {
+  setTimeout(() => { if (!VL.shellReady) { document.documentElement.removeAttribute('data-vl-shell'); bootClassic() } }, 4000)
 } else {
-  renderLobby()
+  bootClassic()
 }
