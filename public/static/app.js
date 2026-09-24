@@ -1034,7 +1034,10 @@ async function enterRoom(joinData) {
   const roomInfo = el('div', { class: 'room-info' })
   const statusDot = el('span', { class: 'status-dot connecting' })
   const statusText = el('span', { class: 'room-status-text' }, 'Подключение…')
-  roomInfo.appendChild(el('span', { class: 'room-status', role: 'status' }, [statusDot, statusText]))
+  // Секундомер звонка: считает с момента, как вы подключились. Пока идёт подключение —
+  // вместо него подпись статуса (CSS: .room-info.is-live).
+  const callTimer = el('span', { class: 'room-timer', 'aria-label': 'Длительность звонка' }, '0:00')
+  roomInfo.appendChild(el('span', { class: 'room-status', role: 'status' }, [statusDot, statusText, callTimer]))
   const codeBadge = el('button', { type: 'button', class: 'room-code-badge', title: 'Скопировать код комнаты' }, [
     el('span', { class: 'room-code-badge__code' }, roomCode),
     el('i', { class: 'fas fa-copy room-code-badge__icon', 'aria-hidden': 'true' })
@@ -1279,10 +1282,28 @@ async function enterRoom(joinData) {
   })
   state.room = room
 
+  // Секундомер: 0:00 → 59:59 → 1:00:00. Запускается при первом «Подключено» и
+  // не сбрасывается при переподключениях — это длительность всего вашего звонка.
+  let callStartedAt = 0
+  let callTimerId = 0
+  function formatCallTime(ms) {
+    const t = Math.max(0, Math.floor(ms / 1000))
+    const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60
+    const ss = String(s).padStart(2, '0')
+    return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`
+  }
+  function tickCallTimer() { callTimer.textContent = formatCallTime(Date.now() - callStartedAt) }
+
   function setStatus(text, cls) {
     statusDot.className = `status-dot ${cls}`
     statusText.textContent = text
     statusDot.title = text
+    roomInfo.classList.toggle('is-live', cls === '')
+    if (cls === '' && !callStartedAt) {
+      callStartedAt = Date.now()
+      tickCallTimer()
+      callTimerId = setInterval(tickCallTimer, 1000)
+    }
     // Знак в шапке: при подключении/переподключении анимирован всё время, в звонке — статичный
     const sigil = document.querySelector('.room-topbar .ank-pulse')
     if (sigil) sigil.classList.toggle('is-live', cls === 'connecting')
@@ -2835,6 +2856,7 @@ async function enterRoom(joinData) {
 
   function cleanupAndGoLobby() {
     clearInterval(screenTilesReconcileInterval)
+    clearInterval(callTimerId)
     closeCallPip()
     if (miniWindow) setMiniWindow(false)
     setCallActive(false)

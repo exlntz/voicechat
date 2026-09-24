@@ -2918,3 +2918,72 @@ body.pip-body > .room-screen { height: 100%; }
 @media (prefers-reduced-motion: reduce) {
   .ank-fill { display: none; }
 }
+
+/* ═══════════════ Звонок без верхней плашки (направление H6) ═══════════════
+   Шапка больше не отдельная полоса: она лежит поверх видео на мягкой тени сверху.
+   Логотип слева, в центре статус/секундомер · код комнаты · корона, справа кнопки.
+   Видео идёт до самого верха экрана. Тень пропускает клики — ловят их только сами
+   элементы шапки. */
+.room-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 15;
+  min-height: 0;
+  padding: 18px 26px 48px;
+  background: linear-gradient(180deg, rgba(5, 7, 10, 0.82) 0%, rgba(5, 7, 10, 0.42) 55%, rgba(5, 7, 10, 0) 100%);
+  border-bottom: 0;
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+}
+.room-topbar > * { pointer-events: auto; }
+
+/* Центр: без рамки, прямо на тени */
+.room-topbar .room-info {
+  height: 36px;
+  padding: 0;
+  background: none;
+  border: 0;
+  gap: 12px;
+  font: 600 15px/1 var(--font);
+  color: var(--text);
+}
+.room-topbar .room-sep { background: rgba(242, 245, 249, 0.18); }
+.room-topbar .status-dot { width: 9px; height: 9px; }
+.room-topbar .status-dot:not(.connecting):not(.disconnected) { box-shadow: 0 0 0 3px rgba(58, 168, 110, 0.22); }
+.room-timer { display: none; font-variant-numeric: tabular-nums; }
+.room-info.is-live .room-timer { display: inline; }
+.room-info.is-live .room-status-text { display: none; }
+/* Код комнаты — капсула, как на макете */
+.room-topbar .room-code-badge {
+  height: 32px;
+  margin: 0;
+  padding: 0 10px 0 12px;
+  background: rgba(242, 245, 249, 0.10);
+}
+.room-topbar .room-code-badge:hover { background: rgba(242, 245, 249, 0.18); }
+.room-topbar .host-indicator { color: var(--text-dim); font-weight: 500; }
+
+/* Круглые кнопки справа — полупрозрачные поверх видео */
+.room-topbar .ctrl-btn {
+  border: 0;
+  background: rgba(15, 17, 21, 0.62);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.room-topbar .ctrl-btn:hover { background: rgba(15, 17, 21, 0.82); }
+
+/* Миниатюры справа начинаются ниже кнопок шапки */
+.room-main.is-spotlight .sidebar-participants { padding-top: 76px; }
+
+@media (max-width: 860px) {
+  .room-main.is-spotlight .sidebar-participants { padding-top: 0; top: 70px; max-height: calc(100% - 88px); }
+}
+@media (max-width: 600px) {
+  .room-topbar { padding: 10px 12px 34px; gap: 8px; }
+  .room-topbar .room-info { gap: 8px; font-size: 14px; }
+}
+@media (max-height: 480px) and (orientation: landscape) {
+  .room-topbar { padding: 8px 14px 28px; }
+}
