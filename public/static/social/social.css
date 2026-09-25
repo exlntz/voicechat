@@ -1210,11 +1210,14 @@ button.vl-dm { width: 100%; border: 0; background: transparent; color: inherit; 
 
 /* Светлая тема: колонка «Чаты» на фоне, белая переписка, выбранный чат — белая карточка */
 html[data-theme="light"] { --vl-r-panel: 28px; }
-html[data-theme="light"] body.vl-ready #vl-sidebar { background: transparent; box-shadow: none; }
-@media (min-width: 861px) { html[data-theme="light"] .vl-side__search { background: #ffffff; } }
-html[data-theme="light"] .vl-dm:hover { background: rgba(21, 32, 43, 0.05); --vl-ring: #e7ebef; }
-html[data-theme="light"] .vl-dm.is-active { background: #ffffff; --vl-ring: #ffffff; box-shadow: 0 1px 0 #dde3e9; --ank-fill: #ffffff; }
-html[data-theme="light"] .vl-me__btn { background: #ffffff; }
+/* Только на ПК: на телефоне список чатов — отдельный слой поверх переписки, ему нужен свой фон */
+@media (min-width: 861px) {
+  html[data-theme="light"] body.vl-ready #vl-sidebar { background: transparent; box-shadow: none; }
+  html[data-theme="light"] .vl-side__search { background: #ffffff; }
+  html[data-theme="light"] .vl-dm:hover { background: rgba(21, 32, 43, 0.05); --vl-ring: #e7ebef; }
+  html[data-theme="light"] .vl-dm.is-active { background: #ffffff; --vl-ring: #ffffff; box-shadow: 0 1px 0 #dde3e9; --ank-fill: #ffffff; }
+  html[data-theme="light"] .vl-me__btn { background: #ffffff; }
+}
 html[data-theme="light"] .vl-pill { background: rgba(21, 32, 43, 0.06); }
 html[data-theme="light"] .vl-pill.is-active { background: var(--accent); }
 /* Обои в светлой теме: шапка, поле ввода и подписи — белое «стекло» */
