@@ -3575,3 +3575,13 @@ html[data-theme="light"] .dd-btn:disabled { background: #eef1f4; }
 .room-main .sidebar-participants .tile-label .volume-control { position: static; top: auto; bottom: auto; background: none !important; padding: 0 4px 0 0; margin: 0; gap: 5px; }
 .room-main .sidebar-participants .tile-label .volume-control input[type="range"] { width: 64px; }
 .room-main .sidebar-participants .tile-label .volume-control i { font-size: 11px; }
+
+/* Список выбора устройств — поверх окна настроек звонка (оно выше прежнего z-index 2100) */
+.dd-menu { z-index: 3000; }
+/* Логотип в шапке звонка чуть выше: облачко с хвостиком визуально «садится» ниже кнопок */
+.room-topbar .ank-brandline { transform: translateY(-3px); }
+/* Карточка «Связь» в светлой теме — светлая, с читаемым текстом */
+html[data-theme="light"] .conn-card { background: #ffffff; color: var(--text-dim); box-shadow: 0 16px 40px rgba(21, 32, 43, 0.16), 0 0 0 1px rgba(21, 32, 43, 0.06); }
+html[data-theme="light"] .conn-card__title, html[data-theme="light"] .conn-card__val { color: var(--text); }
+html[data-theme="light"] .conn-card__warn { color: #8a5d00; background: rgba(227, 193, 79, 0.18); }
+.dd-btn.open { outline: none !important; border-color: transparent; }
