@@ -4,6 +4,7 @@
 // панели задач — через window.electronAPI (есть только в новых сборках, поэтому всё проверяется).
 import { store, on, userById, totalUnread, incomingCount } from './store.js'
 import { displayName, messagePreview } from './ui.js'
+import { enablePush, showLocalNotification } from './push.js'
 
 const E = () => window.electronAPI || {}
 const BASE_TITLE = 'Voice Lobby'
@@ -59,10 +60,7 @@ export function notify({ title, body, tag, route }) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return
   // Вкладка на экране и в фокусе — хватит звука и счётчика
   if (document.visibilityState === 'visible' && document.hasFocus()) return
-  try {
-    const n = new Notification(title, { body, tag, icon: '/apple-touch-icon.png', renotify: !!tag })
-    n.onclick = () => { try { window.focus() } catch {} if (route) navigateFn(route); n.close() }
-  } catch {}
+  showLocalNotification(title, { body, tag, icon: '/static/icon-192.png', badge: '/static/badge-96.png', renotify: !!tag, data: { url: route } }, () => { if (route) navigateFn(route) })
 }
 
 export function notificationsNeedPermission() {
@@ -70,9 +68,13 @@ export function notificationsNeedPermission() {
   return 'Notification' in window && Notification.permission === 'default'
 }
 
+// Разрешение + подписка на push (уведомления и при закрытом сайте)
 export async function requestNotificationPermission() {
   if (!('Notification' in window)) return 'denied'
-  try { return await Notification.requestPermission() } catch { return 'denied' }
+  let res = 'denied'
+  try { res = await Notification.requestPermission() } catch {}
+  if (res === 'granted') enablePush().catch(() => {})
+  return res
 }
 
 // ---- Счётчик ----

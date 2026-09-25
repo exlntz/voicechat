@@ -5,6 +5,7 @@ import { h, icon, avatar, displayName, presenceText, messagePreview, timeShort, 
 import { askDeleteChat } from './chat.js'
 import { openContactDialog } from './contact-dialog.js'
 import { notificationsNeedPermission, requestNotificationPermission } from './notify.js'
+import { needsHomeScreen } from './push.js'
 import { callState, inCall } from './call-invite.js'
 
 export function createSidebar({ root, navigate, openDmWith, openProfile }) {
@@ -39,16 +40,26 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
     h('button', { type: 'button', class: 'vl-btn vl-btn--primary vl-btn--sm' }, 'Включить'),
     h('button', { type: 'button', class: 'vl-round is-ghost is-sm', 'aria-label': 'Скрыть' }, [icon('xmark')])
   ])
-  const [, , enableBtn, hideBtn] = notifBanner.children
+  const [, bannerText, enableBtn, hideBtn] = notifBanner.children
   enableBtn.addEventListener('click', async () => {
     const res = await requestNotificationPermission()
     if (res === 'granted') toast('Уведомления включены', 'success')
     renderNotifBanner()
   })
-  hideBtn.addEventListener('click', () => { try { localStorage.setItem('vl:notifBannerHidden', '1') } catch {} renderNotifBanner() })
+  // iPhone в обычной вкладке Safari: уведомлений там не бывает — подсказываем про экран «Домой»
+  const iosHint = needsHomeScreen()
+  const hideKey = iosHint ? 'vl:iosHomeHintHidden' : 'vl:notifBannerHidden'
+  hideBtn.addEventListener('click', () => { try { localStorage.setItem(hideKey, '1') } catch {} renderNotifBanner() })
   function renderNotifBanner() {
     let hidden = false
-    try { hidden = localStorage.getItem('vl:notifBannerHidden') === '1' } catch {}
+    try { hidden = localStorage.getItem(hideKey) === '1' } catch {}
+    if (iosHint) {
+      bannerText.textContent = 'Уведомления на iPhone: «Поделиться» → «На экран „Домой“», затем откройте сайт с иконки'
+      enableBtn.hidden = true
+      notifBanner.classList.add('is-hint')
+      notifBanner.hidden = hidden
+      return
+    }
     notifBanner.hidden = hidden || !notificationsNeedPermission()
   }
 
