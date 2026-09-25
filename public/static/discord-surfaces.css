@@ -740,24 +740,25 @@ body.vl-ready .vl-msg[data-key]:is(.pos-middle, .pos-last) {
   padding-top: 2px;
 }
 
-body.vl-ready .vl-msg[data-key] :is(.vl-msg__avatar, .vl-avatar) {
-  position: absolute;
-  top: 8px;
-  left: 20px;
-}
-
 body.vl-ready .vl-msg[data-key] .dc-message__header {
   position: absolute;
   top: 2px;
   left: 72px;
   right: 20px;
-  display: block;
   height: 22px;
   min-height: 22px;
   max-height: 22px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+body.vl-ready .vl-msg[data-key] .dc-message__header .dc-message__time {
+  margin-left: 8px;
+}
+
+body.vl-ready .vl-msg[data-key]:is(.pos-middle, .pos-last) > :is(.dc-message__header, .dc-message__avatar) {
+  display: none;
 }
 
 body.vl-ready .vl-msg[data-key] .vl-msg__wrap {
@@ -769,7 +770,7 @@ body.vl-ready .vl-msg[data-key] .vl-msg__wrap {
   align-items: flex-start;
 }
 
-body.vl-ready .vl-msg[data-key] :is(.vl-msg__bubble, .vl-bubble) {
+body.vl-ready .vl-msg[data-key] .vl-bubble {
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -778,15 +779,18 @@ body.vl-ready .vl-msg[data-key] :is(.vl-msg__bubble, .vl-bubble) {
   border: 0;
   border-radius: 0;
   box-shadow: none;
+  color: var(--dc-text);
 }
 
-body.vl-ready .vl-msg[data-key] :is(.vl-msg__text, .vl-bubble__text) {
+body.vl-ready .vl-msg[data-key] .vl-bubble__text {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
+  font-size: 15px;
+  line-height: 1.5;
 }
 
-body.vl-ready .vl-msg[data-key] :is(.vl-msg__meta, .vl-bubble__meta) {
+body.vl-ready .vl-msg[data-key] .vl-bubble__meta {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -794,13 +798,24 @@ body.vl-ready .vl-msg[data-key] :is(.vl-msg__meta, .vl-bubble__meta) {
   position: static;
   top: auto;
   margin-left: 10px;
+  font-size: 10px;
+  color: var(--dc-muted);
+  opacity: .8;
 }
 
-body.vl-ready .vl-msg[data-key] :is(.vl-msg__reply, .vl-bubble__reply),
-body.vl-ready .vl-msg[data-key] :is(.vl-msg__media, .vl-bubble__media) {
+body.vl-ready .vl-msg[data-key] .vl-quote {
+  margin: 0 0 6px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--dc-border);
+}
+
+body.vl-ready .vl-msg[data-key] .vl-media-grid {
   width: 100%;
-  max-width: 100%;
-  min-width: 0;
+  max-width: min(550px, 100%);
+}
+
+body.vl-ready .vl-msg[data-key] .vl-voice {
+  padding: 10px;
 }
 
 body.vl-ready .vl-view .vl-msg[data-key] .vl-msg__tools,
@@ -812,13 +827,6 @@ html body.vl-ready .vl-msg[data-key] .vl-msg__tools {
   body.vl-ready .vl-msg[data-key] {
     padding-left: 56px;
     padding-right: 12px;
-  }
-
-  body.vl-ready .vl-msg[data-key] :is(.vl-msg__avatar, .vl-avatar) {
-    top: 8px;
-    left: 12px;
-    width: 32px;
-    height: 32px;
   }
 
   body.vl-ready .vl-msg[data-key] .dc-message__header {
