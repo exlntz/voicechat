@@ -696,3 +696,133 @@
     animation-duration: 1ms !important;
   }
 }
+
+/* Safety overrides appended after parent review follow-up. */
+html body :is(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid #00a8fc !important;
+  outline-offset: 3px !important;
+}
+
+.tile:is(:fullscreen, .is-fullscreen, .in-app-fullscreen) {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+dialog.dc-switcher .dc-switcher__head,
+dialog.dc-switcher .dc-switcher__field,
+dialog.dc-switcher .dc-switcher__help {
+  flex-shrink: 0;
+}
+
+dialog.dc-switcher .dc-switcher__results {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.room-screen:is(.is-compact, .is-docked) .controls-pill {
+  box-shadow: none;
+}
+
+body.vl-ready .vl-msg[data-key] {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin-top: 16px;
+  min-height: 48px;
+  padding: 24px 20px 2px 72px;
+}
+
+body.vl-ready .vl-msg[data-key]:is(.pos-middle, .pos-last) {
+  margin-top: 0;
+  min-height: 24px;
+  padding-top: 2px;
+}
+
+body.vl-ready .vl-msg[data-key] :is(.vl-msg__avatar, .vl-avatar) {
+  position: absolute;
+  top: 8px;
+  left: 20px;
+}
+
+body.vl-ready .vl-msg[data-key] .dc-message__header {
+  position: absolute;
+  top: 2px;
+  left: 72px;
+  right: 20px;
+  display: block;
+  height: 22px;
+  min-height: 22px;
+  max-height: 22px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+body.vl-ready .vl-msg[data-key] .vl-msg__wrap {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+body.vl-ready .vl-msg[data-key] :is(.vl-msg__bubble, .vl-bubble) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body.vl-ready .vl-msg[data-key] :is(.vl-msg__text, .vl-bubble__text) {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+body.vl-ready .vl-msg[data-key] :is(.vl-msg__meta, .vl-bubble__meta) {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  float: none;
+  position: static;
+  top: auto;
+  margin-left: 10px;
+}
+
+body.vl-ready .vl-msg[data-key] :is(.vl-msg__reply, .vl-bubble__reply),
+body.vl-ready .vl-msg[data-key] :is(.vl-msg__media, .vl-bubble__media) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+body.vl-ready .vl-view .vl-msg[data-key] .vl-msg__tools,
+html body.vl-ready .vl-msg[data-key] .vl-msg__tools {
+  top: 0;
+}
+
+@media (max-width: 860px) {
+  body.vl-ready .vl-msg[data-key] {
+    padding-left: 56px;
+    padding-right: 12px;
+  }
+
+  body.vl-ready .vl-msg[data-key] :is(.vl-msg__avatar, .vl-avatar) {
+    top: 8px;
+    left: 12px;
+    width: 32px;
+    height: 32px;
+  }
+
+  body.vl-ready .vl-msg[data-key] .dc-message__header {
+    left: 56px;
+    right: 12px;
+  }
+}
