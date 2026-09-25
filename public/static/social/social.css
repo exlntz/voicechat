@@ -1274,3 +1274,5 @@ body:has(.vl-modal-overlay) .vl-fab-menu { display: none !important; }
 /* «Комната по коду»: подпись одной строкой; на узком экране пояснение прячем */
 .vl-picker__code .vl-picker__name { white-space: nowrap; }
 @media (max-width: 480px) { .vl-picker__code .vl-picker__user { display: none; } }
+/* Кнопка «Чаты» не лежит поверх логотипа, пока идёт подключение к звонку */
+body:has(.room-screen) .vl-solo-chats { display: none !important; }
