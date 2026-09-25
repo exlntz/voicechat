@@ -3,9 +3,10 @@
 // Ниже — список: вкладки-«чипы» Все / Заявки / Заблокированные и поле «добавить по юзернейму».
 import { store, on, friendsBy, presenceOf, setFriend, loadFriends } from './store.js'
 import { api } from './api.js'
-import { h, icon, avatar, displayName, presenceText, showMenu, confirmDialog, toast, onLongPress } from './ui.js'
+import { h, icon, avatar, displayName, presenceText, showMenu, confirmDialog, toast, onLongPress, contactName } from './ui.js'
 import { startCall } from './call-invite.js'
 import { openUserCard } from './user-card.js'
+import { openContactDialog } from './contact-dialog.js'
 
 const TABS = [
   { id: 'all', label: 'Все' },
@@ -233,6 +234,7 @@ export function createFriendsView({ navigate, openDmWith, menuButton, initialTab
     const u = f.user
     showMenu([
       { label: 'Профиль', icon: 'user', onClick: () => openProfileOf(u) },
+      { label: contactName(u.id) ? 'Изменить контакт' : 'Добавить в контакты', icon: contactName(u.id) ? 'pen' : 'user-plus', onClick: () => openContactDialog(u) },
       { label: 'Написать', icon: 'message', onClick: () => openDmWith(u.id) },
       { label: 'Позвонить', icon: 'phone', onClick: () => callFriend(u.id) },
       { label: 'Скопировать юзернейм', icon: 'at', onClick: () => window.VL.copyToClipboard(u.username).then((ok) => toast(ok ? 'Скопировано' : 'Не удалось скопировать', ok ? 'success' : 'error')) },

@@ -1,8 +1,9 @@
 // ===================== Левая колонка: друзья, лички, панель звонка, профиль =====================
 import { store, on, sortedConversations, presenceOf, incomingCount, friendsBy } from './store.js'
 import { api } from './api.js'
-import { h, icon, avatar, displayName, presenceText, messagePreview, timeShort, showMenu, toast, waveBars, isSavedConv, msgStatus, ticks, onLongPress } from './ui.js'
+import { h, icon, avatar, displayName, presenceText, messagePreview, timeShort, showMenu, toast, waveBars, isSavedConv, msgStatus, ticks, onLongPress, contactName } from './ui.js'
 import { askDeleteChat } from './chat.js'
+import { openContactDialog } from './contact-dialog.js'
 import { notificationsNeedPermission, requestNotificationPermission } from './notify.js'
 import { callState, inCall } from './call-invite.js'
 
@@ -111,6 +112,7 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
         const patch = (body) => api.updateConversation(conv.id, body).catch((er) => toast(er.message, 'error'))
         showMenu([
           { label: conv.pinned ? 'Открепить' : 'Закрепить', icon: conv.pinned ? 'thumbtack-slash' : 'thumbtack', onClick: () => patch({ pinned: !conv.pinned }) },
+          saved || !conv.peer ? null : { label: contactName(conv.peer.id) ? 'Изменить контакт' : 'Добавить в контакты', icon: contactName(conv.peer.id) ? 'pen' : 'user-plus', onClick: () => openContactDialog(conv.peer) },
           saved ? null : { label: conv.muted ? 'Включить уведомления' : 'Выключить уведомления', icon: conv.muted ? 'bell' : 'bell-slash', onClick: () => patch({ muted: !conv.muted }) },
           saved ? null : { label: 'Позвонить', icon: 'phone', onClick: () => import('./call-invite.js').then((m) => { navigate('/dm/' + conv.id); m.startCall(conv.id) }) },
           'sep',

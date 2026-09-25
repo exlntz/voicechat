@@ -103,7 +103,20 @@ export function icon(name, extra = '') {
   return t.content.firstElementChild
 }
 
+// Своё имя для человека («контакт») важнее имени из его профиля — как в Телеграме
+const contactNames = new Map() // userId -> имя, которое задал я
+export function setContactName(userId, name) {
+  if (name) contactNames.set(Number(userId), name)
+  else contactNames.delete(Number(userId))
+}
+export function clearContactNames() { contactNames.clear() }
+export function contactName(userId) { return contactNames.get(Number(userId)) || null }
 export function displayName(user) {
+  if (!user) return 'Пользователь'
+  return contactNames.get(Number(user.id)) || user.displayName || user.username || 'Пользователь'
+}
+// Имя из профиля самого человека (без моего имени-контакта)
+export function profileName(user) {
   return (user && (user.displayName || user.username)) || 'Пользователь'
 }
 
@@ -114,10 +127,12 @@ export function avatarColor(id) {
   return Number(id) && Number(id) === selfId ? '#0458cf' : '#2a303b'
 }
 
+// Инициалы — только из букв и цифр, по целым символам (эмодзи «🎸» не разрезать пополам)
 export function initialsOf(name) {
-  const parts = String(name || '?').trim().split(/\s+/).filter(Boolean)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return String(name || '?').trim().slice(0, 2).toUpperCase()
+  const words = String(name || '').trim().split(/\s+/).map((w) => Array.from(w).filter((ch) => /[\p{L}\p{N}]/u.test(ch))).filter((w) => w.length)
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase()
+  if (words.length === 1) return words[0].slice(0, 2).join('').toUpperCase()
+  return Array.from(String(name || '?').trim())[0] || '?'
 }
 
 // presence: {status: online|idle|dnd|offline, inCall}

@@ -4,7 +4,7 @@
 // «мгновенной» отправки сообщений.
 import { api } from './api.js'
 import * as cache from './cache.js'
-import { uid } from './ui.js'
+import { uid, setContactName, clearContactNames } from './ui.js'
 
 const MAX_IN_MEMORY = 400 // сообщений на чат, пока пользователь внизу ленты
 
@@ -66,6 +66,35 @@ export function userById(id) {
 }
 export function presenceOf(id) {
   return store.presence.get(Number(id)) || { status: 'offline', inCall: false }
+}
+
+// ---------- Контакты (свои имена для людей) ----------
+export async function loadContacts() {
+  const data = await api.get('/api/contacts')
+  clearContactNames()
+  for (const c of data.contacts) setContactName(c.userId, c.name)
+  cache.setKV('contacts', data.contacts)
+  emitNames()
+}
+export async function saveContact(userId, name) {
+  const r = await api.put('/api/contacts/' + Number(userId), { name })
+  applyContact(r.userId, r.name)
+  return r
+}
+function applyContact(userId, name) {
+  setContactName(userId, name)
+  cache.getKV('contacts').then((list) => {
+    const rest = (Array.isArray(list) ? list : []).filter((c) => c.userId !== Number(userId))
+    cache.setKV('contacts', name ? [...rest, { userId: Number(userId), name }] : rest)
+  })
+  emitNames()
+}
+// Имена поменялись — перерисовать всё, где они видны
+function emitNames() {
+  emit('contacts')
+  emit('friends')
+  emit('conversations')
+  emit('presence')
 }
 
 // ---------- Друзья ----------
@@ -494,6 +523,11 @@ export function applyEvent(type, data) {
       }
       break
     }
+    case 'contact.update': {
+      // Своё имя для человека сменили на другом устройстве
+      applyContact(data.userId, data.name)
+      break
+    }
     case 'user.update': {
       // Кто-то (или вы сами на другом устройстве) сменил юзернейм — обновить везде
       updateUser(data.user)
@@ -608,7 +642,8 @@ setInterval(() => {
 
 // ---------- Мгновенный старт: списки из кэша до ответа сервера ----------
 export async function hydrateFromCache() {
-  const [convs, friends] = await Promise.all([cache.getKV('conversations'), cache.getKV('friends')])
+  const [convs, friends, contacts] = await Promise.all([cache.getKV('conversations'), cache.getKV('friends'), cache.getKV('contacts')])
+  if (Array.isArray(contacts)) for (const c of contacts) setContactName(c.userId, c.name)
   if (Array.isArray(friends) && !store.friendsLoaded) {
     for (const f of friends) setFriend({ ...f, presence: { status: 'offline', inCall: false } }, false)
     emit('friends')
@@ -622,6 +657,7 @@ export async function hydrateFromCache() {
 
 export function resetStore() {
   store.me = null
+  clearContactNames()
   store.friends.clear()
   store.users.clear()
   store.presence.clear()

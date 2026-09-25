@@ -2,17 +2,19 @@
 // Как в Дискорде: сверху фон (картинка, GIF или беззвучное зацикленное видео), на нём аватарка;
 // ниже — как в Телеграме: всё, чем вы обменялись в личке, по вкладкам.
 import { api } from './api.js'
-import { store, userById, presenceOf, dmWith, rememberUser } from './store.js'
-import { h, icon, avatar, displayName, presenceText, timeShort, dayLabel, fmtClock, bannerMedia, bannerKey } from './ui.js'
+import { store, userById, presenceOf, dmWith, rememberUser, on } from './store.js'
+import { h, icon, avatar, displayName, presenceText, timeShort, dayLabel, fmtClock, bannerMedia, bannerKey, contactName, profileName } from './ui.js'
+import { openContactDialog } from './contact-dialog.js'
 import { voicePlayer, fileCard, openLightbox } from './media-ui.js'
 
 let current = null
 
 export function closeUserCard() {
   if (!current) return
-  const { overlay, onKey } = current
+  const { overlay, onKey, off } = current
   current = null
   document.removeEventListener('keydown', onKey, true)
+  if (off) off()
   overlay.querySelectorAll('video').forEach((v) => v.pause())
   overlay.classList.add('is-leaving')
   setTimeout(() => overlay.remove(), 180)
@@ -63,17 +65,26 @@ export function openUserCard({ userId = 0, convId = 0, saved = false, onMessage,
     avaSlot.classList.toggle('is-openable', !saved && !!user.avatarUrl)
     banner.classList.toggle('is-openable', !!hasBanner)
     name.textContent = saved ? 'Избранное' : displayName(user)
-    uname.textContent = saved ? 'Заметки, файлы и пересланное — только для вас' : '@' + user.username
+    // Записан у меня под своим именем — рядом с @ник показываем имя из его профиля
+    const alias = !saved && contactName(user.id)
+    uname.textContent = saved ? 'Заметки, файлы и пересланное — только для вас' : '@' + user.username + (alias ? ' · ' + profileName(user) : '')
+    if (contactBtn) {
+      contactBtn.replaceChildren(icon(alias ? 'pen' : 'user-plus'))
+      contactBtn.title = alias ? 'Изменить контакт' : 'Добавить в контакты'
+      contactBtn.setAttribute('aria-label', contactBtn.title)
+    }
     status.textContent = saved ? '' : presenceText(presenceOf(user.id))
     status.hidden = saved
   }
 
+  var contactBtn = saved ? null : h('button', { type: 'button', class: 'vl-round is-sm' })
+  if (contactBtn) contactBtn.addEventListener('click', () => openContactDialog(user))
   if (!saved) {
     const msg = h('button', { type: 'button', class: 'vl-btn vl-btn--primary vl-btn--pill vl-btn--sm' }, [icon('message'), 'Написать'])
     const call = h('button', { type: 'button', class: 'vl-round is-sm', title: 'Позвонить', 'aria-label': 'Позвонить' }, [icon('phone')])
     msg.addEventListener('click', () => { closeUserCard(); onMessage && onMessage(user.id) })
     call.addEventListener('click', () => { closeUserCard(); onCall && onCall(user.id) })
-    actions.append(msg, call)
+    actions.append(msg, call, contactBtn)
   }
 
   // ---------- Вкладки ----------
@@ -168,12 +179,13 @@ export function openUserCard({ userId = 0, convId = 0, saved = false, onMessage,
   avaSlot.addEventListener('click', () => { if (!saved && user.avatarUrl) openLightbox([{ kind: 'image', url: user.avatarUrl, name: 'avatar' }]) })
   banner.addEventListener('click', () => { if (!saved && user.bannerUrl) openLightbox([{ kind: user.bannerKind === 'video' ? 'video' : 'image', url: user.bannerUrl, name: 'banner' }]) })
   // Esc при открытом просмотре закрывает только просмотр
-  const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.vl-lightbox')) { e.preventDefault(); e.stopPropagation(); closeUserCard() } }
+  const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.vl-lightbox, .vl-contact')) { e.preventDefault(); e.stopPropagation(); closeUserCard() } }
   close.addEventListener('click', closeUserCard)
   overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) closeUserCard() })
   document.addEventListener('keydown', onKey, true)
   document.body.appendChild(overlay)
-  current = { overlay, onKey }
+  // Имя контакта поменяли, пока карточка открыта
+  current = { overlay, onKey, off: on('contacts', () => renderHead()) }
   renderHead()
   if (convId) setTab('media')
 
