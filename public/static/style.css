@@ -3501,3 +3501,30 @@ html[data-theme="light"] .tile .tile-label .volume-control { background: transpa
 /* Карточка приглашения — такая же рамка, как у плитки */
 .solo-invite { border: 0; border-radius: 28px; background: #181b21; }
 html[data-theme="light"] .solo-invite { background: #ffffff; }
+
+/* «Скопировать ссылку» в шапке — те же анимации значка, что у кнопки в карточке приглашения */
+.room-copy-btn i { display: inline-block; transform-origin: 50% 50%; }
+.room-copy-btn:not(.is-copied):hover i { animation: solo-link-tug 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1; }
+.room-copy-btn.is-copied i { animation: solo-check-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) 1; }
+
+/* «Участники»: два человека; при наведении передний подпрыгивает, задний подтягивается к нему */
+.room-people-ico { width: 20px; height: 20px; display: block; overflow: visible; }
+.room-people-ico__front, .room-people-ico__back { transform-box: fill-box; transform-origin: 50% 100%; }
+.room-people-btn:hover .room-people-ico__front { animation: room-people-front 0.55s var(--ease) 1; }
+.room-people-btn:hover .room-people-ico__back { animation: room-people-back 0.55s var(--ease) 0.06s 1; }
+@keyframes room-people-front { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-2.5px); } 70% { transform: translateY(0.5px); } }
+@keyframes room-people-back { 0%, 100% { transform: translateX(0); } 45% { transform: translateX(-1.5px); } }
+
+/* Имена в плитках — обычный шрифт интерфейса, жирный (не заголовочный) */
+.tile .tile-label { font: 700 16px/1.2 'Golos Text', var(--font); letter-spacing: 0; }
+@container (max-width: 300px) { .tile .tile-label { font-size: 14px; } }
+
+/* Список участников: корона сразу после имени, «без микрофона» — справа */
+.panel-participant__name { display: flex; align-items: center; gap: 6px; }
+.panel-participant__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel-participant__you { flex-shrink: 0; }
+.panel-participant__name .host-crown { flex-shrink: 0; }
+.panel-participant__muted { margin-left: auto; }
+@media (prefers-reduced-motion: reduce) {
+  .room-copy-btn i, .room-people-btn:hover .room-people-ico__front, .room-people-btn:hover .room-people-ico__back { animation: none !important; }
+}
