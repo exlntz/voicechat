@@ -59,9 +59,9 @@ export function createChatView({ convId, navigate, menuButton }) {
   const headWho = h('button', { type: 'button', class: 'vl-chat__head-who', title: 'Профиль, медиа и файлы' }, [headAvatar, h('span', { class: 'vl-chat__head-text' }, [headName, headSub])])
   headWho.addEventListener('click', () => openCard())
   const searchBtn = h('button', { type: 'button', class: 'vl-round is-lg', title: 'Поиск по чату', 'aria-label': 'Поиск по чату' }, [icon('magnifying-glass')])
-  // «Позвонить» — тёмная таблетка с подписью (на телефоне остаётся только значок)
+  // «Позвонить» — синяя таблетка с подписью (на телефоне остаётся только значок)
   const callLabel = h('span', { class: 'vl-chat__call-label' }, 'Позвонить')
-  const callBtn = h('button', { type: 'button', class: 'vl-btn vl-btn--ink vl-btn--pill vl-chat__call', title: 'Позвонить', 'aria-label': 'Позвонить', hidden: saved }, [icon('phone'), callLabel])
+  const callBtn = h('button', { type: 'button', class: 'vl-btn vl-btn--primary vl-btn--pill vl-chat__call', title: 'Позвонить', 'aria-label': 'Позвонить', hidden: saved }, [icon('phone'), callLabel])
   const moreBtn = h('button', { type: 'button', class: 'vl-round is-lg', title: 'Ещё', 'aria-label': 'Ещё' }, [icon('ellipsis-vertical')])
   searchBtn.addEventListener('click', () => openSearch())
   callBtn.addEventListener('click', () => {
@@ -894,6 +894,13 @@ export function createChatView({ convId, navigate, menuButton }) {
     ])
   }
 
+  function buildHistoryLoader() {
+    const rows = [150, 230, 110].map((w, i) => h('div', { class: `vl-msg ${i === 1 ? 'is-mine' : 'is-theirs'} pos-single is-skeleton` }, [
+      h('div', { class: 'vl-msg__wrap' }, [h('span', { class: 'vl-skel vl-skel--bubble', style: { width: w + 'px' } })])
+    ]))
+    return h('div', { class: 'vl-chat__history', 'aria-label': 'Загружаем историю' }, rows)
+  }
+
   function buildSkeleton() {
     const rows = []
     // Неподвижные бледные пузыри той же формы, что и настоящие, — без мерцания
@@ -916,7 +923,9 @@ export function createChatView({ convId, navigate, menuButton }) {
     if (chat.state === 'empty') {
       items.push({ key: 'skeleton', sig: '1', build: buildSkeleton })
     } else if (chat.hasMore) {
-      items.push({ key: 'loader', sig: chat.loadingOlder ? '1' : '0', build: () => h('div', { class: 'vl-chat__loader' }, [h('span', { class: 'vl-spinner' }), 'Загружаем историю…']) })
+      // Над лентой — бледные пузыри-заглушки: пока грузится история, они мягко «дышат»,
+      // а новые сообщения потом проявляются на их месте (без спиннера и прыжков)
+      items.push({ key: 'loader', sig: '1', build: buildHistoryLoader })
     } else {
       items.push({ key: 'intro', sig: String((userById(peer.id) || peer).avatarUrl || '') + '|' + displayName(userById(peer.id) || peer), build: buildIntro })
     }
@@ -1073,10 +1082,17 @@ export function createChatView({ convId, navigate, menuButton }) {
       animateKeys.add(detail.message.id ? 'm' + detail.message.id : 'c' + detail.message.clientId)
     }
     if (detail.type === 'prepend') {
+      // Подгрузка истории сверху: новые узлы сразу раскладываются по-настоящему (иначе
+      // content-visibility даёт им примерную высоту и лента прыгает при прокрутке),
+      // позиция экрана сохраняется, а сами сообщения плавно проявляются
+      const before = new Set(nodes.keys())
       const prevHeight = scroller.scrollHeight
       const prevTop = scroller.scrollTop
       renderList()
+      const fresh = []
+      for (const [k, e] of nodes) if (!before.has(k) && k[0] === 'm') { e.node.classList.add('is-history-in'); fresh.push(e.node) }
       scroller.scrollTop = prevTop + (scroller.scrollHeight - prevHeight)
+      setTimeout(() => fresh.forEach((n) => n.classList.remove('is-history-in')), 700)
       return
     }
     // Своё сообщение, пока лента показывает старый кусок, — вернуться к концу переписки

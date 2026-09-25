@@ -48,17 +48,14 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
   searchClear.addEventListener('click', (e) => { e.preventDefault(); searchInput.value = ''; setSearch(''); searchInput.focus() })
   const norm = (t) => String(t || '').toLocaleLowerCase('ru')
 
-  // ---- Навигация: две «таблетки» ----
-  const friendsBadge = h('span', { class: 'vl-dot-badge', hidden: true, 'aria-label': 'Есть заявки в друзья' })
-  const navFriends = h('a', { href: '/friends', class: 'vl-pill', 'data-nav': 'friends' }, [icon('user-group'), h('span', {}, 'Друзья'), friendsBadge])
-  const navLobby = h('a', { href: '/lobby', class: 'vl-pill', 'data-nav': 'lobby' }, [icon('hashtag'), h('span', {}, 'По коду')])
-  for (const a of [navFriends, navLobby]) {
-    a.addEventListener('click', (e) => {
-      if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return
-      e.preventDefault()
-      navigate(a.getAttribute('href'))
-    })
-  }
+  // ---- «Друзья» — круглая кнопка в шапке, с числом заявок; «По коду» живёт в меню «Звонок» ----
+  const friendsBadge = h('span', { class: 'vl-side__friends-badge', hidden: true })
+  const navFriends = h('a', { href: '/friends', class: 'vl-round vl-side__friends', title: 'Друзья', 'aria-label': 'Друзья' }, [icon('user-group'), friendsBadge])
+  navFriends.addEventListener('click', (e) => {
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return
+    e.preventDefault()
+    navigate('/friends')
+  })
 
   const dmList = h('div', { class: 'vl-dm-list', role: 'list', 'aria-label': 'Личные сообщения' })
   const scroller = h('div', { class: 'vl-side__scroll' }, [dmList])
@@ -228,10 +225,9 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
   function renderNav() {
     const n = incomingCount()
     friendsBadge.hidden = !n
-    friendsBadge.textContent = String(n)
+    friendsBadge.textContent = n > 99 ? '99+' : String(n)
+    navFriends.setAttribute('aria-label', n ? `Друзья, заявок: ${n}` : 'Друзья')
     navFriends.classList.toggle('is-active', route.name === 'friends')
-    // Звонок из лички подсвечивает личку, а не «Звонок по коду»
-    navLobby.classList.toggle('is-active', route.name === 'lobby' || (route.name === 'room' && !callState.conversationId))
   }
 
   function clearSearch() { if (searchInput.value) { searchInput.value = ''; setSearch('') } }
@@ -241,15 +237,19 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
     const forCall = mode === 'call'
     const input = h('input', { type: 'text', placeholder: 'Имя или юзернейм друга', autocomplete: 'off', spellcheck: 'false' })
     // Звонок без друга: комната по коду (как «По коду» в меню)
-    const codeLink = h('button', { type: 'button', class: 'vl-btn vl-btn--ghost-text vl-picker__code' }, [icon('hashtag'), 'Комната по коду'])
+    const codeLink = h('button', { type: 'button', class: 'vl-picker__row vl-picker__code' }, [
+      h('span', { class: 'vl-picker__code-ico' }, [icon('hashtag')]),
+      h('span', { class: 'vl-picker__name' }, 'Комната по коду'),
+      h('span', { class: 'vl-picker__user' }, 'создать или войти')
+    ])
     codeLink.addEventListener('click', () => { done(); navigate('/lobby') })
     const pick = (u) => { done(); if (forCall) callFriend(u.id); else openDmWith(u.id) }
     const list = h('div', { class: 'vl-picker__list' })
     const close = h('button', { type: 'button', class: 'vl-round is-ghost', 'aria-label': 'Закрыть' }, [icon('xmark')])
     const card = h('div', { class: 'vl-modal vl-picker', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Новое сообщение' }, [
-      h('div', { class: 'vl-picker__head' }, [h('h3', { class: 'vl-modal__title' }, forCall ? 'Позвонить другу' : 'Написать другу'), close]),
-      h('div', { class: 'vl-fld-host' }, [input]), list,
-      forCall ? codeLink : null
+      h('div', { class: 'vl-picker__head' }, [h('h3', { class: 'vl-modal__title' }, forCall ? 'Звонок' : 'Написать другу'), close]),
+      forCall ? codeLink : null,
+      h('div', { class: 'vl-fld-host' }, [input]), list
     ])
     const overlay = h('div', { class: 'vl-modal-overlay' }, [card])
     let results = []
@@ -296,10 +296,9 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
   function renderCallBar() { callBar.hidden = !inCall() }
 
   root.replaceChildren(
-    h('div', { class: 'vl-side__head' }, [h('h2', { class: 'vl-side__title' }, 'Чаты'), newCallBtn]),
+    h('div', { class: 'vl-side__head' }, [h('h2', { class: 'vl-side__title' }, 'Чаты'), navFriends, newCallBtn]),
     searchBox,
     callBar,
-    h('nav', { class: 'vl-side__nav', 'aria-label': 'Разделы' }, [navFriends, navLobby]),
     scroller,
     notifBanner,
     mePanel

@@ -886,9 +886,6 @@ async function renderLobby(prefillRoomCode = '') {
   const joinBtn = el('button', {}, urlRoom ? 'Войти в комнату' : 'Создать / войти')
   card.appendChild(joinBtn)
 
-  const hint = el('div', { class: 'hint-text' }, 'Поделитесь кодом комнаты с теми, кого хотите позвать в звонок.')
-  card.appendChild(hint)
-
   screen.appendChild(card)
   root.appendChild(screen)
 
@@ -1110,25 +1107,28 @@ async function enterRoom(joinData) {
   const roomStatus = el('span', { class: 'room-status', role: 'status', tabindex: '0' }, [statusDot, connBars, statusText, callTimer, connCard])
   roomInfo.appendChild(roomStatus)
   roomInfo.dataset.q = 'unknown'
-  const codeBadge = el('button', { type: 'button', class: 'room-code-badge', title: 'Скопировать код комнаты' }, [
-    el('span', { class: 'room-code-badge__code' }, roomCode),
-    el('i', { class: 'fas fa-copy room-code-badge__icon', 'aria-hidden': 'true' })
-  ])
-  codeBadge.addEventListener('click', async () => {
-    const ok = await copyToClipboard(roomCode)
-    showToast(ok ? 'Скопировано' : 'Не удалось скопировать код комнаты', ok ? 'success' : 'error')
+  // Шапка как в макете «Голос — звонок»: слева логотип, по центру ничего; справа секундомер
+  // и связь, «Скопировать ссылку» и «Участники». Код комнаты и корона в шапке больше не нужны.
+  const topRight = el('div', { class: 'room-topbar__right' })
+  topRight.appendChild(roomInfo)
+  const copyLinkIcon = el('i', { class: 'fas fa-link', 'aria-hidden': 'true' })
+  const copyLinkLabel = el('span', { class: 'room-copy-btn__label' }, 'Скопировать ссылку')
+  const copyLinkBtn = el('button', { type: 'button', class: 'room-copy-btn', title: 'Скопировать ссылку на звонок', 'aria-label': 'Скопировать ссылку на звонок' }, [copyLinkIcon, copyLinkLabel])
+  let copyLinkTimer = 0
+  copyLinkBtn.addEventListener('click', async () => {
+    const ok = await copyToClipboard(location.href)
+    if (!ok) { showToast('Не удалось скопировать ссылку', 'error'); return }
+    copyLinkBtn.classList.add('is-copied')
+    copyLinkIcon.className = 'fas fa-check'
+    copyLinkLabel.textContent = 'Ссылка скопирована'
+    clearTimeout(copyLinkTimer)
+    copyLinkTimer = setTimeout(() => {
+      copyLinkBtn.classList.remove('is-copied')
+      copyLinkIcon.className = 'fas fa-link'
+      copyLinkLabel.textContent = 'Скопировать ссылку'
+    }, 2200)
   })
-  roomInfo.appendChild(el('span', { class: 'room-sep', 'aria-hidden': 'true' }))
-  roomInfo.appendChild(codeBadge)
-  if (state.isHost) {
-    roomInfo.appendChild(el('span', { class: 'room-sep', 'aria-hidden': 'true' }))
-    roomInfo.appendChild(el('span', { class: 'host-indicator', title: 'Вы создатель комнаты — можете выгонять участников' }, [
-      el('i', { class: 'fas fa-crown', 'aria-hidden': 'true' }), el('span', {}, 'Создатель')
-    ]))
-  }
-  topbar.appendChild(roomInfo)
-
-  const topRight = el('div', { style: 'display:flex;align-items:center;gap:8px' })
+  topRight.appendChild(copyLinkBtn)
   // «Звонок в отдельном окне»: в браузере — Document Picture-in-Picture (окно поверх всех
   // программ, как в Google Meet), в .exe — само окно приложения ужимается и встаёт поверх
   // остальных (electronAPI.setMiniMode). Где ни то ни другое недоступно, кнопки нет.
@@ -1137,17 +1137,15 @@ async function enterRoom(joinData) {
   // поэтому в .exe — только мини-режим; старые сборки без него кнопку просто не показывают.
   const canPipWindow = !IS_ELECTRON && 'documentPictureInPicture' in window
   const popOutBtn = el('button', {
-    class: 'ctrl-btn',
-    style: 'width:40px;height:40px;font-size:14px',
+    class: 'ctrl-btn room-popout-btn',
     title: 'Звонок в отдельном окне поверх других программ',
     'aria-label': 'Звонок в отдельном окне'
   }, [el('i', { class: 'fas fa-up-right-from-square' })])
   if (canMiniWindow || canPipWindow) topRight.appendChild(popOutBtn)
   const participantsBtn = el('button', {
-    class: 'ctrl-btn',
-    // 40px, а не 36px - минимальный рекомендуемый размер тач-таргета на телефоне
-    style: 'width:40px;height:40px;font-size:14px',
-    title: 'Участники'
+    class: 'ctrl-btn room-people-btn',
+    title: 'Участники',
+    'aria-label': 'Участники'
   }, [el('i', { class: 'fas fa-users' })])
   topRight.appendChild(participantsBtn)
   topbar.appendChild(topRight)
@@ -1745,7 +1743,7 @@ async function enterRoom(joinData) {
   }
 
   function makeCameraTile(identity, name, isLocal, hostBadge) {
-    const tile = el('div', { class: 'tile camera-tile', id: `tile-cam-${identity}` })
+    const tile = el('div', { class: `tile camera-tile${isLocal ? ' is-local' : ''}`, id: `tile-cam-${identity}` })
     const video = el('video', { autoplay: true, playsinline: true, 'webkit-playsinline': 'true', ...(isLocal ? { muted: true } : {}) })
     if (isLocal) watchLocalMirror(video) // передняя — зеркально, задняя — как есть
     const placeholder = el('div', { class: 'no-video-placeholder' }, [el('div', { class: 'avatar-circle' }, initials(name))])
@@ -1777,7 +1775,8 @@ async function enterRoom(joinData) {
         const p = room.getParticipantByIdentity(identity)
         if (p) p.setVolume(v, LK.Track.Source.Microphone)
       })
-      tile.appendChild(volumeCtl)
+      // Громкость — в рамке самого участника, рядом с его именем (раскрывается при наведении)
+      label.appendChild(volumeCtl)
       // Кнопка "выгнать участника" - видна только создателю комнаты (слева, чтобы не конфликтовать с fullscreen справа)
       if (state.isHost) {
         kickBtn = el('button', { class: 'tile-kick-btn', title: 'Выгнать из звонка' }, [el('i', { class: 'fas fa-user-slash' })])
@@ -3071,12 +3070,12 @@ async function enterRoom(joinData) {
 
   function participantRow(name, isLocal, isHost, micMuted) {
     const children = [
-      el('div', { class: 'avatar-circle' }, initials(name)),
-      el('span', {}, name + (isLocal ? ' (Вы)' : ''))
+      el('div', { class: `avatar-circle${isLocal ? ' is-local' : ''}` }, initials(name)),
+      el('span', { class: 'panel-participant__name' }, [name, isLocal ? el('span', { class: 'panel-participant__you' }, ' (Вы)') : null].filter(Boolean))
     ]
-    if (isHost) children.push(el('i', { class: 'fas fa-crown host-crown', title: 'Создатель комнаты' }))
-    if (micMuted) children.push(el('i', { class: 'fas fa-microphone-slash', title: 'Микрофон выключен', style: 'color:var(--danger-soft)' }))
-    return el('div', { class: 'panel-participant' }, children)
+    if (isHost) children.push(el('i', { class: 'fas fa-crown host-crown', title: 'Создатель комнаты', 'aria-label': 'Создатель комнаты' }))
+    if (micMuted) children.push(el('i', { class: 'fas fa-microphone-slash panel-participant__muted', title: 'Микрофон выключен', 'aria-label': 'Микрофон выключен' }))
+    return el('div', { class: `panel-participant${isHost ? ' is-host' : ''}` }, children)
   }
 
   function openParticipantsPanel() {
@@ -3090,7 +3089,7 @@ async function enterRoom(joinData) {
 
     const panel = el('div', { class: 'panel' })
     const closeBtn = el('button', { class: 'panel-close', type: 'button', 'aria-label': 'Закрыть' }, [el('i', { class: 'fas fa-xmark' })])
-    panel.appendChild(el('div', { class: 'panel-head' }, [el('h3', {}, `Участники · ${room.remoteParticipants.size + 1}`), closeBtn]))
+    panel.appendChild(el('div', { class: 'panel-head' }, [el('h3', {}, ['Участники', el('span', { class: 'panel-count' }, String(room.remoteParticipants.size + 1))]), closeBtn]))
     panel.appendChild(participantRow(state.displayName, true, state.isHost, !state.micEnabled))
     room.remoteParticipants.forEach((p) => {
       const micPub = p.getTrackPublication(LK.Track.Source.Microphone)

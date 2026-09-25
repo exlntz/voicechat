@@ -1,7 +1,9 @@
-// ===================== Профиль: юзернейм и «был в сети» =====================
+// ===================== Профиль: отображаемое имя, юзернейм и «был в сети» =====================
 // Юзернейм хранится без «@» (по нему входят в аккаунт); «@» дорисовывает интерфейс.
 // Смена юзернейма сразу видна друзьям и собеседникам: им уходит событие user.update.
 import { publicUser, rateLimit, USER_COLS, USERNAME_RE, USERNAME_HINT } from './db.js'
+
+const DISPLAY_NAME_RE = /^[\p{L}\p{N}_\- ]{1,40}$/u
 
 export function cleanUsername(raw) {
   return String(raw || '').trim().replace(/^@+/, '')
@@ -13,6 +15,7 @@ export function registerProfileRoutes(app, { db, hub }) {
     byLower: db.prepare('SELECT id FROM users WHERE username_lower = ?'),
     setUsername: db.prepare('UPDATE users SET username = ?, username_lower = ? WHERE id = ?'),
     setShowLastSeen: db.prepare('UPDATE users SET show_last_seen = ? WHERE id = ?'),
+    setDisplayName: db.prepare('UPDATE users SET display_name = ? WHERE id = ?'),
     // Кому сообщить о смене: друзья, заявки и все, с кем есть личка
     audience: db.prepare(`SELECT CASE WHEN user_a = ? THEN user_b ELSE user_a END AS id FROM friendships WHERE user_a = ? OR user_b = ?
       UNION SELECT m2.user_id FROM conversation_members m1 JOIN conversation_members m2 ON m2.conversation_id = m1.conversation_id
@@ -66,6 +69,18 @@ export function registerProfileRoutes(app, { db, hub }) {
         } catch {
           return c.json({ error: 'username_taken', message: 'Этот юзернейм уже занят' }, 409)
         }
+        changedUser = true
+      }
+    }
+
+    // Отображаемое имя: 1–40 символов (буквы любого языка, цифры, пробел, _ и -), как при регистрации
+    if (body.displayName !== undefined) {
+      const name = String(body.displayName || '').replace(/\s+/g, ' ').trim()
+      if (!DISPLAY_NAME_RE.test(name)) return c.json({ error: 'invalid_display_name', message: 'Имя: 1–40 символов — буквы, цифры, пробел, _ и -' }, 400)
+      const current = q.user.get(me)
+      if (current && current.display_name !== name) {
+        if (!rateLimit(`dname:${me}`, 20, 60 * 60 * 1000)) return c.json({ error: 'rate_limited', message: 'Имя можно менять не чаще 20 раз в час' }, 429)
+        q.setDisplayName.run(name, me)
         changedUser = true
       }
     }

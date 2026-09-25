@@ -51,7 +51,7 @@
   // Кнопки, которые оформляем: класс .ank-btn и «магнит» к курсору. Перекатывающейся
   // подписи (текст уезжает вверх, снизу выезжает копия) больше нет — подпись кнопки
   // остаётся обычным текстом, её по-прежнему меняет только app.js.
-  var BTN_SEL = '.auth-submit-btn, .auth-ghost-btn, .lobby-logout-btn, .leave-btn, .join-toggle-btn, .lobby-card > button, .solo-copy-btn'
+  var BTN_SEL = '.auth-submit-btn, .auth-ghost-btn, .lobby-logout-btn, .leave-btn, .join-toggle-btn, .lobby-card > button, .solo-copy-btn, .room-copy-btn'
   // Кнопки, которые нельзя трогать: их подпись/содержимое меняет сам app.js или они иконочные
   var BTN_SKIP = '.password-toggle-btn, .tile-fullscreen-btn, .tile-kick-btn, .panel-close, .auth-switch-link, .screen-ctx-item'
 
@@ -160,26 +160,6 @@
 
   /* ─────────────── 2. Поля ввода ─────────────── */
 
-  // Короткие моноширинные подсказки под строкой: подбираются по плейсхолдеру,
-  // чтобы не дублировать его же текст всплывающей подписью.
-  var HINTS = [
-    [/^юзернейм \(для входа\)/i, 'с английской буквы; дальше буквы, цифры, _ и -'],
-    [/^юзернейм друга/i, 'регистр букв не важен'],
-    [/^новый юзернейм/i, 'с английской буквы; дальше буквы, цифры, _ и -'],
-    [/^как записать/i, 'например: Саша с работы'],
-    [/^имя или юзернейм/i, 'Enter откроет первого в списке'],
-    [/^юзернейм/i, 'тот, с которым регистрировались'],
-    [/^пароль \(мин/i, 'минимум 6 символов'],
-    [/^пароль/i, 'пароль от аккаунта'],
-    [/^отображаемое имя/i, 'его видят другие участники звонка'],
-    [/^код комнаты/i, 'оставьте пустым — создадим новую']
-  ]
-
-  function hintFor(ph) {
-    for (var i = 0; i < HINTS.length; i++) if (HINTS[i][0].test(ph)) return HINTS[i][1]
-    return ph
-  }
-
   var fldSeq = 0
 
   function enhanceField(input) {
@@ -192,11 +172,10 @@
     input.__ankField = true
 
     var ph = input.getAttribute('placeholder') || ''
-    // Длинный плейсхолдер («Код комнаты (оставьте пустым — создать новую)») разбираем:
-    // короткая часть идёт во всплывающую подпись, пояснение в скобках — в подсказку под строкой.
+    // Длинный плейсхолдер («Код комнаты (оставьте пустым — создать новую)»): во всплывающую
+    // подпись идёт только короткая часть, пояснение в скобках не показываем
     var paren = ph.match(/^([^(]{2,26})\s*\((.+)\)\s*$/)
     var phShort = paren ? paren[1].trim() : ph
-    var phNote = paren ? paren[2].trim() : ''
     // Плейсхолдер заменяем пробелом: :placeholder-shown продолжает работать,
     // а видимую роль подписи берёт на себя всплывающий label.
     input.setAttribute('placeholder', ' ')
@@ -219,27 +198,16 @@
     label.setAttribute('for', input.id)
     var bar = make('span', 'fld__bar')
     bar.setAttribute('aria-hidden', 'true')
-    var msg = make('span', 'fld__msg')
-    var hint = phNote || hintFor(ph)
-    msg.dataset.hint = hint
-    msg.textContent = hint
 
     // Порядок важен: label и bar должны идти ПОСЛЕ input — на этом держатся
     // CSS-селекторы всплытия подписи (input:focus ~ .fld__lbl).
     var after = input.nextSibling
     wrap.insertBefore(label, after)
     wrap.insertBefore(bar, after)
-    wrap.appendChild(msg)
 
-    input.addEventListener('focus', function () {
-      wrap.classList.add('is-focus')
-      typeOut(msg, msg.dataset.hint)
-    })
-    input.addEventListener('blur', function () {
-      wrap.classList.remove('is-focus')
-      stopType(msg)
-      msg.textContent = msg.dataset.hint
-    })
+    // Подсказок под строкой больше нет — только всплывающая подпись
+    input.addEventListener('focus', function () { wrap.classList.add('is-focus') })
+    input.addEventListener('blur', function () { wrap.classList.remove('is-focus') })
     input.addEventListener('input', function () {
       wrap.classList.toggle('is-filled', !!input.value)
       wrap.classList.remove('is-err')
@@ -247,19 +215,7 @@
     if (input.value) wrap.classList.add('is-filled')
   }
 
-  // «Печатающаяся» подсказка: дешёвый setInterval на 26 мс, гасится на blur
-  function stopType(node) { if (node.__ankTimer) { clearInterval(node.__ankTimer); node.__ankTimer = 0 } }
-  function typeOut(node, text) {
-    stopType(node)
-    if (calm() || !text) { node.textContent = text || ''; return }
-    var i = 0
-    node.textContent = ''
-    node.__ankTimer = setInterval(function () {
-      i++
-      node.textContent = text.slice(0, i)
-      if (i >= text.length) stopType(node)
-    }, 26)
-  }
+
 
   // Ошибка в форме: слот приезжает слева (CSS) + поля коротко вздрагивают
   function watchErrorSlot(slot) {
