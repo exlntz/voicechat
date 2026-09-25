@@ -91,27 +91,6 @@ export async function prepareImage(file, { maxSide = MAX_SIDE, force = false } =
   }
 }
 
-// Квадратная аватарка 512×512 из середины картинки
-export async function squareAvatar(file) {
-  if (file.type === 'image/gif') return file // GIF-аватарка остаётся живой
-  const url = URL.createObjectURL(file)
-  try {
-    const img = await loadImage(url)
-    const side = Math.min(img.naturalWidth, img.naturalHeight)
-    const size = Math.min(512, side)
-    const canvas = document.createElement('canvas')
-    canvas.width = size
-    canvas.height = size
-    canvas.getContext('2d').drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size)
-    const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.9))
-    return blob ? new File([blob], 'avatar.jpg', { type: 'image/jpeg' }) : file
-  } catch {
-    return file
-  } finally {
-    URL.revokeObjectURL(url)
-  }
-}
-
 export function probeMedia(file) {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file)

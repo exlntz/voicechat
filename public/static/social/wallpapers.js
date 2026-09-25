@@ -1,8 +1,8 @@
 // ===================== Обои чата =====================
 // Готовые — градиенты в тон тёмной теме (id «p:<имя>»), свои — загруженная картинка («file:<id>»).
-// Обои личные: собеседник их не видит.
+// По умолчанию обои ставятся обоим участникам; галочку можно снять — тогда только себе.
 import { api } from './api.js'
-import { h, icon, toast } from './ui.js'
+import { h, icon, toast, isSavedConv, displayName } from './ui.js'
 import { uploadFile, prepareImage } from './upload.js'
 
 export const PRESETS = [
@@ -28,16 +28,19 @@ export function openWallpaperPicker(conv) {
   const grid = h('div', { class: 'vl-wall-grid' })
   const fileInput = h('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/gif', hidden: true })
   const status = h('div', { class: 'vl-fld-status' })
+  const saved = isSavedConv(conv)
+  const both = saved ? null : h('input', { type: 'checkbox' })
+  if (both) both.checked = true
   const card = h('div', { class: 'vl-modal vl-wall', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Обои чата' }, [
     h('div', { class: 'vl-picker__head' }, [h('h3', { class: 'vl-modal__title' }, 'Обои чата'), close]),
-    h('p', { class: 'vl-modal__text' }, 'Обои видите только вы.'),
+    both ? h('label', { class: 'vl-check is-accent' }, [both, h('span', { class: 'vl-check__box', 'aria-hidden': 'true' }, [icon('check')]), h('span', {}, `Поставить и для ${displayName(conv.peer)}`)]) : null,
     grid, status, fileInput
   ])
   const overlay = h('div', { class: 'vl-modal-overlay' }, [card])
 
   async function apply(id) {
     try {
-      await api.updateConversation(conv.id, { wallpaper: id })
+      await api.updateConversation(conv.id, { wallpaper: id, forBoth: both ? both.checked : false })
       done()
     } catch (e) { toast(e.message, 'error') }
   }
