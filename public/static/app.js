@@ -1114,7 +1114,23 @@ async function enterRoom(joinData) {
   const copyLinkIcon = el('i', { class: 'fas fa-link', 'aria-hidden': 'true' })
   const copyLinkLabel = el('span', { class: 'room-copy-btn__label' }, 'Скопировать ссылку')
   const copyLinkBtn = el('button', { type: 'button', class: 'room-copy-btn', title: 'Скопировать ссылку на звонок', 'aria-label': 'Скопировать ссылку на звонок' }, [copyLinkIcon, copyLinkLabel])
+  // Как у кнопки в карточке приглашения: зелёная «Ссылка скопирована» держится, пока курсор
+  // на кнопке, и ещё 2,2 с после того, как он ушёл
   let copyLinkTimer = 0
+  let copyLinkHovered = false
+  const resetCopyLinkSoon = () => {
+    clearTimeout(copyLinkTimer)
+    copyLinkTimer = setTimeout(() => {
+      copyLinkBtn.classList.remove('is-copied')
+      copyLinkIcon.className = 'fas fa-link'
+      copyLinkLabel.textContent = 'Скопировать ссылку'
+    }, 2200)
+  }
+  copyLinkBtn.addEventListener('pointerenter', () => { copyLinkHovered = true; clearTimeout(copyLinkTimer) })
+  copyLinkBtn.addEventListener('pointerleave', () => {
+    copyLinkHovered = false
+    if (copyLinkBtn.classList.contains('is-copied')) resetCopyLinkSoon()
+  })
   copyLinkBtn.addEventListener('click', async () => {
     const ok = await copyToClipboard(location.href)
     if (!ok) { showToast('Не удалось скопировать ссылку', 'error'); return }
@@ -1122,11 +1138,7 @@ async function enterRoom(joinData) {
     copyLinkIcon.className = 'fas fa-check'
     copyLinkLabel.textContent = 'Ссылка скопирована'
     clearTimeout(copyLinkTimer)
-    copyLinkTimer = setTimeout(() => {
-      copyLinkBtn.classList.remove('is-copied')
-      copyLinkIcon.className = 'fas fa-link'
-      copyLinkLabel.textContent = 'Скопировать ссылку'
-    }, 2200)
+    if (!copyLinkHovered) resetCopyLinkSoon()
   })
   topRight.appendChild(copyLinkBtn)
   // «Звонок в отдельном окне»: в браузере — Document Picture-in-Picture (окно поверх всех
@@ -1747,11 +1759,33 @@ async function enterRoom(joinData) {
     if (icon) icon.className = v === 0 ? 'fas fa-volume-xmark' : v < 0.5 ? 'fas fa-volume-low' : 'fas fa-volume-high'
   }
 
+  // Аватарка участника: своя — из аккаунта, чужая — из metadata токена LiveKit (её кладёт сервер)
+  function myAvatarUrl() {
+    const me = (window.VL && VL.store && VL.store.me) || state.currentUser
+    return safeAvatar(me && me.avatarUrl)
+  }
+  function participantAvatarUrl(identity) {
+    try {
+      const p = room.getParticipantByIdentity(identity)
+      return safeAvatar(p && p.metadata && JSON.parse(p.metadata).avatar)
+    } catch { return null }
+  }
+  function safeAvatar(url) { return typeof url === 'string' && /^\/api\/files\/[0-9a-f]+$/i.test(url) ? url : null }
+  // Кружок: фото, если есть, иначе инициалы; фото не загрузилось — тоже инициалы
+  function avatarCircle(name, url, extra = '') {
+    const circle = el('div', { class: `avatar-circle${extra ? ' ' + extra : ''}` }, initials(name))
+    if (url) {
+      const img = el('img', { src: url, alt: '', draggable: 'false', decoding: 'async' })
+      img.addEventListener('load', () => { circle.textContent = ''; circle.appendChild(img); circle.classList.add('has-img') }, { once: true })
+    }
+    return circle
+  }
+
   function makeCameraTile(identity, name, isLocal, hostBadge) {
     const tile = el('div', { class: `tile camera-tile${isLocal ? ' is-local' : ''}`, id: `tile-cam-${identity}` })
     const video = el('video', { autoplay: true, playsinline: true, 'webkit-playsinline': 'true', ...(isLocal ? { muted: true } : {}) })
     if (isLocal) watchLocalMirror(video) // передняя — зеркально, задняя — как есть
-    const placeholder = el('div', { class: 'no-video-placeholder' }, [el('div', { class: 'avatar-circle' }, initials(name))])
+    const placeholder = el('div', { class: 'no-video-placeholder' }, [avatarCircle(name, isLocal ? myAvatarUrl() : participantAvatarUrl(identity))])
     const micIcon = el('i', { class: 'fas fa-microphone-slash', style: 'display:none' })
     // По умолчанию считаем камеру выключенной (большинство участников входят с выключенной камерой),
     // индикатор скрывается явно как только подтверждается активная камера-трек
@@ -3104,9 +3138,9 @@ async function enterRoom(joinData) {
     return true
   }
 
-  function participantRow(name, isLocal, isHost, micMuted) {
+  function participantRow(name, isLocal, isHost, micMuted, avatarUrl) {
     const children = [
-      el('div', { class: `avatar-circle${isLocal ? ' is-local' : ''}` }, initials(name)),
+      avatarCircle(name, avatarUrl, isLocal ? 'is-local' : ''),
       el('span', { class: 'panel-participant__name' }, [
         el('span', { class: 'panel-participant__text' }, name),
         isLocal ? el('span', { class: 'panel-participant__you' }, '(Вы)') : null,
@@ -3130,11 +3164,11 @@ async function enterRoom(joinData) {
     const panel = el('div', { class: 'panel' })
     const closeBtn = el('button', { class: 'panel-close', type: 'button', 'aria-label': 'Закрыть' }, [el('i', { class: 'fas fa-xmark' })])
     panel.appendChild(el('div', { class: 'panel-head' }, [el('h3', {}, ['Участники', el('span', { class: 'panel-count' }, String(room.remoteParticipants.size + 1))]), closeBtn]))
-    panel.appendChild(participantRow(state.displayName, true, state.isHost, !state.micEnabled))
+    panel.appendChild(participantRow(state.displayName, true, state.isHost, !state.micEnabled, myAvatarUrl()))
     room.remoteParticipants.forEach((p) => {
       const micPub = p.getTrackPublication(LK.Track.Source.Microphone)
       const micMuted = !micPub || micPub.isMuted
-      panel.appendChild(participantRow(p.name || p.identity, false, isParticipantHost(p), micMuted))
+      panel.appendChild(participantRow(p.name || p.identity, false, isParticipantHost(p), micMuted, participantAvatarUrl(p.identity)))
     })
 
     const overlay = el('div', { class: 'panel-overlay' }, [panel])
