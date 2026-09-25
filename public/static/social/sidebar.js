@@ -6,17 +6,47 @@ import { askDeleteChat } from './chat.js'
 import { openContactDialog } from './contact-dialog.js'
 import { notificationsNeedPermission, requestNotificationPermission } from './notify.js'
 import { needsHomeScreen } from './push.js'
-import { callState, inCall } from './call-invite.js'
+import { callState, inCall, startCall } from './call-invite.js'
 
 export function createSidebar({ root, navigate, openDmWith, openProfile }) {
   let route = { name: 'friends' }
   const unsub = []
 
-  // ---- Шапка: «Чаты», поиск и новая личка — круглые кнопки ----
-  const findBtn = h('button', { type: 'button', class: 'vl-round', title: 'Найти беседу', 'aria-label': 'Найти беседу' }, [icon('magnifying-glass')])
-  findBtn.addEventListener('click', () => openPicker())
-  const addDmBtn = h('button', { type: 'button', class: 'vl-round is-accent', title: 'Новое сообщение', 'aria-label': 'Новое сообщение' }, [icon('plus')])
-  addDmBtn.addEventListener('click', () => openPicker())
+  // ---- Шапка: «Чаты» и «+ Звонок» (позвонить другу), под ними — поле поиска ----
+  const newCallBtn = h('button', { type: 'button', class: 'vl-btn vl-btn--primary vl-btn--pill vl-side__new-call', title: 'Позвонить другу' }, [icon('plus'), 'Звонок'])
+  newCallBtn.addEventListener('click', () => openPicker('call'))
+
+  // Поиск: друзья и чаты — сразу по мере ввода, сообщения во всех чатах — с сервера
+  const searchInput = h('input', { type: 'search', class: 'vl-side__search-input', placeholder: 'Найти друга или сообщение', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Найти друга или сообщение' })
+  const searchClear = h('button', { type: 'button', class: 'vl-side__search-x', 'aria-label': 'Очистить поиск', hidden: true }, [icon('xmark')])
+  const searchBox = h('label', { class: 'vl-side__search' }, [icon('magnifying-glass'), searchInput, searchClear])
+  let searchQ = ''
+  let msgHits = { q: '', items: [], loading: false }
+  let searchTimer = 0
+  function setSearch(v) {
+    searchQ = v.trim()
+    searchClear.hidden = !v
+    clearTimeout(searchTimer)
+    if (searchQ.length >= 2) {
+      msgHits = { q: searchQ, items: msgHits.q === searchQ ? msgHits.items : [], loading: true }
+      searchTimer = setTimeout(async () => {
+        const q = searchQ
+        try {
+          const r = await api.get('/api/search?q=' + encodeURIComponent(q))
+          if (q === searchQ) msgHits = { q, items: r.messages || [], loading: false }
+        } catch { if (q === searchQ) msgHits = { q, items: [], loading: false } }
+        if (q === searchQ) renderDms()
+      }, 280)
+    } else msgHits = { q: '', items: [], loading: false }
+    renderDms()
+  }
+  searchInput.addEventListener('input', () => setSearch(searchInput.value))
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && searchInput.value) { e.preventDefault(); e.stopPropagation(); searchInput.value = ''; setSearch('') }
+    if (e.key === 'Enter') { const first = dmList.querySelector('a, button'); if (first) { e.preventDefault(); first.click() } }
+  })
+  searchClear.addEventListener('click', (e) => { e.preventDefault(); searchInput.value = ''; setSearch(''); searchInput.focus() })
+  const norm = (t) => String(t || '').toLocaleLowerCase('ru')
 
   // ---- Навигация: две «таблетки» ----
   const friendsBadge = h('span', { class: 'vl-dot-badge', hidden: true, 'aria-label': 'Есть заявки в друзья' })
@@ -85,8 +115,15 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
     const convs = sortedConversations()
     const activeId = route.name === 'dm' ? route.id : route.name === 'room' ? callState.conversationId : null
     const nodes = []
+    const needle = norm(searchQ)
+    const inChats = new Set()
     for (const conv of convs) {
       const peer = conv.peer || (conv.members || []).find((u) => u.id !== store.me.id) || { id: 0, username: '?' }
+      if (needle) {
+        const names = isSavedConv(conv) ? 'избранное' : `${norm(displayName(peer))} ${norm(peer.displayName)} ${norm(peer.username)}`
+        if (!names.includes(needle.replace(/^@/, ''))) continue
+        inChats.add(Number(peer.id))
+      }
       const p = presenceOf(peer.id)
       const typing = store.typing.get(conv.id)
       const isTyping = typing && [...typing.values()].some((t) => t > Date.now())
@@ -134,6 +171,44 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
       onLongPress(item, chatMenu) // телефон: долгое нажатие
       nodes.push(item)
     }
+    if (needle) {
+      // Друзья, с которыми ещё нет переписки
+      const q = needle.replace(/^@/, '')
+      const friends = friendsBy('friend').map((f) => f.user).filter((u) => !inChats.has(Number(u.id)) && `${norm(displayName(u))} ${norm(u.username)}`.includes(q))
+      if (friends.length) nodes.push(h('div', { class: 'vl-side__label' }, 'Друзья'))
+      for (const u of friends) {
+        const row = h('button', { type: 'button', class: 'vl-dm' }, [
+          avatar(u, { size: 44, presence: presenceOf(u.id) }),
+          h('div', { class: 'vl-dm__text' }, [h('div', { class: 'vl-dm__row' }, [h('span', { class: 'vl-dm__name' }, displayName(u))]), h('div', { class: 'vl-dm__sub' }, '@' + u.username)])
+        ])
+        row.addEventListener('click', () => { clearSearch(); openDmWith(u.id) })
+        nodes.push(row)
+      }
+      // Сообщения во всех чатах
+      const hits = msgHits.q === searchQ ? msgHits.items : []
+      if (hits.length) nodes.push(h('div', { class: 'vl-side__label' }, 'Сообщения'))
+      for (const m of hits) {
+        const conv = store.conversations.get(m.conversationId)
+        if (!conv) continue
+        const saved = isSavedConv(conv)
+        const peer = conv.peer || { id: 0, username: '?' }
+        const row = h('a', { href: '/dm/' + conv.id, class: 'vl-dm vl-dm--hit' }, [
+          avatar(saved ? store.me : peer, { size: 44, saved }),
+          h('div', { class: 'vl-dm__text' }, [
+            h('div', { class: 'vl-dm__row' }, [h('span', { class: 'vl-dm__name' }, saved ? 'Избранное' : displayName(peer)), h('span', { class: 'vl-dm__time' }, timeShort(m.createdAt))]),
+            h('div', { class: 'vl-dm__sub' }, (m.authorId === store.me.id && !saved ? 'Вы: ' : '') + m.body)
+          ])
+        ])
+        row.addEventListener('click', (e) => {
+          if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return
+          e.preventDefault()
+          if (route.name === 'dm' && route.id === conv.id) window.dispatchEvent(new CustomEvent('vl-jump', { detail: { convId: conv.id, id: m.id } }))
+          else { store.pendingJump = { convId: conv.id, id: m.id }; navigate('/dm/' + conv.id) }
+        })
+        nodes.push(row)
+      }
+      if (!nodes.length) nodes.push(h('div', { class: 'vl-side__empty' }, msgHits.loading ? 'Ищем…' : 'Ничего не нашлось'))
+    }
     if (!nodes.length) {
       if (!store.conversationsLoaded) {
         for (let i = 0; i < 5; i++) nodes.push(h('div', { class: 'vl-dm is-skeleton' }, [h('span', { class: 'vl-skel vl-skel--circle' }), h('span', { class: 'vl-skel vl-skel--line' })]))
@@ -159,14 +234,22 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
     navLobby.classList.toggle('is-active', route.name === 'lobby' || (route.name === 'room' && !callState.conversationId))
   }
 
-  // ---- Выбор друга для новой лички ----
-  function openPicker() {
+  function clearSearch() { if (searchInput.value) { searchInput.value = ''; setSearch('') } }
+
+  // ---- Выбор друга: новая личка или звонок ----
+  function openPicker(mode = 'message') {
+    const forCall = mode === 'call'
     const input = h('input', { type: 'text', placeholder: 'Имя или юзернейм друга', autocomplete: 'off', spellcheck: 'false' })
+    // Звонок без друга: комната по коду (как «По коду» в меню)
+    const codeLink = h('button', { type: 'button', class: 'vl-btn vl-btn--ghost-text vl-picker__code' }, [icon('hashtag'), 'Комната по коду'])
+    codeLink.addEventListener('click', () => { done(); navigate('/lobby') })
+    const pick = (u) => { done(); if (forCall) callFriend(u.id); else openDmWith(u.id) }
     const list = h('div', { class: 'vl-picker__list' })
     const close = h('button', { type: 'button', class: 'vl-round is-ghost', 'aria-label': 'Закрыть' }, [icon('xmark')])
     const card = h('div', { class: 'vl-modal vl-picker', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Новое сообщение' }, [
-      h('div', { class: 'vl-picker__head' }, [h('h3', { class: 'vl-modal__title' }, 'Написать другу'), close]),
-      h('div', { class: 'vl-fld-host' }, [input]), list
+      h('div', { class: 'vl-picker__head' }, [h('h3', { class: 'vl-modal__title' }, forCall ? 'Позвонить другу' : 'Написать другу'), close]),
+      h('div', { class: 'vl-fld-host' }, [input]), list,
+      forCall ? codeLink : null
     ])
     const overlay = h('div', { class: 'vl-modal-overlay' }, [card])
     let results = []
@@ -181,14 +264,14 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
           h('span', { class: 'vl-picker__name' }, displayName(u)),
           h('span', { class: 'vl-picker__user' }, '@' + u.username)
         ])
-        row.addEventListener('click', () => { done(); openDmWith(u.id) })
+        row.addEventListener('click', () => pick(u))
         return row
       }) : [h('div', { class: 'vl-side__empty' }, friendsBy('friend').length ? 'Никого не нашлось' : 'Пока нет друзей. Добавьте кого-нибудь в разделе «Друзья»')]))
     }
     function done() { overlay.remove(); document.removeEventListener('keydown', onKey, true) }
     function onKey(e) {
       if (e.key === 'Escape') { e.preventDefault(); done() }
-      if (e.key === 'Enter' && results[0]) { e.preventDefault(); done(); openDmWith(results[0].id) }
+      if (e.key === 'Enter' && results[0]) { e.preventDefault(); pick(results[0]) }
     }
     input.addEventListener('input', render)
     close.addEventListener('click', done)
@@ -197,6 +280,11 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
     document.body.appendChild(overlay)
     render()
     input.focus()
+  }
+
+  async function callFriend(userId) {
+    const conv = await openDmWith(userId)
+    if (conv) startCall(conv.id)
   }
 
   // Телефон, экран «Чаты» во время звонка: полоска «Вернуться в звонок» (звонок идёт за списком)
@@ -208,7 +296,8 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
   function renderCallBar() { callBar.hidden = !inCall() }
 
   root.replaceChildren(
-    h('div', { class: 'vl-side__head' }, [h('h2', { class: 'vl-side__title' }, 'Чаты'), findBtn, addDmBtn]),
+    h('div', { class: 'vl-side__head' }, [h('h2', { class: 'vl-side__title' }, 'Чаты'), newCallBtn]),
+    searchBox,
     callBar,
     h('nav', { class: 'vl-side__nav', 'aria-label': 'Разделы' }, [navFriends, navLobby]),
     scroller,

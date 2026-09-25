@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   Voice Lobby — оболочка «друзья и чаты», направление «Сцена».
+   Voice Lobby — оболочка «друзья и чаты», направление «Голос» (светлая и тёмная темы).
 
    Панели парят над тёмным фоном, как плитки в звонке: слева «Чаты», справа
    переписка или звонок. Один акцент — синий из style.css; зелёный только у
@@ -8,25 +8,31 @@
    заметной на экран: пузырь «вспрыгивает», капсула звонка, волна входящего.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-@font-face { font-family: 'Onest'; font-style: normal; font-display: swap; font-weight: 400; src: url('/static/fonts/onest/onest-cyrillic-400-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-@font-face { font-family: 'Onest'; font-style: normal; font-display: swap; font-weight: 500; src: url('/static/fonts/onest/onest-cyrillic-500-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-@font-face { font-family: 'Onest'; font-style: normal; font-display: swap; font-weight: 600; src: url('/static/fonts/onest/onest-cyrillic-600-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-@font-face { font-family: 'Onest'; font-style: normal; font-display: swap; font-weight: 700; src: url('/static/fonts/onest/onest-cyrillic-700-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-@font-face { font-family: 'Onest'; font-style: normal; font-display: swap; font-weight: 400; src: url('/static/fonts/onest/onest-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'Onest'; font-style: normal; font-display: swap; font-weight: 500; src: url('/static/fonts/onest/onest-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'Onest'; font-style: normal; font-display: swap; font-weight: 600; src: url('/static/fonts/onest/onest-latin-600-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'Onest'; font-style: normal; font-display: swap; font-weight: 700; src: url('/static/fonts/onest/onest-latin-700-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Golos Text'; font-style: normal; font-display: swap; font-weight: 400; src: url('/static/fonts/golos/golos-text-cyrillic-400-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Golos Text'; font-style: normal; font-display: swap; font-weight: 400; src: url('/static/fonts/golos/golos-text-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Golos Text'; font-style: normal; font-display: swap; font-weight: 500; src: url('/static/fonts/golos/golos-text-cyrillic-500-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Golos Text'; font-style: normal; font-display: swap; font-weight: 500; src: url('/static/fonts/golos/golos-text-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Golos Text'; font-style: normal; font-display: swap; font-weight: 600; src: url('/static/fonts/golos/golos-text-cyrillic-600-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Golos Text'; font-style: normal; font-display: swap; font-weight: 600; src: url('/static/fonts/golos/golos-text-latin-600-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Golos Text'; font-style: normal; font-display: swap; font-weight: 700; src: url('/static/fonts/golos/golos-text-cyrillic-700-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Golos Text'; font-style: normal; font-display: swap; font-weight: 700; src: url('/static/fonts/golos/golos-text-latin-700-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Unbounded'; font-style: normal; font-display: swap; font-weight: 500; src: url('/static/fonts/unbounded/unbounded-cyrillic-500-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Unbounded'; font-style: normal; font-display: swap; font-weight: 500; src: url('/static/fonts/unbounded/unbounded-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Unbounded'; font-style: normal; font-display: swap; font-weight: 600; src: url('/static/fonts/unbounded/unbounded-cyrillic-600-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Unbounded'; font-style: normal; font-display: swap; font-weight: 600; src: url('/static/fonts/unbounded/unbounded-latin-600-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 
 :root {
-  --vl-font: 'Onest', var(--font);
+  --vl-font: 'Golos Text', var(--font);
+  /* Заголовки и имена — широкий Unbounded, как «Чаты» и «Макс» в макете «Голос» */
+  --vl-display: 'Unbounded', 'Golos Text', var(--font);
   --vl-stage: #0a0c0f;       /* фон под панелями */
   --vl-panel: #13161b;       /* панели */
   --vl-raised: #1a1e25;      /* плитки, карточки, меню */
   --vl-raised-2: #1e232c;    /* выбранная личка */
   --vl-field: #1f242d;       /* поля ввода и чужие пузыри */
-  --vl-hover: rgba(242, 245, 249, 0.05);
-  --vl-soft: rgba(242, 245, 249, 0.07);
-  --vl-soft-2: rgba(242, 245, 249, 0.12);
+  --vl-hover: rgba(var(--ink-rgb), 0.05);
+  --vl-soft: rgba(var(--ink-rgb), 0.07);
+  --vl-soft-2: rgba(var(--ink-rgb), 0.12);
   --vl-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   --vl-gap: 10px;
   --vl-r-panel: 22px;
@@ -37,9 +43,25 @@
   --vl-idle: #e0a23a;
   --vl-dnd: #d94a3d;
   --vl-offline: #5b6270;
+  --vl-ava-0: #2a303b; --vl-ava-1: #2a303b; --vl-ava-2: #2a303b; --vl-ava-3: #2a303b; --vl-ava-4: #2a303b; --vl-ava-5: #2a303b;
+  --vl-ava-ink: #f2f5f9;
+}
+html[data-theme="light"] {
+  --vl-stage: #eef1f4;
+  --vl-panel: #ffffff;
+  --vl-raised: #ffffff;
+  --vl-raised-2: #eef1f4;
+  --vl-field: #eef1f4;
+  --vl-highlight: 0 1px 0 rgba(21, 32, 43, 0.06);
+  --vl-online: #1f9d6b;
+  --vl-idle: #d99a22;
+  --vl-dnd: #d33a2c;
+  --vl-offline: #9aa4ae;
+  --vl-ava-0: #ffd9b8; --vl-ava-1: #cfe3ff; --vl-ava-2: #d6efdf; --vl-ava-3: #e4e0f7; --vl-ava-4: #fde0e3; --vl-ava-5: #fbecb8;
+  --vl-ava-ink: #15202b;
 }
 
-/* Шрифт оболочки — Onest; экран звонка и лобби остаются на системном, как были */
+/* Шрифт оболочки — Golos Text; экран звонка и лобби остаются на системном, как были */
 #vl-sidebar, #vl-view, .vl-island, .vl-dock__tools, .vl-menu, .vl-modal-overlay, .vl-incoming-wrap, .vl-fab-menu {
   font-family: var(--vl-font);
 }
@@ -83,24 +105,24 @@ body.vl-ready .lobby-userbar { display: none; }
 .vl-round {
   --s: 40px;
   width: var(--s); height: var(--s); flex: 0 0 auto; padding: 0; border: 0; border-radius: 50%;
-  background: var(--vl-soft); color: rgba(242, 245, 249, 0.85);
+  background: var(--vl-soft); color: rgba(var(--ink-rgb), 0.85);
   display: inline-grid; place-items: center; cursor: pointer;
   transition: transform 0.2s var(--ease), background 0.2s var(--ease), color 0.2s var(--ease), opacity 0.2s;
 }
 .vl-round .vl-ico { width: calc(var(--s) * 0.42); height: calc(var(--s) * 0.42); }
-.vl-round:hover, .vl-round:focus-visible { transform: translateY(-1px); background: rgba(242, 245, 249, 0.14); color: #fff; }
+.vl-round:hover, .vl-round:focus-visible { transform: translateY(-1px); background: rgba(var(--ink-rgb), 0.14); color: var(--text); }
 .vl-round:active { transform: scale(0.94); }
 .vl-round:disabled { opacity: 0.45; cursor: default; transform: none; }
 .vl-round.is-lg { --s: 42px; }
 .vl-round.is-sm { --s: 34px; }
 .vl-round.is-xs { --s: 30px; }
 .vl-round.is-accent { background: var(--accent); color: #fff; }
-.vl-round.is-accent:hover:not(:disabled), .vl-round.is-accent:focus-visible { background: var(--accent-hover); }
+.vl-round.is-accent:hover:not(:disabled), .vl-round.is-accent:focus-visible { background: var(--accent-hover); color: #fff; }
 .vl-round.is-accent:disabled { background: var(--vl-soft); color: var(--text-faint); }
 .vl-round.is-danger { background: var(--danger); color: #fff; }
-.vl-round.is-danger:hover, .vl-round.is-danger:focus-visible { background: #e25a4d; }
+.vl-round.is-danger:hover, .vl-round.is-danger:focus-visible { background: #e25a4d; color: #fff; }
 .vl-round.is-danger:hover .vl-ico { animation: vl-swing 0.55s var(--ease); }
-.vl-round.is-dark { background: rgba(242, 245, 249, 0.10); color: #f2f5f9; }
+.vl-round.is-dark { background: rgba(var(--ink-rgb), 0.10); color: var(--text); }
 .vl-round.is-ghost { background: transparent; color: var(--text-dim); }
 .vl-round.is-ghost:hover { background: var(--vl-soft); }
 .vl-round.is-glass { background: rgba(10, 12, 15, 0.7); color: #f2f5f9; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
@@ -113,10 +135,10 @@ body.vl-ready .lobby-userbar { display: none; }
 .vl-btn {
   height: 38px; padding: 0 18px; border: 0; border-radius: 999px; cursor: pointer;
   font: 600 14px/1 var(--vl-font); display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap;
-  background: var(--vl-soft); color: rgba(242, 245, 249, 0.9);
+  background: var(--vl-soft); color: rgba(var(--ink-rgb), 0.9);
   transition: transform 0.2s var(--ease), background 0.2s var(--ease), color 0.2s;
 }
-.vl-btn:hover:not(:disabled) { transform: translateY(-1px); background: rgba(242, 245, 249, 0.14); }
+.vl-btn:hover:not(:disabled) { transform: translateY(-1px); background: rgba(var(--ink-rgb), 0.14); }
 .vl-btn:active:not(:disabled) { transform: scale(0.97); }
 .vl-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .vl-btn--pill { border-radius: 999px; }
@@ -139,12 +161,14 @@ body.vl-ready .lobby-userbar { display: none; }
 }
 .vl-badge[hidden], .vl-dot-badge[hidden] { display: none; }
 .vl-dot-badge { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-soft); flex: 0 0 auto; }
+/* В «таблетке» «Друзья» — число заявок, а не просто точка */
+.vl-pill .vl-dot-badge { width: auto; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 9px; background: var(--accent); color: #fff; font: 600 11px/18px var(--vl-font); text-align: center; }
 
 /* Аватар: инициалы на нейтральной подложке, синий — только у вас */
 .vl-avatar {
   --size: 32px;
   position: relative; flex: 0 0 auto; width: var(--size); height: var(--size); border-radius: 50%;
-  display: inline-grid; place-items: center; color: #f2f5f9;
+  display: inline-grid; place-items: center; color: var(--vl-ava-ink);
   font: 600 calc(var(--size) * 0.34) / 1 var(--vl-font); letter-spacing: 0.01em;
 }
 .vl-avatar__txt { pointer-events: none; }
@@ -184,14 +208,14 @@ body.vl-ready .lobby-userbar { display: none; }
 .vl-side__title { flex: 1; margin: 0; font: 700 20px/1.2 var(--vl-font); letter-spacing: -0.02em; }
 .vl-side__nav { display: flex; gap: 6px; padding: 0 4px 12px; }
 .vl-pill {
-  flex: 1; height: 40px; border-radius: 999px; background: var(--vl-hover); color: rgba(242, 245, 249, 0.8);
+  flex: 1; height: 40px; border-radius: 999px; background: var(--vl-hover); color: rgba(var(--ink-rgb), 0.8);
   display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; font: 500 14px var(--vl-font);
   transition: background 0.2s var(--ease), color 0.2s;
 }
 .vl-pill .vl-ico { width: 16px; height: 16px; }
-.vl-pill:hover { background: var(--vl-soft-2); color: #fff; }
+.vl-pill:hover { background: var(--vl-soft-2); color: var(--text); }
 .vl-pill.is-active { background: var(--accent); color: #fff; font-weight: 600; }
-.vl-pill.is-active .vl-dot-badge { background: #fff; }
+.vl-pill.is-active .vl-dot-badge { background: #fff; color: var(--accent); }
 .vl-side__scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--vl-soft-2) transparent; margin: 0 -4px; padding: 0 4px; }
 .vl-side__empty { padding: 14px 10px; color: var(--text-faint); font-size: 13px; line-height: 1.5; }
 .vl-dm-list { display: flex; flex-direction: column; gap: 4px; }
@@ -209,7 +233,7 @@ body.vl-ready .lobby-userbar { display: none; }
 .vl-dm.is-unread .vl-dm__name, .vl-dm.is-active .vl-dm__name { font-weight: 600; }
 .vl-dm__time { font-size: 12px; color: var(--text-faint); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
 .vl-dm.is-unread .vl-dm__time { color: var(--accent-soft); font-weight: 500; }
-.vl-dm__sub { display: flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(242, 245, 249, 0.55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.vl-dm__sub { display: flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(var(--ink-rgb), 0.55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .vl-dm.is-unread .vl-dm__sub { color: var(--text); }
 .vl-dm__sub.is-typing { color: var(--accent-soft); }
 .vl-dm__sub.is-call { color: var(--success-soft); }
@@ -227,25 +251,25 @@ body.vl-ready .lobby-userbar { display: none; }
 .vl-notif-banner > .vl-btn[hidden] { display: none; }
 
 .vl-me { display: flex; align-items: center; margin-top: 8px; flex: 0 0 auto; }
-.vl-me__btn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 8px 18px 8px 8px; border: 0; border-radius: 999px; background: rgba(242, 245, 249, 0.05); color: var(--text); cursor: pointer; text-align: left; font-family: var(--vl-font); --vl-ring: #181b20; }
-.vl-me__btn:hover { background: rgba(242, 245, 249, 0.09); }
+.vl-me__btn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 8px 18px 8px 8px; border: 0; border-radius: 999px; background: rgba(var(--ink-rgb), 0.05); color: var(--text); cursor: pointer; text-align: left; font-family: var(--vl-font); --vl-ring: #181b20; }
+.vl-me__btn:hover { background: rgba(var(--ink-rgb), 0.09); }
 .vl-me__ava { display: inline-flex; }
 .vl-me__text { min-width: 0; }
 .vl-me__name { font: 600 14px/1.25 var(--vl-font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vl-me__sub { font-size: 12px; color: rgba(242, 245, 249, 0.55); }
+.vl-me__sub { font-size: 12px; color: rgba(var(--ink-rgb), 0.55); }
 body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 
 /* ─────────── Капсула звонка над чатом ─────────── */
 .vl-island {
   position: absolute; top: 16px; left: 50%; z-index: 7; transform: translateX(-50%);
   display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 6px 0 16px; box-sizing: border-box;
-  border-radius: 999px; background: #050607; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(242, 245, 249, 0.06);
+  border-radius: 999px; background: #050607; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(var(--ink-rgb), 0.06);
   color: var(--vl-idle); animation: vl-island-in 0.4s var(--ease) both; white-space: nowrap;
 }
 .vl-island.is-live { color: var(--success-soft); }
 .vl-island__label { color: var(--text); font-size: 13px; padding-right: 6px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 .vl-island__label b { font-weight: 600; }
-.vl-island__time { color: rgba(242, 245, 249, 0.55); font-variant-numeric: tabular-nums; }
+.vl-island__time { color: rgba(var(--ink-rgb), 0.55); font-variant-numeric: tabular-nums; }
 @keyframes vl-island-in { from { opacity: 0; transform: translate(-50%, -12px) scale(0.96); } }
 
 /* ─────────── Правая часть: шапки ─────────── */
@@ -262,7 +286,7 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-chat__head { --vl-ring: var(--vl-panel); }
 .vl-chat__head-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
 .vl-chat__head-name { font: 700 20px/1.2 var(--vl-font); letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vl-chat__head-sub { font-size: 13px; color: rgba(242, 245, 249, 0.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vl-chat__head-sub { font-size: 13px; color: rgba(var(--ink-rgb), 0.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vl-chat__head-actions { display: flex; gap: 8px; flex: 0 0 auto; }
 .vl-chat__main { flex: 1 1 auto; min-height: 0; position: relative; display: flex; flex-direction: column; }
 .vl-chat__scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--vl-soft-2) transparent; }
@@ -274,7 +298,7 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-chat__intro p { margin: 0; color: var(--text-dim); font-size: 14px; max-width: 360px; }
 .vl-chat__skeleton { display: flex; flex-direction: column; gap: 10px; padding-bottom: 8px; }
 
-.vl-day { align-self: center; margin: 16px 0 10px; font: 500 12px/1 var(--vl-font); color: rgba(242, 245, 249, 0.5); }
+.vl-day { align-self: center; margin: 16px 0 10px; font: 500 12px/1 var(--vl-font); color: rgba(var(--ink-rgb), 0.5); }
 .vl-unread-divider { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
 .vl-unread-divider::before, .vl-unread-divider::after { content: ""; flex: 1; height: 1px; background: rgba(110, 168, 245, 0.3); }
 .vl-unread-divider span { padding: 5px 12px; border-radius: 999px; background: var(--accent-wash); color: var(--accent-soft); font: 600 12px/1 var(--vl-font); }
@@ -303,7 +327,7 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-bubble__text { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
 .vl-bubble__meta {
   display: inline-flex; align-items: center; gap: 3px; margin-left: 10px; float: right; position: relative; top: 5px;
-  font-size: 11px; line-height: 1; color: rgba(242, 245, 249, 0.45); font-variant-numeric: tabular-nums; user-select: none;
+  font-size: 11px; line-height: 1; color: rgba(var(--ink-rgb), 0.45); font-variant-numeric: tabular-nums; user-select: none;
 }
 .vl-msg.is-mine .vl-bubble__meta { color: rgba(255, 255, 255, 0.72); }
 .vl-bubble__meta .vl-ico { width: 11px; height: 11px; }
@@ -312,13 +336,13 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-msg.is-mine .vl-bubble .vl-link { color: #fff; text-decoration: underline; text-decoration-color: rgba(255, 255, 255, 0.5); }
 .vl-quote {
   display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; margin: 0 0 6px; padding: 6px 10px;
-  border: 0; border-radius: 12px; background: rgba(242, 245, 249, 0.06); color: inherit; cursor: pointer; text-align: left;
+  border: 0; border-radius: 12px; background: rgba(var(--ink-rgb), 0.06); color: inherit; cursor: pointer; text-align: left;
   font: 13px/1.35 var(--vl-font); box-sizing: border-box; transition: background 0.2s;
 }
-.vl-quote:hover { background: rgba(242, 245, 249, 0.1); }
+.vl-quote:hover { background: rgba(var(--ink-rgb), 0.1); }
 .vl-quote b { color: var(--accent-soft); font-weight: 600; }
-.vl-quote span { color: rgba(242, 245, 249, 0.7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-.vl-quote .is-muted { font-style: italic; color: rgba(242, 245, 249, 0.5); }
+.vl-quote span { color: rgba(var(--ink-rgb), 0.7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.vl-quote .is-muted { font-style: italic; color: rgba(var(--ink-rgb), 0.5); }
 .vl-msg.is-mine .vl-quote { background: rgba(255, 255, 255, 0.14); }
 .vl-msg.is-mine .vl-quote:hover { background: rgba(255, 255, 255, 0.2); }
 .vl-msg.is-mine .vl-quote b { color: #fff; }
@@ -343,7 +367,7 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-bubble__meta.is-over-media .vl-ticks { --tick: rgba(255, 255, 255, 0.8); --tick-read: #62e6ff; }
 .vl-ticks.is-still, .vl-ticks.is-still .t2 { transition: none; }
 /* В списке чатов — у последнего своего сообщения, серые/синие на тёмной панели */
-.vl-dm__row .vl-ticks { --tick: rgba(242, 245, 249, 0.5); --tick-read: #4fb4ff; flex: 0 0 auto; align-self: center; margin-right: -4px; }
+.vl-dm__row .vl-ticks { --tick: rgba(var(--ink-rgb), 0.5); --tick-read: #4fb4ff; flex: 0 0 auto; align-self: center; margin-right: -4px; }
 .vl-dm__row .vl-ticks svg { width: 16px; height: 10px; }
 /* Действия у пузыря: маленькая капсула рядом, проявляется при наведении */
 .vl-msg__tools {
@@ -352,7 +376,7 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 }
 .vl-msg__wrap:hover .vl-msg__tools, .vl-msg__wrap:focus-within .vl-msg__tools { opacity: 1; transform: none; pointer-events: auto; }
 .vl-msg__tools .vl-round { background: transparent; }
-.vl-msg__tools .vl-round:hover { background: rgba(242, 245, 249, 0.12); }
+.vl-msg__tools .vl-round:hover { background: rgba(var(--ink-rgb), 0.12); }
 .vl-msg__editor { min-width: min(420px, 60vw); }
 .vl-msg__edit {
   width: 100%; resize: none; box-sizing: border-box; border: 1px solid rgba(110, 168, 245, 0.55); border-radius: 18px;
@@ -376,7 +400,7 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 
 /* «Печатает…» — пузырь с точками */
 .vl-bubble.is-typing { display: inline-flex; align-items: center; gap: 4px; padding: 14px 16px; animation: vl-pop 0.3s var(--ease) both; }
-.vl-bubble.is-typing i { width: 6px; height: 6px; border-radius: 50%; background: rgba(242, 245, 249, 0.6); animation: vl-dot 1.2s infinite ease-in-out; }
+.vl-bubble.is-typing i { width: 6px; height: 6px; border-radius: 50%; background: rgba(var(--ink-rgb), 0.6); animation: vl-dot 1.2s infinite ease-in-out; }
 .vl-bubble.is-typing i:nth-child(2) { animation-delay: 0.15s; }
 .vl-bubble.is-typing i:nth-child(3) { animation-delay: 0.3s; }
 @keyframes vl-dot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-3px); opacity: 1; } }
@@ -448,7 +472,7 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-tile__text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
 .vl-tile__name { font: 600 16px var(--vl-font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vl-tile.is-featured .vl-tile__name { font-size: 17px; font-weight: 700; }
-.vl-tile__sub { font-size: 13px; color: rgba(242, 245, 249, 0.55); }
+.vl-tile__sub { font-size: 13px; color: rgba(var(--ink-rgb), 0.55); }
 .vl-tile__sub.is-call { color: var(--success-soft); }
 .vl-tile__acts { display: flex; gap: 6px; opacity: 0; transform: scale(0.85); transition: opacity 0.2s ease-out, transform 0.25s var(--ease); }
 .vl-tile:hover .vl-tile__acts, .vl-tile:focus-within .vl-tile__acts { opacity: 1; transform: none; }
@@ -458,12 +482,13 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-friends__bar { display: flex; align-items: center; gap: 12px; padding: 4px 8px 12px; flex-wrap: wrap; }
 .vl-chips { display: flex; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
 .vl-chip {
-  position: relative; height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--vl-soft); color: rgba(242, 245, 249, 0.8);
+  position: relative; height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--vl-soft); color: rgba(var(--ink-rgb), 0.8);
   font: 500 14px var(--vl-font); cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
   transition: background 0.2s var(--ease), color 0.2s, transform 0.2s var(--ease);
 }
-.vl-chip:hover { background: var(--vl-soft-2); color: #fff; }
+.vl-chip:hover { background: var(--vl-soft-2); color: var(--text); }
 .vl-chip.is-active { background: #f2f5f9; color: #0f1115; font-weight: 600; }
+html[data-theme="light"] .vl-chip.is-active { background: #15202b; color: #fff; }
 .vl-chip__count { font-variant-numeric: tabular-nums; opacity: 0.65; }
 .vl-chip.has-new::after { content: ""; position: absolute; top: 5px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent-soft); }
 /* Добавить в друзья: поле как на входе (anker.js) и круглая кнопка на уровне «таблетки» */
@@ -483,7 +508,7 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-friend__name { display: flex; align-items: baseline; gap: 8px; min-width: 0; font: 600 15px var(--vl-font); }
 .vl-friend__name > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vl-friend__user { font-weight: 400; font-size: 13px; color: var(--text-faint); white-space: nowrap; }
-.vl-friend__sub { font-size: 13px; color: rgba(242, 245, 249, 0.55); }
+.vl-friend__sub { font-size: 13px; color: rgba(var(--ink-rgb), 0.55); }
 .vl-friend.is-incoming .vl-friend__sub { color: var(--accent-soft); }
 .vl-friend__sub.is-call { color: var(--success-soft); }
 .vl-friend__actions { display: flex; gap: 8px; flex: 0 0 auto; }
@@ -524,10 +549,10 @@ body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { dis
 @keyframes vl-menu-in { from { opacity: 0; transform: scale(0.97); } }
 .vl-menu__item {
   width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 36px; padding: 0 12px; border: 0; border-radius: 10px;
-  background: transparent; color: rgba(242, 245, 249, 0.85); font: 14px var(--vl-font); cursor: pointer; text-align: left;
+  background: transparent; color: rgba(var(--ink-rgb), 0.85); font: 14px var(--vl-font); cursor: pointer; text-align: left;
 }
 .vl-menu__item .vl-ico { width: 16px; height: 16px; opacity: 0.8; }
-.vl-menu__item:hover, .vl-menu__item:focus-visible { background: var(--vl-soft-2); color: #fff; outline: none; }
+.vl-menu__item:hover, .vl-menu__item:focus-visible { background: var(--vl-soft-2); color: var(--text); outline: none; }
 .vl-menu__item.is-danger { color: var(--danger-soft); }
 .vl-menu__item.is-danger:hover, .vl-menu__item.is-danger:focus-visible { background: var(--danger); color: #fff; }
 .vl-menu__sep { height: 1px; background: var(--vl-soft); margin: 4px 8px; }
@@ -582,10 +607,10 @@ body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { dis
 .vl-call-btn.is-decline { background: var(--danger); box-shadow: 0 10px 26px rgba(217, 74, 61, 0.35); }
 
 /* ─────────── Аватарки-картинки, «Избранное» ─────────── */
-.vl-avatar.has-img { background: #2a303b !important; }
+.vl-avatar.has-img { background: var(--vl-ava-0) !important; }
 .vl-avatar__img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 .vl-avatar.has-img .vl-avatar__txt { visibility: hidden; }
-.vl-avatar.is-saved { color: #fff; }
+.vl-avatar.is-saved, .vl-avatar.is-self { color: #fff; }
 .vl-avatar.is-saved .vl-ico { width: 44%; height: 44%; }
 .vl-avatar.is-clickable { cursor: pointer; transition: transform 0.2s var(--ease), filter 0.2s; }
 .vl-avatar.is-clickable:hover { transform: scale(1.05); filter: brightness(1.08); }
@@ -710,9 +735,9 @@ body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { dis
 
 .vl-filecard {
   display: flex; align-items: center; gap: 12px; min-width: 220px; max-width: 340px; padding: 6px 10px 6px 6px; border-radius: 14px;
-  background: rgba(242, 245, 249, 0.06); color: inherit; text-decoration: none; transition: background 0.2s var(--ease);
+  background: rgba(var(--ink-rgb), 0.06); color: inherit; text-decoration: none; transition: background 0.2s var(--ease);
 }
-.vl-filecard:hover { background: rgba(242, 245, 249, 0.1); }
+.vl-filecard:hover { background: rgba(var(--ink-rgb), 0.1); }
 .vl-msg.is-mine .vl-filecard { background: rgba(255, 255, 255, 0.14); }
 .vl-msg.is-mine .vl-filecard:hover { background: rgba(255, 255, 255, 0.2); }
 .vl-filecard__ico { position: relative; width: 42px; height: 42px; flex: 0 0 auto; border-radius: 12px; display: grid; place-items: center; background: var(--accent); color: #fff; }
@@ -772,11 +797,11 @@ body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { dis
   display: grid; place-items: center; cursor: pointer; transition: background 0.2s, color 0.2s, transform 0.25s var(--ease);
 }
 .vl-composer__attach .vl-ico { width: 20px; height: 20px; transition: transform 0.35s var(--ease); }
-.vl-composer__attach:hover { background: var(--vl-soft); color: #fff; }
+.vl-composer__attach:hover { background: var(--vl-soft); color: var(--text); }
 .vl-composer__attach:hover .vl-ico { transform: rotate(-20deg); }
 .vl-composer__field[hidden] { display: none; }
 .vl-composer__send.is-mic { background: var(--vl-field); color: var(--text); box-shadow: none; }
-.vl-composer__send.is-mic:hover { background: rgba(242, 245, 249, 0.14); }
+.vl-composer__send.is-mic:hover { background: rgba(var(--ink-rgb), 0.14); }
 .vl-composer__send.is-swap .vl-ico { animation: vl-swap 0.25s var(--ease) both; }
 @keyframes vl-swap { from { opacity: 0; transform: scale(0.5) rotate(-30deg); } }
 .vl-composer__box.is-recording .vl-composer__send { background: var(--danger); color: #fff; box-shadow: 0 8px 24px rgba(217, 74, 61, 0.35); }
@@ -1007,18 +1032,18 @@ body.vl-shell .toast-container { z-index: 3300; }
     transition-delay: 99999s, 99999s, 0s, 0s, 0s, 0s;
   }
 }
-.vl-round, .vl-btn, .vl-btn--ghost, .vl-btn--soft, .vl-composer__send.is-mic { --ank-fill: rgba(242, 245, 249, 0.14); }
+.vl-round, .vl-btn, .vl-btn--ghost, .vl-btn--soft, .vl-composer__send.is-mic { --ank-fill: rgba(var(--ink-rgb), 0.14); }
 .vl-round.is-ghost, .vl-composer__attach, .vl-picker__row, .vl-quote, .vl-filecard, .vl-ucard__when, .vl-ucard__link, .vl-fwd { --ank-fill: var(--vl-soft-2); }
 .vl-round.is-accent, .vl-btn--primary, .vl-composer__send, .vl-jump, .vl-voice__btn, .vl-pill.is-active { --ank-fill: var(--accent-hover); }
 .vl-round.is-danger, .vl-btn--danger, .vl-menu__item.is-danger, .vl-tray__x { --ank-fill: var(--danger); }
 .vl-round.is-glass { --ank-fill: rgba(40, 45, 55, 0.95); }
 .vl-round.is-danger-hover { --ank-fill: var(--danger); }
-.vl-btn--ghost-text, .vl-me__btn, .vl-chat__head-who, .vl-pinbar__body { --ank-fill: rgba(242, 245, 249, 0.07); }
+.vl-btn--ghost-text, .vl-me__btn, .vl-chat__head-who, .vl-pinbar__body { --ank-fill: rgba(var(--ink-rgb), 0.07); }
 .vl-pill, .vl-chip, .vl-menu__item, .vl-search__row { --ank-fill: var(--vl-soft-2); }
 .vl-chip.is-active { --ank-fill: #ffffff; }
 .vl-dm, .vl-friend { --ank-fill: var(--vl-raised); }
 .vl-dm.is-active, .vl-tile { --ank-fill: var(--vl-raised-2); }
-.settings-nav__item { --ank-fill: rgba(242, 245, 249, 0.06); }
+.settings-nav__item { --ank-fill: rgba(var(--ink-rgb), 0.06); }
 .settings-nav__item.active { --ank-fill: var(--accent-hover); }
 .vl-call-btn.is-accept { --ank-fill: #46c283; }
 .vl-call-btn.is-decline { --ank-fill: #e25a4d; }
@@ -1026,7 +1051,7 @@ body.vl-shell .toast-container { z-index: 3300; }
 .vl-side__call { --ank-fill: rgba(58, 168, 110, 0.28); }
 .vl-msg.is-mine .vl-quote, .vl-msg.is-mine .vl-filecard { --ank-fill: rgba(255, 255, 255, 0.22); }
 .vl-msg.is-mine .vl-voice__btn { --ank-fill: #e8f0ff; }
-.vl-wall-tile__bg { --ank-fill: rgba(242, 245, 249, 0.08); }
+.vl-wall-tile__bg { --ank-fill: rgba(var(--ink-rgb), 0.08); }
 /* Профиль в настройках — разделы таблетками, как кнопки звонка */
 .vl-profile .settings-nav__item { border-radius: 999px; }
 
@@ -1110,3 +1135,107 @@ body.vl-shell .toast-container { z-index: 3300; }
   .vl-island, .vl-wave i, .vl-tile, .vl-solo-chats, .vl-solo-chats:hover .vl-solo-chats__ico .vl-ico, .vl-skel, body.vl-dock-open #app-root, .vl-bubble.is-typing i, .vl-ticks svg, .vl-ticks path { animation: none; }
   .vl-round, .vl-btn, .vl-tile, .vl-tile__acts, .vl-msg__tools, .vl-composer__send { transition: none; }
 }
+
+/* Выбор темы в профиле */
+.vl-theme-pick { display: flex; flex-wrap: wrap; gap: 8px; }
+.vl-chip .vl-ico { width: 16px; height: 16px; flex-shrink: 0; }
+.vl-theme-pick .vl-chip { white-space: nowrap; }
+
+/* ═══════════════ Направление «Голос»: крупные имена, поиск слева, тёмная «Позвонить» ═══════════════
+   Заголовки и имена — Unbounded; остальной текст — Golos Text. В светлой теме колонка «Чаты»
+   лежит прямо на фоне, а переписка — белая панель; в тёмной всё как раньше, на панелях. */
+.vl-side__title { font: 600 26px/1.1 var(--vl-display); letter-spacing: -0.02em; }
+.vl-side__head { gap: 10px; padding: 4px 4px 14px 10px; }
+.vl-side__new-call { height: 40px; padding: 0 16px 0 12px; gap: 6px; font-size: 14px; font-weight: 600; }
+.vl-side__new-call .vl-ico { width: 18px; height: 18px; }
+.vl-side__search {
+  display: flex; align-items: center; gap: 10px; height: 44px; margin: 0 4px 12px; padding: 0 8px 0 16px;
+  border-radius: 22px; background: var(--vl-field); color: var(--text-faint); cursor: text;
+}
+.vl-side__search > .vl-ico { width: 18px; height: 18px; flex-shrink: 0; }
+.vl-side__search-input {
+  flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; color: var(--text);
+  font: 400 14px var(--vl-font); -webkit-appearance: none; appearance: none;
+}
+.vl-side__search-input::placeholder { color: var(--text-faint); }
+.vl-side__search-input::-webkit-search-cancel-button { display: none; }
+.vl-side__search:focus-within { box-shadow: 0 0 0 2px var(--accent-soft); }
+.vl-side__search-x {
+  width: 30px; height: 30px; border: 0; border-radius: 50%; background: transparent; color: var(--text-faint);
+  display: grid; place-items: center; cursor: pointer; flex-shrink: 0;
+}
+.vl-side__search-x[hidden] { display: none; }
+.vl-side__search-x:hover { background: var(--vl-soft); color: var(--text); }
+.vl-side__search-x .vl-ico { width: 16px; height: 16px; }
+.vl-side__label { padding: 12px 12px 6px; font-size: 13px; font-weight: 500; color: var(--text-faint); }
+button.vl-dm { width: 100%; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.vl-dm--hit .vl-dm__sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vl-picker__code { margin: 8px auto 0; }
+
+/* Имена — Unbounded */
+.vl-dm__name, .vl-me__name, .vl-picker__name, .vl-tile__name, .vl-friend__name > span:first-child {
+  font-family: var(--vl-display); font-weight: 500; letter-spacing: -0.01em;
+}
+.vl-dm__name { font-size: 14px; }
+.vl-me__name { font-size: 13.5px; }
+.vl-friends__title, .vl-chat__intro h2, .vl-ucard__name, .vl-profile-card__name, .vl-incoming__name, .vl-modal__title, .settings-sheet .settings-head h3, .settings-section-title {
+  font-family: var(--vl-display); font-weight: 600; letter-spacing: -0.02em;
+}
+
+/* Шапка переписки: крупное имя и статус, справа поиск и «Позвонить» */
+.vl-chat__head-name { font: 600 34px/1.05 var(--vl-display); letter-spacing: -0.03em; }
+.vl-chat__head-sub { margin-top: 6px; font-size: 14px; font-weight: 500; color: var(--text-faint); }
+.vl-chat__head-sub.is-online { color: var(--success-soft); }
+.vl-btn--ink { background: var(--text); color: var(--vl-panel); --ank-fill: rgba(var(--ink-rgb), 0.82); }
+.vl-btn--ink:hover:not(:disabled) { background: var(--text); }
+.vl-chat__call { height: 44px; padding: 0 20px 0 16px; gap: 8px; font-size: 14px; font-weight: 600; }
+.vl-chat__call .vl-ico { width: 18px; height: 18px; }
+.vl-chat__call.is-live { background: var(--success); color: #fff; --ank-fill: var(--success-soft); }
+@media (min-width: 861px) {
+  .vl-chat__head { height: auto; min-height: 96px; align-items: flex-end; padding: 22px 24px 18px 22px; border-bottom: 1px solid var(--border); }
+  .vl-chat__head-who .vl-avatar { display: none; }
+  .vl-chat__head-who { padding: 4px 12px 4px 6px; }
+  .vl-chat__head-actions { align-self: center; margin-top: 10px; }
+  .vl-chat__head-actions .vl-round.is-lg { --s: 44px; }
+}
+@media (max-width: 860px) {
+  .vl-side__title { font-size: 24px; }
+  .vl-chat__head-name { font-size: 20px; }
+  .vl-chat__head-sub { margin-top: 2px; font-size: 13px; }
+  .vl-chat__call { width: 38px; height: 38px; padding: 0; justify-content: center; }
+  .vl-chat__call-label { display: none; }
+  .vl-side__search { margin: 0 2px 10px; }
+  .vl-side__search-input { font-size: 16px; }
+}
+
+/* Светлая тема: колонка «Чаты» на фоне, белая переписка, выбранный чат — белая карточка */
+html[data-theme="light"] { --vl-r-panel: 28px; }
+html[data-theme="light"] body.vl-ready #vl-sidebar { background: transparent; box-shadow: none; }
+@media (min-width: 861px) { html[data-theme="light"] .vl-side__search { background: #ffffff; } }
+html[data-theme="light"] .vl-dm:hover { background: rgba(21, 32, 43, 0.05); --vl-ring: #e7ebef; }
+html[data-theme="light"] .vl-dm.is-active { background: #ffffff; --vl-ring: #ffffff; box-shadow: 0 1px 0 #dde3e9; --ank-fill: #ffffff; }
+html[data-theme="light"] .vl-me__btn { background: #ffffff; }
+html[data-theme="light"] .vl-pill { background: rgba(21, 32, 43, 0.06); }
+html[data-theme="light"] .vl-pill.is-active { background: var(--accent); }
+/* Обои в светлой теме: шапка, поле ввода и подписи — белое «стекло» */
+html[data-theme="light"] .vl-view--chat.has-wall .vl-chat__head { background: rgba(255, 255, 255, 0.86); border-bottom-color: transparent; }
+html[data-theme="light"] .vl-view--chat.has-wall .vl-composer__field,
+html[data-theme="light"] .vl-view--chat.has-wall .vl-reply-bar,
+html[data-theme="light"] .vl-view--chat.has-wall .vl-tray,
+html[data-theme="light"] .vl-view--chat.has-wall .vl-composer__send.is-mic { background: rgba(255, 255, 255, 0.92); }
+html[data-theme="light"] .vl-view--chat.has-wall .vl-day span { background: rgba(255, 255, 255, 0.8); color: var(--text-dim); }
+html[data-theme="light"] .vl-view--chat.has-wall .vl-chat__intro { background: rgba(255, 255, 255, 0.82); }
+html[data-theme="light"] .vl-chip.is-active { --ank-fill: #33414f; }
+html[data-theme="light"] .vl-friend, html[data-theme="light"] .vl-tile { --ank-fill: rgba(21, 32, 43, 0.05); }
+html[data-theme="light"] .vl-solo-chats { --ank-fill: #ffffff; }
+html[data-theme="light"] .vl-solo-chats { background: rgba(255, 255, 255, 0.92); box-shadow: 0 10px 30px rgba(21, 32, 43, 0.14); }
+html[data-theme="light"] .vl-solo-chats:hover { background: #ffffff; }
+/* Всегда тёмные элементы (просмотр фото, капсула звонка, кнопка «назад» поверх звонка):
+   в светлой теме им возвращаются светлые «чернила» */
+html[data-theme="light"] .vl-lightbox,
+html[data-theme="light"] .vl-island,
+html[data-theme="light"] .vl-fab-menu { --ink-rgb: 242, 245, 249; --text: #f2f5f9; --text-dim: rgba(242, 245, 249, 0.7); --text-faint: rgba(242, 245, 249, 0.5); --vl-soft: rgba(242, 245, 249, 0.07); --vl-soft-2: rgba(242, 245, 249, 0.12); }
+html[data-theme="light"] .vl-fld-host .fld input:hover { background: #ffffff; }
+html[data-theme="light"] .vl-modal-overlay,
+html[data-theme="light"] .vl-incoming-wrap { background: rgba(21, 32, 43, 0.32); }
+.vl-side__search-x { --ank-fill: var(--vl-soft-2); }
