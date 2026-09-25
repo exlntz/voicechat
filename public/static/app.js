@@ -1558,7 +1558,8 @@ async function enterRoom(joinData) {
 
     soloInviteCard = el('div', { class: 'solo-invite' }, [
       el('h2', { class: 'solo-invite__title' }, 'Чтобы пригласить других участников, отправьте им ссылку на звонок'),
-      copyBtn
+      copyBtn,
+      el('p', { class: 'solo-invite__hint' }, 'Как только кто-то подключится, он появится рядом с вами.')
     ])
     playEnter(soloInviteCard, 120) // чуть позже своей плитки
     return soloInviteCard
