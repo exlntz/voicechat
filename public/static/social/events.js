@@ -6,7 +6,7 @@ import { applyEvent, emit, store } from './store.js'
 
 const EVENT_TYPES = [
   'hello', 'resync', 'presence', 'friend.update', 'friend.remove', 'conversation.update', 'conversation.remove', 'pins.update', 'user.update',
-  'message.new', 'message.updated', 'message.deleted', 'read', 'typing',
+  'message.new', 'message.updated', 'message.deleted', 'read', 'delivered', 'typing',
   'call.incoming', 'call.cancel', 'call.accepted', 'call.declined', 'call.timeout'
 ]
 

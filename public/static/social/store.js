@@ -555,7 +555,22 @@ export function applyEvent(type, data) {
         emit('conversations')
       } else {
         conv.peerLastReadId = Math.max(conv.peerLastReadId || 0, data.lastReadId)
+        conv.peerLastDeliveredId = Math.max(conv.peerLastDeliveredId || 0, data.lastReadId)
         emit('conversation:' + conv.id, conv)
+        emit('conversations')
+        persistConversations()
+      }
+      break
+    }
+    case 'delivered': {
+      // Приложение собеседника получило сообщения — ✓ становится ✓✓
+      const conv = store.conversations.get(Number(data.conversationId))
+      if (!conv || Number(data.userId) === store.me.id) break
+      if (data.lastDeliveredId > (conv.peerLastDeliveredId || 0)) {
+        conv.peerLastDeliveredId = data.lastDeliveredId
+        emit('conversation:' + conv.id, conv)
+        emit('conversations')
+        persistConversations()
       }
       break
     }

@@ -253,6 +253,36 @@ export function messagePreview(m) {
 const ATTACH_LABEL = { image: 'Фото', video: 'Видео', voice: 'Голосовое сообщение', audio: 'Аудио', file: 'Файл' }
 export function attachmentLabel(kind) { return ATTACH_LABEL[kind] || 'Файл' }
 
+// ---- Галочки у своих сообщений, как в Телеграме ----
+// ✓ — отправлено (на сервере, собеседник ещё не получил), ✓✓ — доставлено, синие ✓✓ — прочитано
+export function msgStatus(conv, m, meId) {
+  if (!conv || conv.type === 'saved' || !m || m.authorId !== meId || m.kind !== 'text' || m.failed) return null
+  if (m.pending || !m.id) return 'pending'
+  if (m.id <= (conv.peerLastReadId || 0)) return 'read'
+  if (m.id <= (conv.peerLastDeliveredId || 0)) return 'delivered'
+  return 'sent'
+}
+const TICK_TITLES = { sent: 'Отправлено', delivered: 'Доставлено', read: 'Прочитано' }
+export function ticks(status, { still = false } = {}) {
+  const t = document.createElement('template')
+  // Вторая галочка всегда в разметке: при «доставлено» она дорисовывается (stroke-dashoffset)
+  t.innerHTML = '<span class="vl-ticks"><svg viewBox="0 0 18 12" aria-hidden="true" focusable="false"><path class="t1" d="M1.4 6.4l3.3 3.3L11 3.2"/><path class="t2" d="M8.2 9l.7.7 6.4-6.5"/></svg></span>'
+  const node = t.content.firstElementChild
+  setTicks(node, status)
+  if (still) node.classList.add('is-still')
+  return node
+}
+export function setTicks(node, status) {
+  if (!node || node.dataset.st === status) return false
+  const prev = node.dataset.st
+  node.dataset.st = status
+  node.title = TICK_TITLES[status] || ''
+  node.setAttribute('aria-label', node.title)
+  // Стало «прочитано» — лёгкий «пульс»
+  if (prev && status === 'read') { node.classList.remove('is-bump'); void node.offsetWidth; node.classList.add('is-bump') }
+  return true
+}
+
 export function uid() {
   try { if (crypto.randomUUID) return crypto.randomUUID() } catch {}
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
