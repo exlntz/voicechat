@@ -520,13 +520,13 @@ export function toast(message, type = 'info') {
 }
 
 // ---------- Тема оформления (на этом устройстве) ----------
-// 'light' | 'dark' | 'system'. Атрибут data-theme ставит ещё скрипт в <head> — здесь только смена.
+// 'light' | 'dark' | 'system', по умолчанию тёмная. Атрибут data-theme ставит ещё скрипт в <head> — здесь только смена.
 export function getThemeChoice() {
-  try { return localStorage.getItem('vl:theme') || 'light' } catch { return 'light' }
+  try { return localStorage.getItem('vl:theme') || 'dark' } catch { return 'dark' }
 }
 function resolveTheme(choice) {
   if (choice === 'system') return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  return choice === 'dark' ? 'dark' : 'light'
+  return choice === 'light' ? 'light' : 'dark'
 }
 export function applyTheme(choice = getThemeChoice()) {
   const t = resolveTheme(choice)
