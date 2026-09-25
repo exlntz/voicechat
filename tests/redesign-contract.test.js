@@ -34,13 +34,24 @@ function toProjectPath(fullPath) {
 }
 
 function stripQueryAndHash(specifier) {
-  return specifier.split('#', 1)[0].split('?', 1)[0]
+  return String(specifier ?? '').trim().split('#', 1)[0].split('?', 1)[0].trim()
+}
+
+function stripCssComments(source) {
+  return String(source ?? '').replace(/\/\*[\s\S]*?\*\//g, '')
+}
+
+function normalizeLocalReference(specifier) {
+  const clean = String(specifier ?? '').trim()
+  if (!clean || clean.startsWith('//')) return null
+  return clean
 }
 
 function resolveAssetPath(fromFilePath, specifier) {
   const clean = stripQueryAndHash(specifier)
-  if (!clean || clean.startsWith('data:') || clean.startsWith('http:') ||
-    clean.startsWith('https:') || clean.startsWith('#')) {
+  if (!clean || clean.startsWith('//') || clean.startsWith('data:') ||
+    clean.startsWith('http:') || clean.startsWith('https:') ||
+    clean.startsWith('#')) {
     return null
   }
 
@@ -52,21 +63,29 @@ function resolveAssetPath(fromFilePath, specifier) {
 }
 
 function localCssReferences(source) {
-  const references = new Set()
+  const activeSource = stripCssComments(source)
+  const references = []
+  const seen = new Set()
   const importPattern = /@import\s+(?:url\(\s*)?['"]([^'"]+)['"]\s*\)?/g
   const urlPattern = /url\(\s*['"]?([^'"()]+)['"]?\s*\)/g
 
-  for (const match of source.matchAll(importPattern)) references.add(match[1])
-  for (const match of source.matchAll(urlPattern)) references.add(match[1])
+  for (const pattern of [importPattern, urlPattern]) {
+    for (const match of activeSource.matchAll(pattern)) {
+      const reference = normalizeLocalReference(match[1])
+      if (!reference || seen.has(reference)) continue
+      seen.add(reference)
+      references.push(reference)
+    }
+  }
 
-  return [...references]
+  return references
 }
 
 test('social redesign entry loads styles before the dynamic shell bridge', () => {
   const main = read('public/static/social/main.js')
 
   assert.match(main,
-    /import\s*\{\s*initDiscordUI\s*,\s*loadDiscordStyles\s*\}\s*from\s*['"]\.\/discord-ui\.js['"]/)
+    /import\s*\{\s*initDiscordUI\s*,\s*loadDiscordStyles\s*\}\s*from\s*['"]\.\/discord-ui\.js['"]/) 
   assert.match(main, /await\s+loadDiscordStyles\s*\(\s*\)/)
   assert.match(main,
     /const\s*\{\s*navigate\s*,\s*parseRoute\s*,\s*openDmWith\s*\}\s*=\s*await\s+import\(\s*['"]\.\/shell\.js['"]\s*\)/)
@@ -118,6 +137,21 @@ test('required redesign static assets are present under public/static', () => {
   ]) {
     assert.ok(files.has(required), `${required} is required by the redesign contract`)
   }
+})
+
+test('localCssReferences ignores commented URLs and protocol-relative externals', () => {
+  const source = `
+    /* @import '/static/ignore.css'; */
+    /* background-image: url('/static/also-ignore.css'); */
+    @import './theme.css';
+    @import url('//cdn.example.com/fonts.css');
+    .hero { background-image: url('/static/real.png?v=1#hash'); }
+  `
+
+  assert.deepEqual(localCssReferences(source), [
+    './theme.css',
+    '/static/real.png?v=1#hash',
+  ])
 })
 
 test('local CSS imports and asset references under public/static resolve to real files', () => {
