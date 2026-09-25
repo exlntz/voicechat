@@ -30,6 +30,9 @@ export function registerChatRoutes(app, { db, hub, friends, media, createCallRoo
     setWallpaper: db.prepare('UPDATE conversation_members SET wallpaper = ? WHERE conversation_id = ? AND user_id = ?'),
     clearFor: db.prepare('UPDATE conversation_members SET cleared_before = ?, hidden = 1, pinned_at = NULL WHERE conversation_id = ? AND user_id = ?'),
     setRead: db.prepare('UPDATE conversation_members SET last_read_id = MAX(last_read_id, ?) WHERE conversation_id = ? AND user_id = ?'),
+    setDelivered: db.prepare('UPDATE conversation_members SET last_delivered_id = ? WHERE conversation_id = ? AND user_id = ? AND last_delivered_id < ?'),
+    undelivered: db.prepare(`SELECT cm.conversation_id AS cid, (SELECT MAX(id) FROM messages m WHERE m.conversation_id = cm.conversation_id AND m.author_id != cm.user_id) AS top
+      FROM conversation_members cm WHERE cm.user_id = ?`),
     unread: db.prepare(`SELECT COUNT(*) AS n FROM messages m WHERE ${VISIBLE} AND m.id > ? AND m.author_id != ?`),
     lastMessage: db.prepare(`SELECT * FROM messages m WHERE ${VISIBLE} ORDER BY m.id DESC LIMIT 1`),
     maxId: db.prepare('SELECT MAX(id) AS id FROM messages WHERE conversation_id = ?'),
@@ -72,7 +75,7 @@ export function registerChatRoutes(app, { db, hub, friends, media, createCallRoo
     dropConvPins: db.prepare('DELETE FROM pins WHERE conversation_id = ?'),
     dropConvMessages: db.prepare('DELETE FROM messages WHERE conversation_id = ?'),
     resetConv: db.prepare('UPDATE conversations SET last_message_id = NULL, last_message_at = NULL WHERE id = ?'),
-    resetMembers: db.prepare('UPDATE conversation_members SET hidden = 1, pinned_at = NULL, last_read_id = 0, cleared_before = 0 WHERE conversation_id = ?'),
+    resetMembers: db.prepare('UPDATE conversation_members SET hidden = 1, pinned_at = NULL, last_read_id = 0, last_delivered_id = 0, cleared_before = 0 WHERE conversation_id = ?'),
     wallpaperFile: db.prepare("SELECT 1 FROM files WHERE id = ? AND owner_id = ? AND purpose = 'wallpaper'")
   }
 
@@ -162,6 +165,8 @@ export function registerChatRoutes(app, { db, hub, friends, media, createCallRoo
       lastReadId: Number(mine.last_read_id),
       // до какого сообщения дочитал собеседник — для отметки «прочитано»
       peerLastReadId: saved ? Number.MAX_SAFE_INTEGER : (others.length ? Math.min(...others.map((m) => Number(m.last_read_id))) : 0),
+      // до какого сообщения приложение собеседника его получило — ✓✓ (прочитанное тоже доставлено)
+      peerLastDeliveredId: saved ? Number.MAX_SAFE_INTEGER : (others.length ? Math.min(...others.map((m) => Math.max(Number(m.last_delivered_id) || 0, Number(m.last_read_id)))) : 0),
       unread: q.unread.get(convId, cleared, me, Number(mine.last_read_id), me).n,
       muted: !!mine.muted,
       hidden: !!mine.hidden,
@@ -200,6 +205,18 @@ export function registerChatRoutes(app, { db, hub, friends, media, createCallRoo
     return { body: body.trim() ? body : '' }
   }
 
+  // Доставлено: отметить у получателя и сообщить участникам (у автора ✓ станет ✓✓)
+  function markDelivered(convId, userId, messageId) {
+    if (q.setDelivered.run(messageId, convId, userId, messageId).changes) {
+      hub.publish(memberIds(convId), 'delivered', { conversationId: convId, userId, lastDeliveredId: messageId })
+    }
+  }
+  // Пользователь подключился: всё, что пришло ему, пока его не было, — доставлено
+  function markDeliveredAll(userId) {
+    for (const r of q.undelivered.all(userId)) if (r.top) markDelivered(Number(r.cid), userId, Number(r.top))
+  }
+  hub.setOnConnect(markDeliveredAll)
+
   // Новое сообщение: запись, поднять чат в списке, вернуть скрытые лички, разослать участникам
   function postMessage(convId, authorId, { kind = 'text', body = '', meta = null, replyTo = null, clientId = null, fileIds = [], forward = null }) {
     const now = Date.now()
@@ -217,6 +234,11 @@ export function registerChatRoutes(app, { db, hub, friends, media, createCallRoo
     }
     const message = messageView(q.message.get(id))
     hub.publish(members.map((m) => m.user_id), 'message.new', { message })
+    // Получатель в сети (открыт реалтайм) — сообщение ему уже доставлено
+    for (const m of members) {
+      const uid = Number(m.user_id)
+      if (uid !== authorId && hub.isOnline(uid)) markDelivered(convId, uid, id)
+    }
     return message
   }
 
@@ -566,6 +588,7 @@ export function registerChatRoutes(app, { db, hub, friends, media, createCallRoo
     const upTo = Math.min(toInt(body.messageId) || maxId, maxId)
     if (upTo > Number(ctx.mine.last_read_id)) {
       q.setRead.run(upTo, ctx.convId, ctx.me)
+      q.setDelivered.run(upTo, ctx.convId, ctx.me, upTo)
       // Себе (другие вкладки/устройства сбросят счётчик) и собеседнику (отметка «прочитано»)
       hub.publish(memberIds(ctx.convId), 'read', { conversationId: ctx.convId, userId: ctx.me, lastReadId: upTo })
     }

@@ -16,7 +16,7 @@ import {
 import { api } from './api.js'
 import {
   h, icon, avatar, setPresenceDot, displayName, presenceText, richText, timeHM, dayLabel,
-  dayKey, showMenu, toast, isSavedConv, attachmentLabel, fmtClock
+  dayKey, showMenu, toast, isSavedConv, attachmentLabel, fmtClock, msgStatus, ticks, setTicks
 } from './ui.js'
 import { startCall, joinCallFromMessage, callState, inCall } from './call-invite.js'
 import { renderAttachments, openLightbox } from './media-ui.js'
@@ -719,7 +719,7 @@ export function createChatView({ convId, navigate, menuButton }) {
   }
 
   // pos: single | first | middle | last — место в серии подряд идущих сообщений одного автора
-  function buildMessage(m, pos, readMark) {
+  function buildMessage(m, pos) {
     const mine = m.authorId === me.id
     const key = m.id ? 'm' + m.id : 'c' + m.clientId
     const editing = editingKey === key
@@ -740,7 +740,7 @@ export function createChatView({ convId, navigate, menuButton }) {
         m.id && isPinned(m.id) ? icon('thumbtack') : null,
         m.editedAt ? h('span', { title: 'Изменено ' + new Date(m.editedAt).toLocaleString('ru-RU') }, 'изм. ') : null,
         h('time', { datetime: new Date(m.createdAt).toISOString() }, timeHM(m.createdAt)),
-        m.pending ? icon('clock') : null
+        statusMark(m)
       ])
       const parts = []
       if (m.forward) {
@@ -776,7 +776,6 @@ export function createChatView({ convId, navigate, menuButton }) {
       drop.addEventListener('click', () => discardDraft(convId, m.clientId))
       children.push(h('div', { class: 'vl-msg__failed' }, [icon('circle-exclamation'), h('span', {}, `${m.failed}.`), retry, drop]))
     }
-    if (readMark) children.push(h('div', { class: 'vl-msg__read' }, [icon('check-double'), 'Прочитано']))
 
     const msg = h('div', { class: cls.join(' '), 'data-key': key }, children)
     if (m.id) {
@@ -898,12 +897,6 @@ export function createChatView({ convId, navigate, menuButton }) {
     } else {
       items.push({ key: 'intro', sig: String((userById(peer.id) || peer).avatarUrl || ''), build: buildIntro })
     }
-    // Последнее своё сообщение, которое собеседник уже прочитал
-    const peerRead = (c && c.peerLastReadId) || 0
-    let lastMine = null
-    for (const m of chat.list) if (m.id && m.authorId === me.id && m.kind === 'text') lastMine = m
-    const readMarkId = !saved && !chat.hasNewer && lastMine && lastMine.id <= peerRead && lastMine === chat.list[chat.list.length - 1] ? lastMine.id : null
-
     if (unreadAfter != null && unreadMarkerId == null) {
       const first = chat.list.find((m) => m.id && m.id > unreadAfter && m.authorId !== me.id)
       if (first) unreadMarkerId = first.id
@@ -938,13 +931,12 @@ export function createChatView({ convId, navigate, menuButton }) {
         const jp = joins[i]
         const jn = !!joins[i + 1]
         const pos = jp ? (jn ? 'middle' : 'last') : (jn ? 'first' : 'single')
-        const read = m.id && m.id === readMarkId
         const files = (m.attachments || []).map((f) => f.id || f.name).join(',')
         const prog = m.pending && m.upload ? Math.round(draftProgress(m) * 50) : ''
         const pinned = m.id && pinSig && isPinned(m.id) ? 1 : 0
         const hl = highlight && m.body && m.body.toLocaleLowerCase('ru').includes(highlight.toLocaleLowerCase('ru')) ? highlight : ''
-        const sig = [m.id, m.body, m.editedAt, m.pending ? 1 : 0, m.failed || '', pos, read ? 1 : 0, editingKey === key ? 1 : 0, m.reply ? m.reply.id : '', files, prog, pinned, hl, m.forward ? m.forward.userId : ''].join('|')
-        items.push({ key, sig, build: () => buildMessage(m, pos, read) })
+        const sig = [m.id, m.body, m.editedAt, m.pending ? 1 : 0, m.failed || '', pos, editingKey === key ? 1 : 0, m.reply ? m.reply.id : '', files, prog, pinned, hl, m.forward ? m.forward.userId : ''].join('|')
+        items.push({ key, sig, build: () => buildMessage(m, pos) })
       }
       prev = m
     })
@@ -970,6 +962,25 @@ export function createChatView({ convId, navigate, menuButton }) {
       else list.insertBefore(entry.node, cursor)
     }
     for (const [k, e] of nodes) if (!seen.has(k)) { e.node.remove(); nodes.delete(k) }
+    updateTicks(c, msgs)
+  }
+
+  // Галочки меняются на месте (узел сообщения не пересоздаётся) — так видна анимация
+  // «дорисовалась вторая» и «посинели»
+  function statusMark(m) {
+    const st = msgStatus(conv(), m, me.id)
+    if (!st) return null
+    return st === 'pending' ? icon('clock') : ticks(st)
+  }
+  function updateTicks(c, msgs) {
+    if (saved || !c) return
+    for (const m of msgs) {
+      if (!m.id || m.authorId !== me.id) continue
+      const entry = nodes.get('m' + m.id)
+      if (!entry) continue
+      if (entry.ticks === undefined) entry.ticks = entry.node.querySelector('.vl-ticks')
+      if (entry.ticks) setTicks(entry.ticks, msgStatus(c, m, me.id))
+    }
   }
 
   // ---------- Прокрутка ----------

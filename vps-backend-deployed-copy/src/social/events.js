@@ -33,6 +33,7 @@ export function createHub(db) {
   const offlineTimers = new Map()
   // Звонки живут в chats.js — hub спрашивает у него снимок для "hello"
   let helloExtras = () => ({})
+  let onConnect = () => {}
 
   const lastSeenStmt = db.prepare('SELECT last_seen, show_last_seen FROM users WHERE id = ?')
   const setLastSeenStmt = db.prepare('UPDATE users SET last_seen = ? WHERE id = ?')
@@ -190,6 +191,8 @@ export function createHub(db) {
         const helloId = `${bootId}-${seq}`
         conn.queue = conn.queue.then(() => stream.writeSSE({ event: 'hello', retry: 2000, id: helloId, data: hello })).catch(() => {})
         if (!replay(conn, lastEventId)) writeTo(conn, 'resync', {}, helloId)
+        // Пользователь снова в сети: всё, что ему пришло, пока его не было, — доставлено
+        try { onConnect(userId) } catch (e) { console.error(e) }
 
         while (!finished && !stream.aborted && !stream.closed) {
           await stream.sleep(PING_MS)
@@ -225,6 +228,7 @@ export function createHub(db) {
     friendIds,
     mount,
     setHelloExtras(fn) { helloExtras = fn },
+    setOnConnect(fn) { onConnect = fn },
     stats: () => ({ users: conns.size, connections: [...conns.values()].reduce((n, s) => n + s.size, 0) })
   }
 }

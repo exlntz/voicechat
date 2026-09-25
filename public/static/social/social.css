@@ -326,8 +326,24 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-msg.is-failed .vl-bubble { box-shadow: 0 0 0 1.5px var(--danger); }
 .vl-msg__failed { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 12.5px; color: var(--danger-soft); }
 .vl-msg__failed .vl-ico { width: 14px; height: 14px; }
-.vl-msg__read { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 12px; color: rgba(242, 245, 249, 0.5); }
-.vl-msg__read .vl-ico { width: 13px; height: 13px; color: var(--accent-soft); }
+/* Галочки: ✓ отправлено, ✓✓ доставлено, синие ✓✓ прочитано.
+   Вторая галочка дорисовывается, цвет плавно синеет; у нового сообщения первая «рисуется». */
+.vl-ticks { --tick: rgba(255, 255, 255, 0.6); --tick-read: #62e6ff; display: inline-flex; align-items: center; color: var(--tick); transition: color 0.35s var(--ease); }
+.vl-ticks svg { width: 17px; height: 11px; overflow: visible; }
+.vl-ticks path { fill: none; stroke: currentColor; stroke-width: 1.85; stroke-linecap: round; stroke-linejoin: round; }
+.vl-ticks .t1 { stroke-dasharray: 14; stroke-dashoffset: 0; }
+.vl-ticks .t2 { stroke-dasharray: 11; stroke-dashoffset: 11; transition: stroke-dashoffset 0.4s var(--ease) 0.05s; }
+.vl-ticks[data-st="delivered"] .t2, .vl-ticks[data-st="read"] .t2 { stroke-dashoffset: 0; }
+.vl-ticks[data-st="read"] { color: var(--tick-read); }
+.vl-ticks.is-bump svg { animation: vl-tick-bump 0.45s var(--ease); }
+@keyframes vl-tick-bump { 40% { transform: scale(1.22); } }
+.vl-msg.is-new .vl-ticks .t1 { animation: vl-tick-draw 0.35s var(--ease) 0.1s both; }
+@keyframes vl-tick-draw { from { stroke-dashoffset: 14; } }
+.vl-bubble__meta.is-over-media .vl-ticks { --tick: rgba(255, 255, 255, 0.8); --tick-read: #62e6ff; }
+.vl-ticks.is-still, .vl-ticks.is-still .t2 { transition: none; }
+/* В списке чатов — у последнего своего сообщения, серые/синие на тёмной панели */
+.vl-dm__row .vl-ticks { --tick: rgba(242, 245, 249, 0.5); --tick-read: #4fb4ff; flex: 0 0 auto; align-self: center; margin-right: -4px; }
+.vl-dm__row .vl-ticks svg { width: 16px; height: 10px; }
 /* Действия у пузыря: маленькая капсула рядом, проявляется при наведении */
 .vl-msg__tools {
   display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--vl-raised); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
@@ -985,6 +1001,6 @@ body.vl-solo .lobby-screen { padding-top: 64px; }
 
 @media (prefers-reduced-motion: reduce) {
   .vl-view-enter, .vl-msg.is-new .vl-bubble, .vl-msg--call.is-new .vl-callpill, .vl-bubble.is-typing, .vl-incoming, .vl-incoming__wave,
-  .vl-island, .vl-wave i, .vl-tile, .vl-solo-chats, .vl-solo-chats:hover .vl-solo-chats__ico .vl-ico, .vl-skel, body.vl-dock-open #app-root, .vl-bubble.is-typing i { animation: none; }
+  .vl-island, .vl-wave i, .vl-tile, .vl-solo-chats, .vl-solo-chats:hover .vl-solo-chats__ico .vl-ico, .vl-skel, body.vl-dock-open #app-root, .vl-bubble.is-typing i, .vl-ticks svg, .vl-ticks path { animation: none; }
   .vl-round, .vl-btn, .vl-tile, .vl-tile__acts, .vl-msg__tools, .vl-composer__send { transition: none; }
 }

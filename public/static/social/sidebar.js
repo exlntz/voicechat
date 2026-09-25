@@ -1,7 +1,7 @@
 // ===================== Левая колонка: друзья, лички, панель звонка, профиль =====================
 import { store, on, sortedConversations, presenceOf, incomingCount, friendsBy } from './store.js'
 import { api } from './api.js'
-import { h, icon, avatar, displayName, presenceText, messagePreview, timeShort, showMenu, toast, waveBars, isSavedConv } from './ui.js'
+import { h, icon, avatar, displayName, presenceText, messagePreview, timeShort, showMenu, toast, waveBars, isSavedConv, msgStatus, ticks } from './ui.js'
 import { askDeleteChat } from './chat.js'
 import { notificationsNeedPermission, requestNotificationPermission } from './notify.js'
 import { callState, inCall } from './call-invite.js'
@@ -93,6 +93,7 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
           h('div', { class: 'vl-dm__row' }, [
             h('span', { class: 'vl-dm__name' }, saved ? 'Избранное' : displayName(peer)),
             conv.muted ? h('span', { class: 'vl-dm__flag', title: 'Уведомления выключены' }, [icon('bell-slash')]) : null,
+            lastTicks(conv),
             h('span', { class: 'vl-dm__time' }, timeShort(conv.lastMessageAt))
           ]),
           h('div', { class: `vl-dm__sub${isTyping ? ' is-typing' : ''}${callHere ? ' is-call' : ''}` }, saved && !conv.lastMessage ? 'Сохранённые сообщения' : sub)
@@ -126,6 +127,12 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
       }
     }
     dmList.replaceChildren(...nodes)
+  }
+
+  // Галочки у последнего своего сообщения — без анимации (список перерисовывается целиком)
+  function lastTicks(conv) {
+    const st = msgStatus(conv, conv.lastMessage, store.me.id)
+    return st && st !== 'pending' ? ticks(st, { still: true }) : null
   }
 
   function renderNav() {

@@ -78,6 +78,8 @@ export function initSocialSchema(db) {
   try { db.exec('ALTER TABLE conversation_members ADD COLUMN pinned_at INTEGER') } catch {}
   try { db.exec('ALTER TABLE conversation_members ADD COLUMN cleared_before INTEGER NOT NULL DEFAULT 0') } catch {}
   try { db.exec('ALTER TABLE conversation_members ADD COLUMN wallpaper TEXT') } catch {}
+  // Доставлено: до какого сообщения приложение участника его уже получило (галочки ✓✓)
+  try { db.exec('ALTER TABLE conversation_members ADD COLUMN last_delivered_id INTEGER NOT NULL DEFAULT 0') } catch {}
   // Пересланное: {userId, name} автора оригинала
   try { db.exec('ALTER TABLE messages ADD COLUMN forward TEXT') } catch {}
 
