@@ -892,17 +892,11 @@ body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { dis
 }
 .vl-solo-chats:hover { transform: translateY(-1px); background: rgba(30, 35, 44, 0.92); }
 .vl-solo-chats:active { transform: scale(0.97); }
-.vl-solo-chats__ico { position: relative; width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; }
-.vl-solo-chats__ico .vl-ico { width: 16px; height: 16px; transition: transform 0.35s var(--ease); }
-/* Три точки «печатает…» проявляются в облачке при наведении, облачко чуть качается */
-.vl-solo-chats__ico i { position: absolute; top: 12px; width: 2.5px; height: 2.5px; border-radius: 50%; background: #fff; opacity: 0; }
-.vl-solo-chats__ico i:nth-of-type(1) { left: 10.5px; }
-.vl-solo-chats__ico i:nth-of-type(2) { left: 14px; }
-.vl-solo-chats__ico i:nth-of-type(3) { left: 17.5px; }
-.vl-solo-chats:hover .vl-solo-chats__ico .vl-ico { transform: scale(1.12); }
-.vl-solo-chats:hover .vl-solo-chats__ico i { opacity: 1; animation: vl-dot 1s infinite ease-in-out; }
-.vl-solo-chats:hover .vl-solo-chats__ico i:nth-of-type(2) { animation-delay: 0.12s; }
-.vl-solo-chats:hover .vl-solo-chats__ico i:nth-of-type(3) { animation-delay: 0.24s; }
+.vl-solo-chats__ico { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; overflow: hidden; }
+.vl-solo-chats__ico .vl-ico { width: 15px; height: 15px; transform-origin: 30% 80%; }
+/* Облачко чата один раз легко качается при наведении — как значки на других кнопках */
+.vl-solo-chats:hover .vl-solo-chats__ico .vl-ico, .vl-solo-chats:focus-visible .vl-solo-chats__ico .vl-ico { animation: vl-chat-nudge 0.5s var(--ease) 1; }
+@keyframes vl-chat-nudge { 30% { transform: rotate(-12deg) scale(1.06); } 65% { transform: rotate(5deg); } 100% { transform: none; } }
 body.in-call .vl-solo-chats, body:not(.vl-solo) .vl-solo-chats { display: none; }
 body.vl-solo .lobby-screen { padding-top: 64px; }
 
@@ -967,6 +961,6 @@ body.vl-solo .lobby-screen { padding-top: 64px; }
 
 @media (prefers-reduced-motion: reduce) {
   .vl-view-enter, .vl-msg.is-new .vl-bubble, .vl-msg--call.is-new .vl-callpill, .vl-bubble.is-typing, .vl-incoming, .vl-incoming__wave,
-  .vl-island, .vl-wave i, .vl-tile, .vl-skel, body.vl-dock-open #app-root, .vl-bubble.is-typing i { animation: none; }
+  .vl-island, .vl-wave i, .vl-tile, .vl-solo-chats, .vl-solo-chats:hover .vl-solo-chats__ico .vl-ico, .vl-skel, body.vl-dock-open #app-root, .vl-bubble.is-typing i { animation: none; }
   .vl-round, .vl-btn, .vl-tile, .vl-tile__acts, .vl-msg__tools, .vl-composer__send { transition: none; }
 }

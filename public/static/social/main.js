@@ -359,7 +359,7 @@ let soloChatsBtn = null
 function showSoloChatsButton() {
   if (soloChatsBtn) return
   soloChatsBtn = h('button', { type: 'button', class: 'vl-solo-chats', title: 'Открыть чаты и друзей' }, [
-    h('span', { class: 'vl-solo-chats__ico' }, [icon('message'), h('i'), h('i'), h('i')]),
+    h('span', { class: 'vl-solo-chats__ico' }, [icon('message')]),
     h('span', {}, 'Чаты')
   ])
   soloChatsBtn.addEventListener('click', () => exitSolo('/friends', { openLatestChat: true }))
