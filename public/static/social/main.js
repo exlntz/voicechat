@@ -17,6 +17,7 @@ import { openProfile, closeProfile } from './profile.js'
 import { createFriendsView } from './friends.js'
 import { createChatView } from './chat.js'
 import { initNotifications, setBaseTitle } from './notify.js'
+import { initPush, disablePush } from './push.js'
 import { initCalls, onCallEnded, isSwitching, inCall, callState } from './call-invite.js'
 import { preloadWallpaper } from './wallpapers.js'
 import { h, icon, toast, displayName, setSelfId, waveBars, isMobile, onMobileChange, homePath } from './ui.js'
@@ -322,6 +323,8 @@ async function startSession(me, prefillRoom = '') {
   hydrateFromCache().catch(() => {})
   store.myStatus = effectiveStatus()
   startEvents()
+  // Воркер push-уведомлений; нажатие на уведомление открывает чат в этом окне
+  initPush({ open: openDeepLink })
   Promise.all([loadFriends(), loadConversations(), loadContacts()]).catch((e) => toast(e.message || 'Не удалось загрузить списки', 'error'))
 
   if (prefillRoom) history.replaceState({}, '', '/room/' + prefillRoom)
@@ -404,7 +407,8 @@ async function endSession({ callServer = false } = {}) {
   if (!sessionActive) return
   if (inCall() && VL.leaveCall) VL.leaveCall()
   sessionActive = false
-  if (callServer) { try { await api.logout() } catch {} }
+  // Вышли из аккаунта — уведомления на это устройство больше не нужны
+  if (callServer) { await disablePush(); try { await api.logout() } catch {} }
   stopEvents()
   unmountView()
   if (sidebar) { sidebar.destroy(); sidebar = null }

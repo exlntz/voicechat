@@ -224,6 +224,7 @@ body.vl-ready .lobby-userbar { display: none; }
 .vl-notif-banner > .vl-ico { width: 16px; height: 16px; color: var(--accent-soft); }
 .vl-notif-banner > .vl-btn { grid-column: 1 / 3; justify-self: start; }
 .vl-notif-banner > .vl-round { grid-row: 1; grid-column: 3; }
+.vl-notif-banner > .vl-btn[hidden] { display: none; }
 
 .vl-me { display: flex; align-items: center; gap: 6px; margin-top: 8px; padding: 8px; border-radius: var(--vl-r-card); background: rgba(242, 245, 249, 0.04); flex: 0 0 auto; }
 .vl-me__btn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 2px 4px; border: 0; border-radius: 12px; background: transparent; color: var(--text); cursor: pointer; text-align: left; font-family: var(--vl-font); --vl-ring: #181b20; }
@@ -901,6 +902,9 @@ body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { dis
 .vl-crop__bar .vl-ico { width: 18px; height: 18px; flex: 0 0 auto; }
 .vl-crop__bar .vl-ico.is-small { width: 13px; height: 13px; }
 .vl-crop__zoom { flex: 1; accent-color: var(--accent); cursor: pointer; }
+
+/* Уведомления на этом устройстве: кнопки нет, когда включать нечего */
+.settings-card-actions[hidden] { display: none; }
 
 /* ─────────── Контакт: своё имя для человека ─────────── */
 .vl-contact { display: flex; flex-direction: column; gap: 14px; }

@@ -6,7 +6,7 @@
 //                                     (заблокированный не должен узнать о блокировке)
 import { publicUser, getUserById, pairKey, toInt, rateLimit, USER_COLS } from './db.js'
 
-export function registerFriendRoutes(app, { db, hub }) {
+export function registerFriendRoutes(app, { db, hub, push }) {
   const getRow = db.prepare('SELECT * FROM friendships WHERE user_a = ? AND user_b = ?')
   const insertRow = db.prepare('INSERT INTO friendships (user_a, user_b, status, requested_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
   const updateRow = db.prepare('UPDATE friendships SET status = ?, requested_by = ?, updated_at = ? WHERE user_a = ? AND user_b = ?')
@@ -106,6 +106,7 @@ export function registerFriendRoutes(app, { db, hub }) {
       }
     }
     insertRow.run(a, b, 'pending', me, now, now)
+    if (push) { const who = getUserById(db, me); push.send(target.id, { title: 'Заявка в друзья', body: `${who ? who.displayName : 'Кто-то'} (@${who ? who.username : ''}) хочет добавить вас в друзья`, tag: 'friend-' + me, url: '/friends?tab=pending' }) }
     notifyBoth(me, target.id)
     return c.json({ ok: true, friend: entryFor(me, target, getRow.get(a, b)) })
   })

@@ -7,6 +7,8 @@ import { h, icon, avatar, displayName, toast, bannerMedia, bannerKey } from './u
 import { uploadFile } from './upload.js'
 import { openLightbox } from './media-ui.js'
 import { cropAvatar, cropBanner } from './crop.js'
+import { pushSupported, needsHomeScreen, pushEnabled, enablePush, disablePush } from './push.js'
+import { requestNotificationPermission } from './notify.js'
 
 let current = null // открытое окно
 
@@ -261,10 +263,55 @@ export function openProfile({ logout }) {
       h('span', { class: 'settings-row__text' }, 'Показывать, когда я был(а) в сети'),
       h('span', { class: 'switch' }, [toggle, h('span', { class: 'switch__track', 'aria-hidden': 'true' })])
     ])
-    return [h('div', { class: 'settings-card' }, [
+    const lastSeenCard = h('div', { class: 'settings-card' }, [
       h('div', { class: 'settings-card-head' }, [h('span', { class: 'settings-card-title' }, [icon('clock'), 'Время в сети'])]),
       row,
       note
-    ])]
+    ])
+    return window.electronAPI ? [lastSeenCard] : [lastSeenCard, buildPushCard()]
+  }
+
+  // ---------- Уведомления на этом устройстве (push: приходят и при закрытом сайте) ----------
+  function buildPushCard() {
+    const note = h('p', { class: 'settings-card-note' })
+    const btn = h('button', { type: 'button', class: 'vl-btn vl-btn--primary vl-btn--pill vl-btn--sm' })
+    const actions = h('div', { class: 'settings-card-actions' }, [btn])
+    const card = h('div', { class: 'settings-card' }, [
+      h('div', { class: 'settings-card-head' }, [h('span', { class: 'settings-card-title' }, [icon('bell'), 'Уведомления на этом устройстве'])]),
+      note, actions
+    ])
+    async function refresh() {
+      btn.disabled = false
+      if (needsHomeScreen()) {
+        note.textContent = 'На iPhone уведомления приходят только у сайта на экране «Домой»: в Safari нажмите «Поделиться» → «На экран „Домой“» и откройте Voice Lobby с иконки.'
+        actions.hidden = true
+        return
+      }
+      if (!pushSupported()) { note.textContent = 'Этот браузер не поддерживает уведомления при закрытом сайте.'; actions.hidden = true; return }
+      if (Notification.permission === 'denied') {
+        note.textContent = 'Уведомления запрещены в настройках браузера (или телефона) для этого сайта — разрешите их там.'
+        actions.hidden = true
+        return
+      }
+      const on = await pushEnabled()
+      note.textContent = on
+        ? 'Включены: сообщения, звонки и заявки в друзья приходят, даже когда сайт закрыт.'
+        : 'Включите, чтобы получать сообщения и звонки, даже когда сайт закрыт.'
+      btn.textContent = on ? 'Выключить' : 'Включить'
+      btn.className = `vl-btn ${on ? 'vl-btn--soft' : 'vl-btn--primary'} vl-btn--pill vl-btn--sm`
+      btn.onclick = async () => {
+        btn.disabled = true
+        try {
+          if (on) await disablePush()
+          else {
+            const res = await requestNotificationPermission()
+            if (res === 'granted') await enablePush()
+          }
+        } catch (e) { toast(e.message || 'Не получилось', 'error') }
+        refresh()
+      }
+    }
+    refresh()
+    return card
   }
 }

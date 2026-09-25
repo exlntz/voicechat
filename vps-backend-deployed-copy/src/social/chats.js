@@ -5,6 +5,7 @@
 // dm_key = "saved:<id>": в списке появляется только после первого сообщения.
 import { getUserById, pairKey, toInt, rateLimit, MESSAGE_MAX_LENGTH, PAGE_SIZE } from './db.js'
 import { randomBytes } from 'node:crypto'
+import { messagePushText } from './push.js'
 
 const CALL_RING_MS = 45000 // столько звонит входящий, потом «пропущенный»
 const MAX_ATTACHMENTS = 10
@@ -13,7 +14,7 @@ const SEARCH_SCAN = 20000 // сколько последних сообщени�
 const WALLPAPER_RE = /^(p:[a-z0-9-]{1,24}|file:[0-9a-f]{32})$/
 const URL_RE = /\bhttps?:\/\/[^\s<>"']+[^\s<>"'.,;:!?)\]}]/gi
 
-export function registerChatRoutes(app, { db, hub, friends, media, createCallRoom }) {
+export function registerChatRoutes(app, { db, hub, friends, media, push, createCallRoom }) {
   const VISIBLE = `m.conversation_id = ? AND m.id > ? AND m.deleted_at IS NULL
     AND NOT EXISTS (SELECT 1 FROM message_hidden h WHERE h.user_id = ? AND h.message_id = m.id)`
   const q = {
@@ -239,7 +240,26 @@ export function registerChatRoutes(app, { db, hub, friends, media, createCallRoo
       const uid = Number(m.user_id)
       if (uid !== authorId && hub.isOnline(uid)) markDelivered(convId, uid, id)
     }
+    // Кого нет на сайте — push на телефон/компьютер (кроме чатов «без звука» и звонков: у них свой push)
+    if (push && kind !== 'call') {
+      for (const m of members) {
+        const uid = Number(m.user_id)
+        if (uid === authorId || m.muted) continue
+        push.send(uid, { title: nameFor(uid, authorId), body: messagePushText(message), tag: 'conv-' + convId, url: '/dm/' + convId })
+      }
+    }
     return message
+  }
+  // Как получатель видит автора: своё имя-контакт или имя из профиля
+  let contactStmt = null
+  function nameFor(viewerId, userId) {
+    try {
+      if (!contactStmt) contactStmt = db.prepare('SELECT name FROM contacts WHERE owner_id = ? AND user_id = ?')
+      const r = contactStmt.get(viewerId, userId)
+      if (r) return r.name
+    } catch {}
+    const u = getUserById(db, userId)
+    return u ? u.displayName : 'Сообщение'
   }
 
   function updateMessageMeta(messageId, patch) {
@@ -677,6 +697,7 @@ export function registerChatRoutes(app, { db, hub, friends, media, createCallRoo
       hub.publish([...call.calleeIds], 'call.cancel', { callId: call.id, reason: 'timeout' })
     }, CALL_RING_MS)
     hub.publish([...calleeIds], 'call.incoming', callView(call))
+    if (push) for (const uid of calleeIds) push.send(uid, { title: nameFor(uid, ctx.me), body: 'Входящий звонок — нажмите, чтобы ответить', tag: 'call-' + call.id, url: '/dm/' + ctx.convId, call: true })
     return c.json({ callId: call.id, roomCode, hostSecret, message })
   })
 
