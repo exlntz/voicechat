@@ -3556,3 +3556,22 @@ html[data-theme="light"] .tile { box-shadow: none; }
 html[data-theme="light"] .dd-btn:disabled { background: #eef1f4; }
 /* Без камеры чёрный фон <video> не выглядывает тонким контуром из-под скруглённых углов */
 .tile:has(> .no-video-placeholder:not([style*="none"])) > video { visibility: hidden; }
+
+/* Миниатюры участников рядом с демонстрацией (и при «главном на весь экран»): маленький
+   кружок и имя, без громкости и кнопок — они у крупной плитки */
+.room-main .sidebar-participants .tile { border-radius: 18px; }
+.room-main .sidebar-participants .tile .avatar-circle { width: clamp(30px, 22cqw, 48px); font-size: clamp(12px, 7cqw, 17px); box-shadow: none; }
+.room-main .sidebar-participants .tile.speaking .avatar-circle { box-shadow: 0 0 0 4px rgba(58, 168, 110, 0.22); }
+.room-main .sidebar-participants .tile-label {
+  left: 10px; bottom: 8px; max-width: calc(100% - 20px); padding: 3px 8px; gap: 5px; font-size: 12px; font-weight: 700;
+}
+.room-main .sidebar-participants .tile-label i { font-size: 11px; }
+.room-main .sidebar-participants .tile-fullscreen-btn,
+.room-main .sidebar-participants .tile-kick-btn { display: none !important; }
+/* Громкость в миниатюре — таблеткой над именем при наведении (на телефоне — у крупной плитки) */
+.room-main .sidebar-participants .tile-label .volume-control { display: inline-flex !important; }
+@media (hover: none) { .room-main .sidebar-participants .tile-label .volume-control { display: none !important; } }
+/* В миниатюре (низкая плитка) громкость — в строке с именем, не поверх кружка */
+.room-main .sidebar-participants .tile-label .volume-control { position: static; top: auto; bottom: auto; background: none !important; padding: 0 4px 0 0; margin: 0; gap: 5px; }
+.room-main .sidebar-participants .tile-label .volume-control input[type="range"] { width: 64px; }
+.room-main .sidebar-participants .tile-label .volume-control i { font-size: 11px; }
