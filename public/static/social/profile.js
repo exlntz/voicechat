@@ -3,10 +3,10 @@
 // слева разделы, справа карточки (те же классы settings-*, одно оформление на весь сайт).
 import { api } from './api.js'
 import { store, updateUser } from './store.js'
-import { h, icon, avatar, displayName, toast } from './ui.js'
-import { uploadFile, prepareImage, probeMedia } from './upload.js'
+import { h, icon, avatar, displayName, toast, bannerMedia, bannerKey } from './ui.js'
+import { uploadFile } from './upload.js'
 import { openLightbox } from './media-ui.js'
-import { cropAvatar } from './crop.js'
+import { cropAvatar, cropBanner } from './crop.js'
 
 let current = null // открытое окно
 
@@ -93,13 +93,9 @@ export function openProfile({ logout }) {
       avaBox.replaceChildren(avatar(u, { size: 72 }))
       avaBox.classList.toggle('is-openable', !!u.avatarUrl)
       if (u.bannerUrl) {
-        if (bannerBox.dataset.src !== u.bannerUrl) {
-          bannerBox.dataset.src = u.bannerUrl
-          bannerBox.replaceChildren(u.bannerKind === 'video'
-            ? h('video', { src: u.bannerUrl, autoplay: true, muted: true, loop: true, playsinline: true })
-            : h('img', { src: u.bannerUrl, alt: '' }))
-          const v = bannerBox.querySelector('video')
-          if (v) { v.muted = true; v.play().catch(() => {}) }
+        if (bannerBox.dataset.src !== bannerKey(u)) {
+          bannerBox.dataset.src = bannerKey(u)
+          bannerBox.replaceChildren(bannerMedia(u))
         }
       } else { bannerBox.replaceChildren(); delete bannerBox.dataset.src }
       bannerBox.classList.toggle('has-media', !!u.bannerUrl)
@@ -128,6 +124,15 @@ export function openProfile({ logout }) {
         } catch (e) { setMediaStatus(e.message, 'err'); return }
         if (!raw) return // «Отмена»
       }
+      // Фон: выбрать полосу 3:1 — картинка вырезается, у видео и GIF запоминается рамка
+      let bannerPicked = null
+      if (purpose === 'banner') {
+        if (raw.size > 30 * 1024 * 1024) { setMediaStatus('Файл для фона — до 30 МБ', 'err'); return }
+        try {
+          bannerPicked = await cropBanner(raw)
+        } catch (e) { setMediaStatus(e.message, 'err'); return }
+        if (!bannerPicked) return // «Отмена»
+      }
       pickAva.disabled = pickBanner.disabled = true
       setMediaStatus('Загружаем…', '')
       try {
@@ -136,14 +141,10 @@ export function openProfile({ logout }) {
         if (purpose === 'avatar') {
           // Уже вырезана в cropAvatar (квадрат до 1024 px); GIF — как есть
           if (file.size > 5 * 1024 * 1024) throw new Error('GIF-аватарка больше 5 МБ')
-        } else if (raw.type.startsWith('video/')) {
-          if (raw.size > 30 * 1024 * 1024) throw new Error('Видео для фона — до 30 МБ')
-          meta = await probeMedia(raw)
         } else {
-          const prepared = await prepareImage(raw, { maxSide: 1920 })
-          file = prepared.file
-          meta = prepared.meta
-          if (file.size > 30 * 1024 * 1024) throw new Error('Файл для фона — до 30 МБ')
+          file = bannerPicked.file
+          meta = { ...bannerPicked.meta }
+          if (bannerPicked.crop) meta.crop = bannerPicked.crop
         }
         await uploadFile(file, { purpose, meta, onProgress: (p) => setMediaStatus(`Загружаем… ${Math.round(p * 100)}%`, '') })
         const r = await api.get('/api/profile')

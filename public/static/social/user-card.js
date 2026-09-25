@@ -3,7 +3,7 @@
 // ниже — как в Телеграме: всё, чем вы обменялись в личке, по вкладкам.
 import { api } from './api.js'
 import { store, userById, presenceOf, dmWith, rememberUser } from './store.js'
-import { h, icon, avatar, displayName, presenceText, timeShort, dayLabel, fmtClock } from './ui.js'
+import { h, icon, avatar, displayName, presenceText, timeShort, dayLabel, fmtClock, bannerMedia, bannerKey } from './ui.js'
 import { voicePlayer, fileCard, openLightbox } from './media-ui.js'
 
 let current = null
@@ -53,14 +53,10 @@ export function openUserCard({ userId = 0, convId = 0, saved = false, onMessage,
     const hasBanner = !saved && user.bannerUrl
     banner.classList.toggle('has-media', !!hasBanner)
     if (hasBanner) {
-      const key = user.bannerUrl
+      const key = bannerKey(user)
       if (banner.dataset.src !== key) {
         banner.dataset.src = key
-        banner.replaceChildren(user.bannerKind === 'video'
-          ? h('video', { src: user.bannerUrl, autoplay: true, muted: true, loop: true, playsinline: true, preload: 'auto' })
-          : h('img', { src: user.bannerUrl, alt: '', draggable: 'false' }))
-        const v = banner.querySelector('video')
-        if (v) { v.muted = true; v.play().catch(() => {}) }
+        banner.replaceChildren(bannerMedia(user))
       }
     } else { banner.replaceChildren(); delete banner.dataset.src }
     avaSlot.replaceChildren(avatar(user, { size: 96, presence: saved ? null : presenceOf(user.id), saved }))

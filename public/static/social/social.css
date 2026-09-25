@@ -826,7 +826,7 @@ body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { dis
   border-radius: 28px; background: var(--vl-raised); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   animation: vl-pop 0.26s var(--ease) both; font-family: var(--vl-font);
 }
-.vl-ucard__banner { flex: 0 0 auto; height: 150px; background: linear-gradient(135deg, #1b2a44, #0458cf 60%, #2a3b63); position: relative; overflow: hidden; }
+.vl-ucard__banner { flex: 0 0 auto; aspect-ratio: 3 / 1; background: linear-gradient(135deg, #1b2a44, #0458cf 60%, #2a3b63); position: relative; overflow: hidden; }
 .vl-ucard.is-saved .vl-ucard__banner { background: linear-gradient(135deg, #0a3a86, #0458cf 55%, #3d7fe0); }
 .vl-ucard__banner.has-media { background: #0d1016; }
 .vl-ucard__banner img, .vl-ucard__banner video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: vl-fade-in 0.4s ease both; }
@@ -888,7 +888,10 @@ body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { dis
 .vl-crop__stage:focus-visible { box-shadow: 0 0 0 2px var(--accent-soft); }
 .vl-crop__img { position: absolute; left: 0; top: 0; max-width: none; transform-origin: 0 0; pointer-events: none; will-change: transform; }
 /* Круглая рамка: всё вокруг затемнено */
-.vl-crop__ring { position: absolute; border-radius: 50%; box-shadow: 0 0 0 400px rgba(10, 12, 15, 0.62); outline: 2px solid rgba(255, 255, 255, 0.85); pointer-events: none; }
+.vl-crop__ring { position: absolute; border-radius: 50%; box-sizing: border-box; box-shadow: 0 0 0 400px rgba(10, 12, 15, 0.62); outline: 2px solid rgba(255, 255, 255, 0.85); pointer-events: none; }
+.vl-crop__ring.is-rect { border-radius: 12px; }
+/* Фон с выбранной рамкой: размеры и сдвиг ставит bannerMedia (ui.js) */
+.vl-ucard__banner .is-cropped, .vl-pcard__banner .is-cropped { object-fit: fill; max-width: none; }
 .vl-crop__bar { display: flex; align-items: center; gap: 12px; margin: 16px 4px 20px; color: var(--text-faint); }
 .vl-crop__bar .vl-ico { width: 18px; height: 18px; flex: 0 0 auto; }
 .vl-crop__bar .vl-ico.is-small { width: 13px; height: 13px; }
@@ -911,7 +914,7 @@ body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { dis
 
 /* ─────────── Свой профиль: превью фона и аватарки ─────────── */
 .vl-pcard { padding: 0 !important; overflow: hidden; flex-shrink: 0; --vl-ring: var(--vl-raised); }
-.vl-pcard__banner { height: 110px; background: linear-gradient(135deg, #1b2a44, #0458cf 60%, #2a3b63); position: relative; overflow: hidden; }
+.vl-pcard__banner { aspect-ratio: 3 / 1; background: linear-gradient(135deg, #1b2a44, #0458cf 60%, #2a3b63); position: relative; overflow: hidden; }
 .vl-pcard__banner.has-media { background: #0d1016; }
 .vl-pcard__banner img, .vl-pcard__banner video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .vl-pcard__row { display: flex; align-items: flex-start; gap: 14px; padding: 0 18px 16px; margin-top: -34px; position: relative; }
