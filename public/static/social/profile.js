@@ -4,7 +4,8 @@
 import { api } from './api.js'
 import { store, updateUser } from './store.js'
 import { h, icon, avatar, displayName, toast } from './ui.js'
-import { uploadFile, squareAvatar, prepareImage, probeMedia } from './upload.js'
+import { uploadFile, prepareImage, probeMedia } from './upload.js'
+import { openLightbox } from './media-ui.js'
 
 let current = null // открытое окно
 
@@ -56,7 +57,7 @@ export function openProfile({ logout }) {
   ])
   const overlay = h('div', { class: 'settings-overlay vl-profile-overlay' }, [sheet])
   overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) closeProfile() })
-  const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); closeProfile() } }
+  const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.vl-lightbox')) { e.preventDefault(); closeProfile() } }
   document.addEventListener('keydown', onKey, true)
   document.body.appendChild(overlay)
   current = { overlay, onKey }
@@ -89,6 +90,7 @@ export function openProfile({ logout }) {
     function paintPreview() {
       const u = store.me
       avaBox.replaceChildren(avatar(u, { size: 72 }))
+      avaBox.classList.toggle('is-openable', !!u.avatarUrl)
       if (u.bannerUrl) {
         if (bannerBox.dataset.src !== u.bannerUrl) {
           bannerBox.dataset.src = u.bannerUrl
@@ -112,6 +114,8 @@ export function openProfile({ logout }) {
     const removeAva = h('button', { type: 'button', class: 'vl-btn vl-btn--ghost-text vl-btn--sm' }, 'Убрать аватарку')
     const removeBanner = h('button', { type: 'button', class: 'vl-btn vl-btn--ghost-text vl-btn--sm' }, 'Убрать фон')
     pickAva.addEventListener('click', () => avaInput.click())
+    avaBox.addEventListener('click', () => { const u = store.me; if (u.avatarUrl) openLightbox([{ kind: 'image', url: u.avatarUrl, name: 'avatar' }]) })
+    bannerBox.addEventListener('click', () => { const u = store.me; if (u.bannerUrl) openLightbox([{ kind: u.bannerKind === 'video' ? 'video' : 'image', url: u.bannerUrl, name: 'banner' }]) })
     pickBanner.addEventListener('click', () => bannerInput.click())
     const setMediaStatus = (text, kind) => { mediaStatus.textContent = text; mediaStatus.className = 'vl-fld-status' + (kind ? ' is-' + kind : '') }
     async function upload(purpose, raw) {
@@ -121,8 +125,11 @@ export function openProfile({ logout }) {
         let file = raw
         let meta = {}
         if (purpose === 'avatar') {
+          // Картинку не обрезаем: в кружке она по центру, а по нажатию открывается целиком
           if (raw.size > 20 * 1024 * 1024) throw new Error('Картинка больше 20 МБ')
-          file = await squareAvatar(raw)
+          const prepared = await prepareImage(raw, { maxSide: 1600 })
+          file = prepared.file
+          meta = prepared.meta
           if (file.size > 5 * 1024 * 1024) throw new Error('GIF-аватарка больше 5 МБ')
         } else if (raw.type.startsWith('video/')) {
           if (raw.size > 30 * 1024 * 1024) throw new Error('Видео для фона — до 30 МБ')

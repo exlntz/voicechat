@@ -299,7 +299,8 @@ export function registerChatRoutes(app, { db, hub, friends, media, createCallRoo
     return c.json({ conversation: summary(ctx.convId, ctx.me) })
   })
 
-  // Настройки чата для себя: без звука, скрыть из списка, закрепить сверху, обои
+  // Настройки чата: без звука, скрыть из списка, закрепить сверху — для себя;
+  // обои — по умолчанию у обоих участников (forBoth: false — только у себя)
   app.patch('/api/conversations/:id', async (c) => {
     const ctx = requireMember(c)
     if (ctx.error) return ctx.error
@@ -311,7 +312,14 @@ export function registerChatRoutes(app, { db, hub, friends, media, createCallRoo
       const w = body.wallpaper === null || body.wallpaper === '' ? null : String(body.wallpaper)
       if (w && !WALLPAPER_RE.test(w)) return c.json({ error: 'bad_wallpaper', message: 'Неизвестные обои' }, 400)
       if (w && w.startsWith('file:') && !q.wallpaperFile.get(w.slice(5), ctx.me)) return c.json({ error: 'bad_wallpaper', message: 'Картинка не найдена' }, 400)
-      q.setWallpaper.run(w, ctx.convId, ctx.me)
+      const targets = body.forBoth === false ? [ctx.me] : memberIds(ctx.convId)
+      for (const id of targets) q.setWallpaper.run(w, ctx.convId, id)
+      // Собеседнику — свежая карточка чата, если личка у него не скрыта
+      for (const id of targets) {
+        if (id === ctx.me) continue
+        const m = q.member.get(ctx.convId, id)
+        if (m && !m.hidden) hub.publish([id], 'conversation.update', summary(ctx.convId, id))
+      }
     }
     const s = summary(ctx.convId, ctx.me)
     hub.publish([ctx.me], 'conversation.update', s)

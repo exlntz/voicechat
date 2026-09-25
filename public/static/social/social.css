@@ -784,6 +784,8 @@ body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { dis
 .vl-check__box { width: 20px; height: 20px; flex: 0 0 auto; border-radius: 6px; border: 1.5px solid var(--vl-soft-2); display: grid; place-items: center; color: transparent; transition: background 0.15s, border-color 0.15s, color 0.15s; }
 .vl-check__box .vl-ico { width: 13px; height: 13px; stroke-width: 3; }
 .vl-check input:checked + .vl-check__box { background: var(--danger); border-color: var(--danger); color: #fff; }
+.vl-check.is-accent input:checked + .vl-check__box { background: var(--accent); border-color: var(--accent); }
+.vl-wall .vl-check { margin: 4px 0 16px; }
 .vl-check input:focus-visible + .vl-check__box { outline: 2px solid var(--accent-soft); outline-offset: 2px; }
 
 /* ─────────── Просмотрщик фото и видео ─────────── */
@@ -852,6 +854,11 @@ body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { dis
 .vl-ucard__link-text b { font: 600 14px var(--vl-font); }
 .vl-ucard__link-text span { color: var(--accent-soft); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vl-ucard__more { display: flex; margin: 12px auto 0; }
+
+/* Аватарку и фон можно открыть целиком */
+.vl-ucard__ava.is-openable, .vl-pcard__ava.is-openable, .vl-ucard__banner.is-openable, .vl-pcard__banner.has-media { cursor: zoom-in; }
+.vl-ucard__ava.is-openable .vl-avatar, .vl-pcard__ava.is-openable .vl-avatar { transition: transform 0.25s var(--ease), filter 0.2s; }
+.vl-ucard__ava.is-openable:hover .vl-avatar, .vl-pcard__ava.is-openable:hover .vl-avatar { transform: scale(1.04); filter: brightness(1.08); }
 
 /* ─────────── Обои: выбор ─────────── */
 .vl-wall { width: min(520px, 100%); }

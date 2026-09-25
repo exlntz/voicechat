@@ -64,6 +64,8 @@ export function openUserCard({ userId = 0, convId = 0, saved = false, onMessage,
       }
     } else { banner.replaceChildren(); delete banner.dataset.src }
     avaSlot.replaceChildren(avatar(user, { size: 96, presence: saved ? null : presenceOf(user.id), saved }))
+    avaSlot.classList.toggle('is-openable', !saved && !!user.avatarUrl)
+    banner.classList.toggle('is-openable', !!hasBanner)
     name.textContent = saved ? 'Избранное' : displayName(user)
     uname.textContent = saved ? 'Заметки, файлы и пересланное — только для вас' : '@' + user.username
     status.textContent = saved ? '' : presenceText(presenceOf(user.id))
@@ -166,7 +168,11 @@ export function openUserCard({ userId = 0, convId = 0, saved = false, onMessage,
     return b
   }
 
-  const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeUserCard() } }
+  // Нажатие на аватарку или фон — открыть целиком
+  avaSlot.addEventListener('click', () => { if (!saved && user.avatarUrl) openLightbox([{ kind: 'image', url: user.avatarUrl, name: 'avatar' }]) })
+  banner.addEventListener('click', () => { if (!saved && user.bannerUrl) openLightbox([{ kind: user.bannerKind === 'video' ? 'video' : 'image', url: user.bannerUrl, name: 'banner' }]) })
+  // Esc при открытом просмотре закрывает только просмотр
+  const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.vl-lightbox')) { e.preventDefault(); e.stopPropagation(); closeUserCard() } }
   close.addEventListener('click', closeUserCard)
   overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) closeUserCard() })
   document.addEventListener('keydown', onKey, true)
