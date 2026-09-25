@@ -1141,12 +1141,17 @@ async function enterRoom(joinData) {
     title: 'Звонок в отдельном окне поверх других программ',
     'aria-label': 'Звонок в отдельном окне'
   }, [el('i', { class: 'fas fa-up-right-from-square' })])
-  if (canMiniWindow || canPipWindow) topRight.appendChild(popOutBtn)
+  // В шапке кнопки «в отдельном окне» больше нет (по просьбе); сама функция осталась в коде
+  // Значок «Участники» — два человека (как в макете «Голос — звонок»): при наведении
+  // передний коротко подпрыгивает, задний чуть позже сдвигается к нему
   const participantsBtn = el('button', {
     class: 'ctrl-btn room-people-btn',
     title: 'Участники',
-    'aria-label': 'Участники'
-  }, [el('i', { class: 'fas fa-users' })])
+    'aria-label': 'Участники',
+    html: '<svg class="room-people-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<g class="room-people-ico__back"><path d="M16 3.5a4 4 0 0 1 0 8"/><path d="M22 21a7 7 0 0 0-4-6.3"/></g>' +
+      '<g class="room-people-ico__front"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/></g></svg>'
+  })
   topRight.appendChild(participantsBtn)
   topbar.appendChild(topRight)
 
@@ -3071,9 +3076,13 @@ async function enterRoom(joinData) {
   function participantRow(name, isLocal, isHost, micMuted) {
     const children = [
       el('div', { class: `avatar-circle${isLocal ? ' is-local' : ''}` }, initials(name)),
-      el('span', { class: 'panel-participant__name' }, [name, isLocal ? el('span', { class: 'panel-participant__you' }, ' (Вы)') : null].filter(Boolean))
+      el('span', { class: 'panel-participant__name' }, [
+        el('span', { class: 'panel-participant__text' }, name),
+        isLocal ? el('span', { class: 'panel-participant__you' }, '(Вы)') : null,
+        // Корона — рядом с именем того, кто создал комнату (в том числе у вас самих)
+        isHost ? el('i', { class: 'fas fa-crown host-crown', title: 'Создатель комнаты', 'aria-label': 'Создатель комнаты' }) : null
+      ].filter(Boolean))
     ]
-    if (isHost) children.push(el('i', { class: 'fas fa-crown host-crown', title: 'Создатель комнаты', 'aria-label': 'Создатель комнаты' }))
     if (micMuted) children.push(el('i', { class: 'fas fa-microphone-slash panel-participant__muted', title: 'Микрофон выключен', 'aria-label': 'Микрофон выключен' }))
     return el('div', { class: `panel-participant${isHost ? ' is-host' : ''}` }, children)
   }
