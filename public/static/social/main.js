@@ -20,7 +20,7 @@ import { initNotifications, setBaseTitle } from './notify.js'
 import { initPush, disablePush } from './push.js'
 import { initCalls, onCallEnded, isSwitching, inCall, callState } from './call-invite.js'
 import { preloadWallpaper } from './wallpapers.js'
-import { h, icon, toast, displayName, setSelfId, waveBars, isMobile, onMobileChange, homePath } from './ui.js'
+import { h, icon, toast, displayName, setSelfId, waveBars, isMobile, onMobileChange, homePath, initHoverFill } from './ui.js'
 
 const VL = window.VL
 const E = () => window.electronAPI || {}
@@ -497,6 +497,7 @@ setUnauthorizedHandler(() => { if (sessionActive) { toast('Сессия исте
 // ---------- Запуск ----------
 async function boot() {
   VL.shellReady = true
+  initHoverFill() // заливка кнопок от курсора, как в звонке
   body.classList.add('vl-shell')
   initNotifications({ navigate: openDeepLink })
   initCalls({ navigate, onCallStart: () => updateLayout() })

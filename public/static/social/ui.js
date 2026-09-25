@@ -319,6 +319,76 @@ export function setTicks(node, status) {
   return true
 }
 
+// ---- Заливка от курсора, как у кнопок звонка (anker.js) ----
+// При наведении мышью из точки входа вырастает круг цвета наведения (--ank-fill в social.css)
+// и заполняет кнопку; при уходе сжимается в точку выхода. Один делегированный обработчик на
+// весь документ — не нужно навешивать его на каждую кнопку при каждой перерисовке.
+const FILL_SEL = [
+  '.vl-round', '.vl-btn', '.vl-pill', '.vl-chip', '.vl-dm:not(.is-skeleton)', '.vl-me__btn', '.vl-composer__send', '.vl-composer__attach',
+  '.vl-menu__item', '.vl-picker__row', '.vl-search__row', '.vl-friend:not(.is-skeleton)', '.vl-tile:not(.is-skeleton)', '.settings-nav__item',
+  '.vl-call-btn', '.vl-jump', '.vl-solo-chats', '.vl-side__call', '.vl-voice__btn', '.vl-quote', '.vl-filecard', '.vl-ucard__when',
+  '.vl-ucard__link', '.vl-pinbar__body', '.vl-fwd', '.vl-tray__x', '.vl-chat__head-who', '.vl-wall-tile__bg'
+].join(',')
+const FILL_MS = 420
+export function initHoverFill() {
+  if (!window.matchMedia || !matchMedia('(hover: hover) and (pointer: fine)').matches) return
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const state = new WeakMap()
+  function ensure(el) {
+    let st = state.get(el)
+    if (!st) {
+      const wrap = document.createElement('span')
+      wrap.className = 'ank-fill'
+      wrap.setAttribute('aria-hidden', 'true')
+      const dot = document.createElement('span')
+      dot.className = 'ank-fill__dot'
+      wrap.appendChild(dot)
+      st = { wrap, dot, t0: 0 }
+      state.set(el, st)
+    }
+    // Узел мог перерисоваться (replaceChildren) — вернуть заливку на место
+    if (st.wrap.parentNode !== el) el.insertBefore(st.wrap, el.firstChild)
+    // У кнопок с position: absolute/fixed (плавающие) позицию не трогаем
+    el.classList.add(getComputedStyle(el).position === 'static' ? 'has-fill' : 'has-fill-keep')
+    return st
+  }
+  function place(el, st, e) {
+    const r = el.getBoundingClientRect()
+    const x = e.clientX - r.left
+    const y = e.clientY - r.top
+    const rad = Math.hypot(Math.max(x, r.width - x), Math.max(y, r.height - y)) + 2
+    st.dot.style.left = (x - rad).toFixed(1) + 'px'
+    st.dot.style.top = (y - rad).toFixed(1) + 'px'
+    st.dot.style.width = st.dot.style.height = (rad * 2).toFixed(1) + 'px'
+  }
+  function jump(st, scale) {
+    st.dot.classList.add('is-instant')
+    st.dot.style.transform = `scale(${scale})`
+    void st.dot.offsetWidth
+    st.dot.classList.remove('is-instant')
+  }
+  document.addEventListener('pointerover', (e) => {
+    if (e.pointerType && e.pointerType !== 'mouse') return
+    const el = e.target.closest && e.target.closest(FILL_SEL)
+    if (!el || el.disabled || (e.relatedTarget && el.contains(e.relatedTarget))) return
+    const st = ensure(el)
+    place(el, st, e)
+    jump(st, 0)
+    st.dot.style.transform = 'scale(1)'
+    st.t0 = performance.now()
+  }, { passive: true, capture: true })
+  document.addEventListener('pointerout', (e) => {
+    if (e.pointerType && e.pointerType !== 'mouse') return
+    const el = e.target.closest && e.target.closest(FILL_SEL)
+    if (!el || (e.relatedTarget && el.contains(e.relatedTarget))) return
+    const st = state.get(el)
+    if (!st) return
+    // Круг уже залил кнопку — переносим центр в точку выхода и сжимаем туда
+    if (performance.now() - st.t0 >= FILL_MS) { place(el, st, e); jump(st, 1) }
+    st.dot.style.transform = 'scale(0)'
+  }, { passive: true, capture: true })
+}
+
 // ---- Телефон ----
 // На узком экране список чатов — отдельный главный экран (/chats), как в Телеграме
 const MOBILE_MQ = typeof matchMedia === 'function' ? matchMedia('(max-width: 860px)') : null
