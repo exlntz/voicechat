@@ -3,6 +3,8 @@ import SwiftUI
 // Лобби перед звонком: с чем входить, код комнаты, вход
 struct LobbyView: View {
     @EnvironmentObject var app: AppModel
+    /// Внутри вкладки «Звонки»: без логотипа и строки аккаунта (они в шапке и профиле)
+    var embedded = false
     @State var roomCode = ""
     @State var camOn = false
     @State var micOn = true
@@ -10,12 +12,29 @@ struct LobbyView: View {
     @State var error: String?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                BrandHeader(logo: 44, font: 30)
-                    .padding(.bottom, 2)
+        Group {
+            if embedded {
+                card
+            } else {
+                ScrollView { card }
+                    .scrollDismissesKeyboard(.interactively)
+            }
+        }
+        .onAppear { micOn = !app.joinMicMuted }
+        .onChange(of: app.joinMicMuted) { muted in micOn = !muted }
+    }
 
-                userBar
+    private var card: some View {
+            VStack(alignment: .leading, spacing: 16) {
+                if !embedded {
+                    BrandHeader(logo: 44, font: 30)
+                        .padding(.bottom, 2)
+                    userBar
+                } else {
+                    Text("Комната по коду")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(Theme.text)
+                }
 
                 if let notice = app.notice { MessageBox(text: notice) }
                 if let error { MessageBox(text: error) }
@@ -33,25 +52,17 @@ struct LobbyView: View {
                 .tint(Theme.accent)
                 .padding(.vertical, 2)
 
-                UnderlineField(title: "Код комнаты", text: $roomCode,
-                               hint: "оставьте пустым — создать новую", onSubmit: join)
+                UnderlineField(title: "Код комнаты", text: $roomCode, onSubmit: join)
                     .padding(.top, 4)
 
                 PrimaryButton(title: roomCode.isEmpty ? "Создать / войти" : "Войти в комнату",
                               loading: busy, action: join)
                     .padding(.top, 8)
 
-                Text("Поделитесь кодом комнаты с теми, кого хотите позвать в звонок.")
-                    .font(.system(size: 13))
-                    .foregroundColor(Theme.textFaint)
             }
             .padding(24)
             .cardStyle()
             .padding(16)
-        }
-        .scrollDismissesKeyboard(.interactively)
-        .onAppear { micOn = !app.joinMicMuted }
-        .onChange(of: app.joinMicMuted) { muted in micOn = !muted }
     }
 
     private var userBar: some View {

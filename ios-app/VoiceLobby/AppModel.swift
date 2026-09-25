@@ -3,9 +3,12 @@ import SwiftUI
 
 @MainActor
 final class AppModel: ObservableObject {
-    enum Screen: Equatable { case loading, auth, lobby, call }
+    enum Screen: Equatable { case loading, auth, main, call }
+    /// Вкладки нижнего меню
+    enum Tab: Hashable { case chats, calls, friends }
 
     @Published var screen: Screen = .loading
+    @Published var tab: Tab = .chats
     @Published var user: User?
     @Published var call: CallModel?
     /// Сообщение для лобби после звонка (например, «Вы отключены от звонка»)
@@ -18,19 +21,19 @@ final class AppModel: ObservableObject {
 
     func start() async {
         do { user = try await API.me() } catch { user = nil }
-        screen = user == nil ? .auth : .lobby
+        screen = user == nil ? .auth : .main
     }
 
     func login(username: String, password: String) async throws {
         user = try await API.login(username: username, password: password)
         notice = nil
-        screen = .lobby
+        screen = .main
     }
 
     func register(displayName: String, username: String, password: String) async throws {
         user = try await API.register(displayName: displayName, username: username, password: password)
         notice = nil
-        screen = .lobby
+        screen = .main
     }
 
     func logout() async {
@@ -57,6 +60,15 @@ final class AppModel: ObservableObject {
         await model.connect()
     }
 
+    /// Позвонить в личку: сервер создаёт комнату и звонит собеседнику, мы сразу входим в неё
+    func call(conversation id: Int) async throws {
+        let start = try await API.startCall(conversation: id)
+        if let secret = start.hostSecret {
+            UserDefaults.standard.set(secret, forKey: "hostSecret:\(start.roomCode)")
+        }
+        try await join(roomCode: start.roomCode, micOn: !joinMicMuted, camOn: false)
+    }
+
     func leaveCall() async {
         await call?.leave()
         finishCall(message: nil)
@@ -65,7 +77,7 @@ final class AppModel: ObservableObject {
     private func finishCall(message: String?) {
         call = nil
         notice = message
-        screen = user == nil ? .auth : .lobby
+        screen = user == nil ? .auth : .main
     }
 
     /// Код комнаты из поля: можно вставить и ссылку вида https://voicelobby.online/room/abc123
