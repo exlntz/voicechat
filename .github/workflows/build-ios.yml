@@ -28,6 +28,14 @@ jobs:
       - name: Забрать код
         uses: actions/checkout@v4
 
+      # «Жидкое стекло» (нижнее меню, стеклянные кнопки) есть только в SDK iOS 26 — берём
+      # самый новый Xcode на машине; на старом Xcode приложение соберётся с матовыми панелями
+      - name: Выбрать новейший Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$XC" ]; then sudo xcode-select -s "$XC/Contents/Developer"; fi
+          xcodebuild -version
+
       - name: Инструменты (XcodeGen, xcbeautify, ldid)
         run: brew install xcodegen xcbeautify ldid
 
