@@ -3,7 +3,7 @@
 // Ниже — список: вкладки-«чипы» Все / Заявки / Заблокированные и поле «добавить по юзернейму».
 import { store, on, friendsBy, presenceOf, setFriend, loadFriends } from './store.js'
 import { api } from './api.js'
-import { h, icon, avatar, displayName, presenceText, showMenu, confirmDialog, toast } from './ui.js'
+import { h, icon, avatar, displayName, presenceText, showMenu, confirmDialog, toast, onLongPress } from './ui.js'
 import { startCall } from './call-invite.js'
 import { openUserCard } from './user-card.js'
 
@@ -224,6 +224,7 @@ export function createFriendsView({ navigate, openDmWith, menuButton, initialTab
       item.addEventListener('click', () => openDmWith(u.id))
       item.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target === item) openDmWith(u.id) })
       item.addEventListener('contextmenu', (e) => { e.preventDefault(); moreMenu(f, e) })
+      onLongPress(item, (e) => moreMenu(f, e))
     }
     return item
   }

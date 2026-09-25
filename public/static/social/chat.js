@@ -16,7 +16,7 @@ import {
 import { api } from './api.js'
 import {
   h, icon, avatar, setPresenceDot, displayName, presenceText, richText, timeHM, dayLabel,
-  dayKey, showMenu, toast, isSavedConv, attachmentLabel, fmtClock, msgStatus, ticks, setTicks
+  dayKey, showMenu, toast, isSavedConv, attachmentLabel, fmtClock, msgStatus, ticks, setTicks, onLongPress, homePath
 } from './ui.js'
 import { startCall, joinCallFromMessage, callState, inCall } from './call-invite.js'
 import { renderAttachments, openLightbox } from './media-ui.js'
@@ -791,6 +791,8 @@ export function createChatView({ convId, navigate, menuButton }) {
         setReply(m)
       })
       attachSwipe(msg, m)
+      // Телефон: долгое нажатие — меню сообщения
+      onLongPress(msg, (e) => { if (!editingKey && !e.target.closest('a, textarea, button, .vl-voice')) messageMenu(m, e) })
     }
     return msg
   }
@@ -818,10 +820,12 @@ export function createChatView({ convId, navigate, menuButton }) {
       pill.appendChild(join)
     }
     const node = h('div', { class: `vl-msg vl-msg--call${animateKeys.delete('m' + m.id) ? ' is-new' : ''}`, 'data-key': 'm' + m.id }, [pill])
-    node.addEventListener('contextmenu', (e) => {
+    const callMenu = (e) => {
       e.preventDefault()
       showMenu([{ label: 'Удалить у меня', icon: 'trash', danger: true, onClick: () => api.del(`/api/conversations/${convId}/messages/${m.id}?for=me`).then(() => removeMessage(convId, m.id)).catch((er) => toast(er.message, 'error')) }], e)
-    })
+    }
+    node.addEventListener('contextmenu', callMenu)
+    onLongPress(node, callMenu)
     return node
   }
 
@@ -1087,7 +1091,8 @@ export function createChatView({ convId, navigate, menuButton }) {
   unsub.push(() => document.removeEventListener('keydown', onFind))
   // Размер ленты меняется (панель звонка сверху, клавиатура телефона) — держим низ, если были внизу
   const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(() => { if (atBottom) scroller.scrollTop = scroller.scrollHeight }) : null
-  if (ro) ro.observe(scroller)
+  // Лента тоже меняет высоту (сообщения вне экрана сначала с примерной высотой, картинки догружаются)
+  if (ro) { ro.observe(scroller); ro.observe(list) }
 
   // Переход «показать в чате» из профиля/поиска до открытия чата
   let pendingJump = Number(store.pendingJump && store.pendingJump.convId === convId ? store.pendingJump.id : 0)
@@ -1176,6 +1181,6 @@ export async function askDeleteChat(conv, { navigate } = {}) {
   if (!res) return
   try {
     await api.del(`/api/conversations/${conv.id}?for=${res.checked || saved ? 'all' : 'me'}`)
-    if (navigate && store.activeConvId === conv.id) navigate('/friends')
+    if (navigate && store.activeConvId === conv.id) navigate(homePath())
   } catch (e) { toast(e.message, 'error') }
 }

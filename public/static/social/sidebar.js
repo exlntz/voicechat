@@ -1,7 +1,7 @@
 // ===================== Левая колонка: друзья, лички, панель звонка, профиль =====================
 import { store, on, sortedConversations, presenceOf, incomingCount, friendsBy } from './store.js'
 import { api } from './api.js'
-import { h, icon, avatar, displayName, presenceText, messagePreview, timeShort, showMenu, toast, waveBars, isSavedConv, msgStatus, ticks } from './ui.js'
+import { h, icon, avatar, displayName, presenceText, messagePreview, timeShort, showMenu, toast, waveBars, isSavedConv, msgStatus, ticks, onLongPress } from './ui.js'
 import { askDeleteChat } from './chat.js'
 import { notificationsNeedPermission, requestNotificationPermission } from './notify.js'
 import { callState, inCall } from './call-invite.js'
@@ -106,7 +106,7 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
         navigate('/dm/' + conv.id)
       })
       // ПКМ по чату: закрепить, уведомления, удалить (у себя или у обоих)
-      item.addEventListener('contextmenu', (e) => {
+      const chatMenu = (e) => {
         e.preventDefault()
         const patch = (body) => api.updateConversation(conv.id, body).catch((er) => toast(er.message, 'error'))
         showMenu([
@@ -116,7 +116,9 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
           'sep',
           { label: saved ? 'Очистить' : 'Удалить чат', icon: 'trash', danger: true, onClick: () => askDeleteChat(conv, { navigate }) }
         ], e)
-      })
+      }
+      item.addEventListener('contextmenu', chatMenu)
+      onLongPress(item, chatMenu) // телефон: долгое нажатие
       nodes.push(item)
     }
     if (!nodes.length) {
@@ -184,8 +186,17 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
     input.focus()
   }
 
+  // Телефон, экран «Чаты» во время звонка: полоска «Вернуться в звонок» (звонок идёт за списком)
+  const callBar = h('button', { type: 'button', class: 'vl-side__call', hidden: true }, [waveBars(4), h('span', {}, 'Идёт звонок'), h('b', {}, 'Вернуться')])
+  callBar.addEventListener('click', () => {
+    if (callState.conversationId) navigate('/dm/' + callState.conversationId)
+    else if (window.VL.state.roomCode) navigate('/room/' + window.VL.state.roomCode)
+  })
+  function renderCallBar() { callBar.hidden = !inCall() }
+
   root.replaceChildren(
     h('div', { class: 'vl-side__head' }, [h('h2', { class: 'vl-side__title' }, 'Чаты'), findBtn, addDmBtn]),
+    callBar,
     h('nav', { class: 'vl-side__nav', 'aria-label': 'Разделы' }, [navFriends, navLobby]),
     scroller,
     notifBanner,
@@ -194,8 +205,8 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
 
   unsub.push(on('conversations', renderDms), on('presence', () => { renderDms(); renderMe() }), on('typing-any', renderDms))
   unsub.push(on('friends', renderNav), on('unread', renderNav), on('connection', renderMe), on('status', renderMe), on('me', renderMe))
-  unsub.push(on('call-changed', () => { renderNav(); renderDms() }))
-  const onCallUi = () => renderDms()
+  unsub.push(on('call-changed', () => { renderNav(); renderDms(); renderCallBar() }))
+  const onCallUi = () => { renderDms(); renderCallBar() }
   window.addEventListener('vl-call-state', onCallUi)
 
   renderDms(); renderNav(); renderMe(); renderNotifBanner()
