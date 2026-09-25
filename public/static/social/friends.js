@@ -5,6 +5,7 @@ import { store, on, friendsBy, presenceOf, setFriend, loadFriends } from './stor
 import { api } from './api.js'
 import { h, icon, avatar, displayName, presenceText, showMenu, confirmDialog, toast } from './ui.js'
 import { startCall } from './call-invite.js'
+import { openUserCard } from './user-card.js'
 
 const TABS = [
   { id: 'all', label: 'Все' },
@@ -15,8 +16,24 @@ const TABS = [
 const TAB_ALIASES = { online: 'all', add: 'all' }
 const MAX_TILES = 6
 
-export function createFriendsView({ openDmWith, menuButton, initialTab }) {
+export function createFriendsView({ navigate, openDmWith, menuButton, initialTab }) {
   let tab = normalizeTab(initialTab)
+  // Профиль друга: фон, аватарка, общие медиа и файлы
+  function openProfileOf(u) {
+    openUserCard({
+      userId: u.id,
+      onMessage: openDmWith,
+      onCall: callFriend,
+      onJump: (convId, id) => { store.pendingJump = { convId, id }; navigate('/dm/' + convId) }
+    })
+  }
+  // Клик по аватарке — профиль, по остальной строке — личка
+  function profileAvatar(node, u) {
+    node.classList.add('is-clickable')
+    node.setAttribute('title', 'Профиль')
+    node.addEventListener('click', (e) => { e.stopPropagation(); openProfileOf(u) })
+    return node
+  }
 
   function normalizeTab(id) {
     const t = TAB_ALIASES[id] || id
@@ -39,16 +56,16 @@ export function createFriendsView({ openDmWith, menuButton, initialTab }) {
     b.addEventListener('click', () => setTab(t.id))
     return b
   })
-  const addInput = h('input', { type: 'text', class: 'vl-field', placeholder: 'Добавить по @юзернейму', maxlength: '25', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Юзернейм друга' })
+  // Поле — как на входе и регистрации (всплывающая подпись и подсказка, anker.js); «@» подставляется сам
+  const addInput = h('input', { type: 'text', placeholder: 'Юзернейм друга', maxlength: '25', autocomplete: 'off', spellcheck: 'false' })
+  if (window.VL.atPrefixField) window.VL.atPrefixField(addInput)
   const addBtn = h('button', { type: 'button', class: 'vl-round is-accent', title: 'Отправить заявку', 'aria-label': 'Отправить заявку', disabled: true }, [icon('user-plus')])
-  const addStatus = h('div', { class: 'vl-add__status', role: 'status' })
+  const addStatus = h('div', { class: 'vl-fld-status', role: 'status' })
   const list = h('div', { class: 'vl-friend-list', role: 'list' })
   const bottom = h('section', { class: 'vl-panel vl-friends__bottom' }, [
-    h('div', { class: 'vl-friends__bar' }, [
-      h('div', { class: 'vl-chips', role: 'tablist', 'aria-label': 'Список друзей' }, chips),
-      h('div', { class: 'vl-add' }, [addInput, addBtn])
-    ]),
+    h('div', { class: 'vl-add' }, [h('div', { class: 'vl-fld-host' }, [addInput]), addBtn]),
     addStatus,
+    h('div', { class: 'vl-friends__bar' }, [h('div', { class: 'vl-chips', role: 'tablist', 'aria-label': 'Список друзей' }, chips)]),
     list
   ])
 
@@ -56,9 +73,9 @@ export function createFriendsView({ openDmWith, menuButton, initialTab }) {
 
   // ---------- Добавить в друзья ----------
   addInput.addEventListener('input', () => {
-    addBtn.disabled = !addInput.value.trim()
+    addBtn.disabled = !addInput.value.replace(/^@+/, '').trim()
     addStatus.textContent = ''
-    addStatus.className = 'vl-add__status'
+    addStatus.className = 'vl-fld-status'
   })
   addInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !addBtn.disabled) addBtn.click() })
   addBtn.addEventListener('click', async () => {
@@ -67,14 +84,16 @@ export function createFriendsView({ openDmWith, menuButton, initialTab }) {
     try {
       const res = await api.requestFriend(username)
       setFriend(res.friend)
-      addStatus.className = 'vl-add__status is-success'
+      // Очистить поле так, чтобы подпись опустилась обратно (anker.js следит за событием input)
+      addInput.value = ''
+      addInput.dispatchEvent(new Event('input'))
+      addStatus.className = 'vl-fld-status is-ok'
       addStatus.textContent = res.friend.status === 'friend'
         ? `Готово, теперь вы друзья: ${displayName(res.friend.user)}.`
         : `Заявка отправлена: ${displayName(res.friend.user)}.`
-      addInput.value = ''
       if (res.friend.status !== 'friend') setTab('pending')
     } catch (e) {
-      addStatus.className = 'vl-add__status is-error'
+      addStatus.className = 'vl-fld-status is-err'
       addStatus.textContent = e.message
       addBtn.disabled = false
     }
@@ -121,9 +140,7 @@ export function createFriendsView({ openDmWith, menuButton, initialTab }) {
       return
     }
     if (!online.length) {
-      const add = h('button', { type: 'button', class: 'vl-linkbtn' }, 'Добавить друга')
-      add.addEventListener('click', () => addInput.focus())
-      tiles.replaceChildren(h('p', { class: 'vl-tiles__empty' }, ['Сейчас никого нет в сети. ', add]))
+      tiles.replaceChildren(h('p', { class: 'vl-tiles__empty' }, 'Сейчас никого нет в сети.'))
       return
     }
     const shown = online.slice(0, MAX_TILES)
@@ -131,7 +148,7 @@ export function createFriendsView({ openDmWith, menuButton, initialTab }) {
       const u = f.user
       const p = presenceOf(u.id)
       const featured = i === 0 && p.inCall
-      const ava = avatar(u, { size: featured ? 64 : 52, presence: featured ? null : p })
+      const ava = profileAvatar(avatar(u, { size: featured ? 64 : 52, presence: featured ? null : p }), u)
       if (featured) ava.classList.add('is-ringed')
       const tile = h('div', { class: `vl-tile${featured ? ' is-featured' : ''}`, role: 'listitem', tabindex: '0' }, [
         ava,
@@ -196,7 +213,7 @@ export function createFriendsView({ openDmWith, menuButton, initialTab }) {
       ]
     }
     const item = h('div', { class: `vl-friend${extra}`, role: 'listitem', tabindex: f.status === 'friend' ? '0' : null }, [
-      avatar(u, { size: 44, presence: f.status === 'friend' ? p : null }),
+      f.status === 'friend' ? profileAvatar(avatar(u, { size: 44, presence: p }), u) : avatar(u, { size: 44 }),
       h('div', { class: 'vl-friend__text' }, [
         h('div', { class: 'vl-friend__name' }, [h('span', {}, displayName(u)), h('span', { class: 'vl-friend__user' }, '@' + u.username)]),
         h('div', { class: `vl-friend__sub${p.inCall && f.status === 'friend' ? ' is-call' : ''}` }, sub)
@@ -214,6 +231,7 @@ export function createFriendsView({ openDmWith, menuButton, initialTab }) {
   function moreMenu(f, anchor) {
     const u = f.user
     showMenu([
+      { label: 'Профиль', icon: 'user', onClick: () => openProfileOf(u) },
       { label: 'Написать', icon: 'message', onClick: () => openDmWith(u.id) },
       { label: 'Позвонить', icon: 'phone', onClick: () => callFriend(u.id) },
       { label: 'Скопировать юзернейм', icon: 'at', onClick: () => window.VL.copyToClipboard(u.username).then((ok) => toast(ok ? 'Скопировано' : 'Не удалось скопировать', ok ? 'success' : 'error')) },
@@ -276,6 +294,9 @@ export function createFriendsView({ openDmWith, menuButton, initialTab }) {
   }
 
   const unsub = [on('friends', render), on('presence', () => { renderTiles(); renderList() }), on('connection', render)]
+  // «Был(а) в сети 5 мин. назад» стареет — раз в минуту пересобираем список
+  const ageTimer = setInterval(renderList, 60000)
+  unsub.push(() => clearInterval(ageTimer))
   render()
   if (initialTab === 'add') setTimeout(() => addInput.focus(), 30)
 

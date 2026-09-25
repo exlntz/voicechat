@@ -1,13 +1,12 @@
 // ===================== Левая колонка: друзья, лички, панель звонка, профиль =====================
 import { store, on, sortedConversations, presenceOf, incomingCount, friendsBy } from './store.js'
 import { api } from './api.js'
-import { h, icon, avatar, displayName, presenceText, messagePreview, timeShort, showMenu, toast, waveBars } from './ui.js'
+import { h, icon, avatar, displayName, presenceText, messagePreview, timeShort, showMenu, toast, waveBars, isSavedConv } from './ui.js'
+import { askDeleteChat } from './chat.js'
 import { notificationsNeedPermission, requestNotificationPermission } from './notify.js'
 import { callState, inCall } from './call-invite.js'
 
-const STATUS_LABELS = { online: 'В сети', idle: 'Отошёл', dnd: 'Не беспокоить' }
-
-export function createSidebar({ root, navigate, openDmWith, setStatus, logout }) {
+export function createSidebar({ root, navigate, openDmWith, openProfile }) {
   let route = { name: 'friends' }
   const unsub = []
 
@@ -56,27 +55,17 @@ export function createSidebar({ root, navigate, openDmWith, setStatus, logout })
   const meAvatarSlot = h('span', { class: 'vl-me__ava' })
   const meName = h('div', { class: 'vl-me__name' })
   const meSub = h('div', { class: 'vl-me__sub' })
-  const meBtn = h('button', { type: 'button', class: 'vl-me__btn', title: 'Статус' }, [meAvatarSlot, h('div', { class: 'vl-me__text' }, [meName, meSub])])
-  const logoutBtn = h('button', { type: 'button', class: 'vl-round is-ghost', title: 'Выйти из аккаунта', 'aria-label': 'Выйти из аккаунта' }, [icon('right-from-bracket')])
-  const mePanel = h('div', { class: 'vl-me' }, [meBtn, logoutBtn])
-  meBtn.addEventListener('click', () => {
-    const item = (status, label, cls) => ({ label, icon: store.myStatus === status ? 'check' : cls, onClick: () => setStatus(status) })
-    showMenu([
-      item('online', 'В сети', 'circle'),
-      item('idle', 'Отошёл', 'moon'),
-      item('dnd', 'Не беспокоить', 'circle-minus'),
-      'sep',
-      { label: 'Скопировать юзернейм', icon: 'at', onClick: async () => { const ok = await window.VL.copyToClipboard(store.me.username); toast(ok ? 'Скопировано' : 'Не удалось скопировать', ok ? 'success' : 'error') } }
-    ], meBtn)
-  })
-  logoutBtn.addEventListener('click', () => logout())
+  // Нажатие на своё имя открывает профиль (оформление, конфиденциальность, выход)
+  const meBtn = h('button', { type: 'button', class: 'vl-me__btn', title: 'Профиль' }, [meAvatarSlot, h('div', { class: 'vl-me__text' }, [meName, meSub])])
+  const mePanel = h('div', { class: 'vl-me' }, [meBtn])
+  meBtn.addEventListener('click', () => openProfile())
 
   function renderMe() {
     if (!store.me) return
     const p = { status: store.connected ? store.myStatus : 'offline', inCall: false }
     meAvatarSlot.replaceChildren(avatar(store.me, { size: 36, presence: p }))
     meName.textContent = displayName(store.me)
-    meSub.textContent = store.connected ? (STATUS_LABELS[store.myStatus] || 'В сети') : 'Подключение…'
+    meSub.textContent = store.connected ? '@' + store.me.username : 'Подключение…'
   }
 
   // ---- Список личек ----
@@ -91,44 +80,40 @@ export function createSidebar({ root, navigate, openDmWith, setStatus, logout })
       const isTyping = typing && [...typing.values()].some((t) => t > Date.now())
       // В звонке именно с этим человеком — живые зелёные полоски вместо последнего сообщения
       const callHere = inCall() && callState.conversationId === conv.id
-      const subText = isTyping ? 'печатает…' : callHere ? 'в звонке с вами' : conv.lastMessage ? (conv.lastMessage.authorId === store.me.id ? 'Вы: ' : '') + messagePreview(conv.lastMessage) : presenceText(p)
+      const subText = isTyping ? 'печатает…' : callHere ? 'в звонке с вами' : conv.lastMessage ? (conv.lastMessage.authorId === store.me.id && conv.type !== 'saved' ? 'Вы: ' : '') + messagePreview(conv.lastMessage) : presenceText(p)
       const sub = callHere && !isTyping ? [waveBars(4), subText] : subText
-      const close = h('button', { type: 'button', class: 'vl-dm__close', title: 'Закрыть', 'aria-label': 'Закрыть личку' }, [icon('xmark')])
+      const saved = isSavedConv(conv)
       const item = h('a', {
         href: '/dm/' + conv.id,
         role: 'listitem',
-        class: `vl-dm${conv.id === activeId ? ' is-active' : ''}${conv.unread ? ' is-unread' : ''}${conv.muted ? ' is-muted' : ''}`
+        class: `vl-dm${conv.id === activeId ? ' is-active' : ''}${conv.unread ? ' is-unread' : ''}${conv.muted ? ' is-muted' : ''}${conv.pinned ? ' is-pinned' : ''}`
       }, [
-        avatar(peer, { size: 44, presence: p }),
+        avatar(peer, { size: 44, presence: saved ? null : p, saved }),
         h('div', { class: 'vl-dm__text' }, [
-          h('div', { class: 'vl-dm__row' }, [h('span', { class: 'vl-dm__name' }, displayName(peer)), h('span', { class: 'vl-dm__time' }, timeShort(conv.lastMessageAt))]),
-          h('div', { class: `vl-dm__sub${isTyping ? ' is-typing' : ''}${callHere ? ' is-call' : ''}` }, sub)
+          h('div', { class: 'vl-dm__row' }, [
+            h('span', { class: 'vl-dm__name' }, saved ? 'Избранное' : displayName(peer)),
+            conv.muted ? h('span', { class: 'vl-dm__flag', title: 'Уведомления выключены' }, [icon('bell-slash')]) : null,
+            h('span', { class: 'vl-dm__time' }, timeShort(conv.lastMessageAt))
+          ]),
+          h('div', { class: `vl-dm__sub${isTyping ? ' is-typing' : ''}${callHere ? ' is-call' : ''}` }, saved && !conv.lastMessage ? 'Сохранённые сообщения' : sub)
         ]),
-        conv.unread ? h('span', { class: 'vl-badge' }, conv.unread > 99 ? '99+' : String(conv.unread)) : null,
-        close
+        conv.unread ? h('span', { class: 'vl-badge' }, conv.unread > 99 ? '99+' : String(conv.unread)) : conv.pinned ? h('span', { class: 'vl-dm__pin', title: 'Закреплён' }, [icon('thumbtack')]) : null
       ])
       item.addEventListener('click', (e) => {
         if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return
         e.preventDefault()
         navigate('/dm/' + conv.id)
       })
-      close.addEventListener('click', async (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-        try {
-          await api.updateConversation(conv.id, { hidden: true })
-          store.conversations.delete(conv.id)
-          renderDms()
-          if (route.name === 'dm' && route.id === conv.id) navigate('/friends')
-        } catch (err) { toast(err.message, 'error') }
-      })
+      // ПКМ по чату: закрепить, уведомления, удалить (у себя или у обоих)
       item.addEventListener('contextmenu', (e) => {
         e.preventDefault()
+        const patch = (body) => api.updateConversation(conv.id, body).catch((er) => toast(er.message, 'error'))
         showMenu([
-          { label: conv.muted ? 'Включить уведомления' : 'Без звука', icon: conv.muted ? 'bell' : 'bell-slash', onClick: () => api.updateConversation(conv.id, { muted: !conv.muted }).catch((er) => toast(er.message, 'error')) },
-          { label: 'Позвонить', icon: 'phone', onClick: () => import('./call-invite.js').then((m) => { navigate('/dm/' + conv.id); m.startCall(conv.id) }) },
+          { label: conv.pinned ? 'Открепить' : 'Закрепить', icon: conv.pinned ? 'thumbtack-slash' : 'thumbtack', onClick: () => patch({ pinned: !conv.pinned }) },
+          saved ? null : { label: conv.muted ? 'Включить уведомления' : 'Выключить уведомления', icon: conv.muted ? 'bell' : 'bell-slash', onClick: () => patch({ muted: !conv.muted }) },
+          saved ? null : { label: 'Позвонить', icon: 'phone', onClick: () => import('./call-invite.js').then((m) => { navigate('/dm/' + conv.id); m.startCall(conv.id) }) },
           'sep',
-          { label: 'Закрыть личку', icon: 'xmark', onClick: () => close.click() }
+          { label: saved ? 'Очистить' : 'Удалить чат', icon: 'trash', danger: true, onClick: () => askDeleteChat(conv, { navigate }) }
         ], e)
       })
       nodes.push(item)
@@ -154,12 +139,12 @@ export function createSidebar({ root, navigate, openDmWith, setStatus, logout })
 
   // ---- Выбор друга для новой лички ----
   function openPicker() {
-    const input = h('input', { type: 'text', class: 'vl-input', placeholder: 'Имя или юзернейм друга', autocomplete: 'off' })
+    const input = h('input', { type: 'text', placeholder: 'Имя или юзернейм друга', autocomplete: 'off', spellcheck: 'false' })
     const list = h('div', { class: 'vl-picker__list' })
     const close = h('button', { type: 'button', class: 'vl-round is-ghost', 'aria-label': 'Закрыть' }, [icon('xmark')])
     const card = h('div', { class: 'vl-modal vl-picker', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Новое сообщение' }, [
       h('div', { class: 'vl-picker__head' }, [h('h3', { class: 'vl-modal__title' }, 'Написать другу'), close]),
-      input, list
+      h('div', { class: 'vl-fld-host' }, [input]), list
     ])
     const overlay = h('div', { class: 'vl-modal-overlay' }, [card])
     let results = []
@@ -201,7 +186,7 @@ export function createSidebar({ root, navigate, openDmWith, setStatus, logout })
   )
 
   unsub.push(on('conversations', renderDms), on('presence', () => { renderDms(); renderMe() }), on('typing-any', renderDms))
-  unsub.push(on('friends', renderNav), on('unread', renderNav), on('connection', renderMe), on('status', renderMe))
+  unsub.push(on('friends', renderNav), on('unread', renderNav), on('connection', renderMe), on('status', renderMe), on('me', renderMe))
   unsub.push(on('call-changed', () => { renderNav(); renderDms() }))
   const onCallUi = () => renderDms()
   window.addEventListener('vl-call-state', onCallUi)

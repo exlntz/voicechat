@@ -34,6 +34,8 @@ export function createHub(db) {
   // Звонки живут в chats.js — hub спрашивает у него снимок для "hello"
   let helloExtras = () => ({})
 
+  const lastSeenStmt = db.prepare('SELECT last_seen, show_last_seen FROM users WHERE id = ?')
+  const setLastSeenStmt = db.prepare('UPDATE users SET last_seen = ? WHERE id = ?')
   const friendIdsStmt = db.prepare(`SELECT CASE WHEN user_a = ? THEN user_b ELSE user_a END AS id
     FROM friendships WHERE (user_a = ? OR user_b = ?) AND status = 'accepted'`)
   function friendIds(userId) {
@@ -76,10 +78,14 @@ export function createHub(db) {
     }
   }
 
+  // Не в сети: lastSeen — время ухода (мс) или null, если человек скрыл его в профиле
+  // («был(а) недавно»); hidden — скрыл ли.
   function presenceOf(userId) {
     const p = presence.get(Number(userId))
-    if (!p) return { status: 'offline', inCall: false }
-    return { status: p.status, inCall: !!p.inCall }
+    if (p) return { status: p.status, inCall: !!p.inCall }
+    const row = lastSeenStmt.get(Number(userId))
+    const hidden = !!row && !row.show_last_seen
+    return { status: 'offline', inCall: false, lastSeen: row && !hidden && row.last_seen ? Number(row.last_seen) : null, hidden }
   }
 
   function broadcastPresence(userId) {
@@ -95,6 +101,8 @@ export function createHub(db) {
     if (timer) { clearTimeout(timer); offlineTimers.delete(userId) }
     if (!presence.has(userId)) {
       presence.set(userId, { status: 'online', inCall: null, since: Date.now() })
+      // На случай перезапуска сервера без «ухода»: хотя бы время входа будет свежим
+      try { setLastSeenStmt.run(Date.now(), userId) } catch {}
       broadcastPresence(userId)
     }
     return conn
@@ -110,6 +118,7 @@ export function createHub(db) {
       offlineTimers.delete(userId)
       if (conns.has(userId)) return
       presence.delete(userId)
+      try { setLastSeenStmt.run(Date.now(), userId) } catch {}
       broadcastPresence(userId)
     }, OFFLINE_GRACE_MS))
   }

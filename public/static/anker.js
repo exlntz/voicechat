@@ -163,7 +163,10 @@
   // Короткие моноширинные подсказки под строкой: подбираются по плейсхолдеру,
   // чтобы не дублировать его же текст всплывающей подписью.
   var HINTS = [
-    [/^юзернейм \(для входа\)/i, 'английские буквы, цифры, _ и -'],
+    [/^юзернейм \(для входа\)/i, 'с английской буквы; дальше буквы, цифры, _ и -'],
+    [/^юзернейм друга/i, 'заглавные и строчные буквы не различаются'],
+    [/^новый юзернейм/i, 'с английской буквы; дальше буквы, цифры, _ и -'],
+    [/^имя или юзернейм/i, 'Enter откроет первого в списке'],
     [/^юзернейм/i, 'тот, с которым регистрировались'],
     [/^пароль \(мин/i, 'минимум 6 символов'],
     [/^пароль/i, 'пароль от аккаунта'],
@@ -182,7 +185,8 @@
     if (input.__ankField) return
     var type = (input.getAttribute('type') || 'text').toLowerCase()
     if (['text', 'password', 'email', 'tel', 'search', 'number'].indexOf(type) < 0) return
-    var host = input.closest('.auth-form-panel, .lobby-card')
+    // .vl-fld-host — поля оболочки «друзья и чаты» (добавить друга, поиск, профиль)
+    var host = input.closest('.auth-form-panel, .lobby-card, .vl-fld-host')
     if (!host) return
     input.__ankField = true
 
@@ -441,7 +445,7 @@
     if (ctx.matches && ctx.matches(BTN_SEL)) enhanceButton(ctx)
     $$('.ctrl-btn', ctx).forEach(enhanceButton)
 
-    $$('.auth-form-panel input, .lobby-card input', ctx).forEach(enhanceField)
+    $$('.auth-form-panel input, .lobby-card input, .vl-fld-host input', ctx).forEach(enhanceField)
     $$('.auth-error', ctx).forEach(watchErrorSlot)
 
     var auth = $('.auth-screen', document)

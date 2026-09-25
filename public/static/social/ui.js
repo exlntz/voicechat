@@ -70,7 +70,28 @@ const ICONS = {
   'ellipsis-vertical': '<path stroke-width="3" d="M12 5h.01M12 12h.01M12 19h.01"/>',
   ellipsis: '<path stroke-width="3" d="M5 12h.01M12 12h.01M19 12h.01"/>',
   'hourglass-half': '<path d="M5 22h14M5 2h14M17 22v-4.17a2 2 0 0 0-.59-1.42L12 12l-4.41 4.41A2 2 0 0 0 7 17.83V22M7 2v4.17a2 2 0 0 0 .59 1.42L12 12l4.41-4.41A2 2 0 0 0 17 6.17V2"/>',
-  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  paperclip: '<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
+  file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
+  play: '<path fill="currentColor" d="M7 4.5v15a1 1 0 0 0 1.5.86l12.4-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/>',
+  pause: '<rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>',
+  bookmark: '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>',
+  thumbtack: '<path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+  'thumbtack-slash': '<path d="M12 17v5M15 9.34V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H7.89M2 2l20 20M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h12"/>',
+  share: '<path d="m15 14 5-5-5-5"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/>',
+  palette: '<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.84-.44-1.13-.29-.29-.44-.65-.44-1.13a1.64 1.64 0 0 1 1.67-1.67h2c3.05 0 5.56-2.5 5.56-5.55C21.97 6.01 17.46 2 12 2z"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
+  'chevron-up': '<path d="m18 15-6-6-6 6"/>',
+  'chevron-down': '<path d="m6 9 6 6 6-6"/>',
+  'chevron-left': '<path d="m15 18-6-6 6-6"/>',
+  'chevron-right': '<path d="m9 18 6-6-6-6"/>',
+  camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+  user: '<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
+  'circle-info': '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+  waveform: '<path d="M2 10v3M6 6v11M10 3v18M14 8v7M18 5v13M22 10v3"/>'
 }
 
 export function icon(name, extra = '') {
@@ -100,12 +121,35 @@ export function initialsOf(name) {
 }
 
 // presence: {status: online|idle|dnd|offline, inCall}
-export function avatar(user, { size = 32, presence = null } = {}) {
-  const node = h('span', { class: 'vl-avatar', style: { '--size': size + 'px', background: avatarColor(user && user.id) }, 'aria-hidden': 'true' }, [
-    h('span', { class: 'vl-avatar__txt' }, initialsOf(displayName(user)))
+// Аватарка: картинка, если загружена, иначе инициалы. «Избранное» — закладка на синем.
+export function avatar(user, { size = 32, presence = null, saved = false } = {}) {
+  const url = user && user.avatarUrl
+  const node = h('span', { class: `vl-avatar${url ? ' has-img' : ''}${saved ? ' is-saved' : ''}`, style: { '--size': size + 'px', background: saved ? 'var(--accent)' : avatarColor(user && user.id) }, 'aria-hidden': 'true' }, [
+    saved ? icon('bookmark') : h('span', { class: 'vl-avatar__txt' }, initialsOf(displayName(user)))
   ])
+  if (url && !saved) {
+    const img = h('img', { class: 'vl-avatar__img', src: url, alt: '', loading: 'lazy', decoding: 'async', draggable: 'false' })
+    img.addEventListener('error', () => { img.remove(); node.classList.remove('has-img') }, { once: true })
+    node.appendChild(img)
+  }
   if (presence) node.appendChild(h('span', { class: 'vl-presence', dataset: { status: presence.status || 'offline', call: presence.inCall ? '1' : '' } }))
   return node
+}
+
+// Имя чата и аватар: для «Избранного» — своё, для лички — собеседник
+export function isSavedConv(conv) { return !!conv && conv.type === 'saved' }
+export function convTitle(conv, peer) { return isSavedConv(conv) ? 'Избранное' : displayName(peer) }
+
+export function fmtSize(bytes) {
+  const n = Number(bytes) || 0
+  if (n < 1024) return n + ' Б'
+  if (n < 1024 * 1024) return Math.round(n / 1024) + ' КБ'
+  if (n < 1024 * 1024 * 1024) return (n / 1024 / 1024).toFixed(n < 10 * 1024 * 1024 ? 1 : 0).replace('.', ',') + ' МБ'
+  return (n / 1024 / 1024 / 1024).toFixed(1).replace('.', ',') + ' ГБ'
+}
+export function fmtClock(sec) {
+  const t = Math.max(0, Math.round(Number(sec) || 0))
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
 }
 
 // Живые полоски «идёт звонок» (как индикатор в капсуле звонка)
@@ -120,8 +164,13 @@ export function setPresenceDot(avatarNode, presence) {
   dot.dataset.call = presence && presence.inCall ? '1' : ''
 }
 
+// Не в сети: «был(а) в сети 14:05», а если человек скрыл это в профиле — «был(а) недавно»
 export function presenceText(p) {
-  if (!p || p.status === 'offline') return 'Не в сети'
+  if (!p || p.status === 'offline') {
+    if (p && p.hidden) return 'Был(а) недавно'
+    if (p && p.lastSeen) return 'Был(а) в сети ' + lastSeenWhen(p.lastSeen)
+    return 'Не в сети'
+  }
   if (p.inCall) return 'В звонке'
   if (p.status === 'idle') return 'Отошёл'
   if (p.status === 'dnd') return 'Не беспокоить'
@@ -137,6 +186,18 @@ export function timeHM(ts) {
   const d = new Date(ts)
   return `${d.getHours()}:${pad(d.getMinutes())}`
 }
+function lastSeenWhen(ts) {
+  const diff = Date.now() - ts
+  if (diff < 60 * 1000) return 'только что'
+  if (diff < 60 * 60 * 1000) return `${Math.floor(diff / 60000)} мин. назад`
+  const d = new Date(ts)
+  const now = new Date()
+  const y = new Date(now); y.setDate(now.getDate() - 1)
+  if (sameDay(d, now)) return `сегодня в ${timeHM(ts)}`
+  if (sameDay(d, y)) return `вчера в ${timeHM(ts)}`
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`
+}
+
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря']
 export function dayLabel(ts) {
   const d = new Date(ts)
@@ -181,8 +242,16 @@ export function messagePreview(m) {
     if (st === 'declined') return 'Звонок отклонён'
     return 'Звонок'
   }
-  return String(m.body || '').replace(/\s+/g, ' ').slice(0, 120)
+  const text = String(m.body || '').replace(/\s+/g, ' ').slice(0, 120)
+  const first = m.attachments && m.attachments[0]
+  if (!first) return text
+  const label = ATTACH_LABEL[first.kind] || 'Файл'
+  const what = first.kind === 'file' || first.kind === 'audio' ? first.name : label
+  const n = m.attachments.length
+  return (n > 1 ? `${label} ×${n}` : what) + (text ? ' · ' + text : '')
 }
+const ATTACH_LABEL = { image: 'Фото', video: 'Видео', voice: 'Голосовое сообщение', audio: 'Аудио', file: 'Файл' }
+export function attachmentLabel(kind) { return ATTACH_LABEL[kind] || 'Файл' }
 
 export function uid() {
   try { if (crypto.randomUUID) return crypto.randomUUID() } catch {}

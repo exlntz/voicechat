@@ -16,12 +16,13 @@ export const store = {
   conversations: new Map(), // id -> summary
   conversationsLoaded: false,
   friendsLoaded: false,
-  chats: new Map(), // convId -> {list, hasMore, state: 'empty'|'cache'|'ready', loadingOlder}
+  chats: new Map(), // convId -> {list, hasMore, hasNewer, state: 'empty'|'cache'|'ready', loadingOlder}
   typing: new Map(), // convId -> Map(userId -> expiresAt)
   calls: new Map(), // callId -> входящий звонок
   myStatus: 'online',
   connected: false,
   activeConvId: null, // открытый сейчас чат (для непрочитанных и уведомлений)
+  savedId: null, // id «Избранного», когда известен
   atBottom: true // пользователь внизу ленты открытого чата
 }
 
@@ -40,6 +41,25 @@ export function emit(topic, payload) {
 // ---------- Пользователи и присутствие ----------
 export function rememberUser(user) {
   if (user && user.id) store.users.set(Number(user.id), user)
+}
+export function updateUser(user) {
+  if (!user || !user.id) return
+  const id = Number(user.id)
+  rememberUser(user)
+  const f = store.friends.get(id)
+  if (f) f.user = user
+  for (const c of store.conversations.values()) {
+    if (c.peer && c.peer.id === id) c.peer = user
+    if (c.members) c.members = c.members.map((m) => (m.id === id ? user : m))
+  }
+  if (store.me && store.me.id === id) {
+    store.me = { ...store.me, ...user }
+    if (window.VL && window.VL.state) window.VL.state.currentUser = { ...window.VL.state.currentUser, ...user }
+    emit('me')
+  }
+  emit('friends')
+  emit('conversations')
+  emit('presence')
 }
 export function userById(id) {
   return store.users.get(Number(id)) || null
@@ -80,26 +100,56 @@ export async function loadConversations() {
   emit('unread')
   persistConversations()
 }
+// Скрытые лички в памяти не держим. Исключение — «Избранное»: оно скрыто, пока пустое,
+// но открыть его можно (store хранит карточку, список слева её не показывает).
 export function setConversation(conv, notify = true) {
   if (!conv) return
   for (const u of conv.members || []) rememberUser(u)
-  if (conv.hidden) store.conversations.delete(conv.id)
+  if (conv.hidden && conv.type !== 'saved') store.conversations.delete(conv.id)
   else store.conversations.set(conv.id, conv)
+  if (conv.type === 'saved') store.savedId = conv.id
   if (notify) { emit('conversations'); emit('unread'); emit('conversation:' + conv.id, conv); persistConversations() }
 }
+// Закреплённые — сверху, дальше по свежести; скрытое «Избранное» не показываем
 export function sortedConversations() {
-  return [...store.conversations.values()].sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0))
+  return [...store.conversations.values()].filter((c) => !c.hidden)
+    .sort((a, b) => (b.pinnedAt || 0) - (a.pinnedAt || 0) || (b.lastMessageAt || 0) - (a.lastMessageAt || 0))
 }
 export function dmWith(userId) {
   for (const c of store.conversations.values()) if (c.peer && c.peer.id === Number(userId)) return c
   return null
+}
+// «Избранное»: создаётся на сервере при первом обращении
+export async function ensureSaved() {
+  if (store.savedId && store.conversations.has(store.savedId)) return store.conversations.get(store.savedId)
+  const { conversation } = await api.post('/api/conversations/saved')
+  setConversation(conversation)
+  return conversation
+}
+// Чат удалён (у себя или у всех): убрать из списка, памяти и кэша
+export function dropConversation(convId) {
+  convId = Number(convId)
+  const conv = store.conversations.get(convId)
+  if (conv && conv.type === 'saved') {
+    conv.hidden = true
+    conv.lastMessage = null
+    conv.pins = []
+  } else {
+    store.conversations.delete(convId)
+  }
+  store.chats.delete(convId)
+  cache.putMessages(convId, [])
+  emit('conversations')
+  emit('unread')
+  emit('conversation-removed', convId)
+  persistConversations()
 }
 export async function ensureConversation(id) {
   id = Number(id)
   if (store.conversations.has(id)) return store.conversations.get(id)
   const data = await api.conversation(id)
   // Скрытую (закрытую) личку при прямом переходе по ссылке всё равно открываем
-  if (data.conversation.hidden) {
+  if (data.conversation.hidden && data.conversation.type !== 'saved') {
     const res = await api.updateConversation(id, { hidden: false })
     setConversation(res.conversation)
     return res.conversation
@@ -122,7 +172,7 @@ function persistConversations() {
 function chatOf(convId) {
   convId = Number(convId)
   let chat = store.chats.get(convId)
-  if (!chat) { chat = { list: [], hasMore: true, state: 'empty', loadingOlder: false }; store.chats.set(convId, chat) }
+  if (!chat) { chat = { list: [], hasMore: true, hasNewer: false, state: 'empty', loadingOlder: false }; store.chats.set(convId, chat) }
   return chat
 }
 export function getChat(convId) { return chatOf(convId) }
@@ -143,7 +193,8 @@ function persistChat(convId) {
   persistTimers.set(convId, setTimeout(() => {
     persistTimers.delete(convId)
     const chat = store.chats.get(convId)
-    if (chat && chat.state === 'ready') cache.putMessages(convId, chat.list)
+    // В кэше — только «хвост» переписки; после перехода к старому сообщению не пишем
+    if (chat && chat.state === 'ready' && !chat.hasNewer) cache.putMessages(convId, chat.list)
   }, 500))
 }
 
@@ -183,8 +234,9 @@ export async function refreshChat(convId) {
     if (chat.list.some((m) => m.id === minId)) older = chat.list.filter((m) => m.id && m.id < minId)
   }
   const pendingIds = new Set(fresh.map((m) => m.clientId).filter(Boolean))
-  chat.list = [...older, ...fresh, ...pending.filter((m) => !pendingIds.has(m.clientId))]
-  chat.hasMore = older.length ? chat.hasMore : data.hasMore
+  chat.list = [...(chat.hasNewer ? [] : older), ...fresh, ...pending.filter((m) => !pendingIds.has(m.clientId))]
+  chat.hasMore = older.length && !chat.hasNewer ? chat.hasMore : data.hasMore
+  chat.hasNewer = false
   chat.state = 'ready'
   changed(convId, { type: 'reset' })
   return chat
@@ -209,10 +261,43 @@ export async function loadOlder(convId) {
   }
 }
 
+// Перейти к сообщению, которого нет в памяти (поиск, закреп, цитата): страница вокруг него.
+// Лента перестаёт быть «хвостом» (hasNewer) — новое догружается прокруткой вниз.
+export async function loadAround(convId, messageId) {
+  convId = Number(convId)
+  const chat = chatOf(convId)
+  const data = await api.get(`/api/conversations/${convId}/messages?around=${Number(messageId)}`)
+  chat.list = [...data.messages, ...chat.list.filter((m) => !m.id)]
+  chat.hasMore = data.hasMore
+  chat.hasNewer = data.hasNewer
+  chat.state = 'ready'
+  emit('messages:' + convId, { type: 'reset', keepScroll: true })
+  return data.messages.some((m) => m.id === Number(messageId))
+}
+export async function loadNewer(convId) {
+  convId = Number(convId)
+  const chat = chatOf(convId)
+  if (chat.loadingNewer || !chat.hasNewer) return false
+  const last = [...chat.list].reverse().find((m) => m.id)
+  if (!last) return false
+  chat.loadingNewer = true
+  try {
+    const data = await api.messages(convId, { after: last.id, limit: 50 })
+    const known = new Set(chat.list.map((m) => m.id))
+    const drafts = chat.list.filter((m) => !m.id)
+    chat.list = [...chat.list.filter((m) => m.id), ...data.messages.filter((m) => !known.has(m.id)), ...drafts]
+    chat.hasNewer = data.hasNewer
+    emit('messages:' + convId, { type: 'reset', keepScroll: true })
+    return true
+  } finally {
+    chat.loadingNewer = false
+  }
+}
+
 // Когда пользователь снова внизу — сбрасываем раздувшуюся историю, чтобы DOM оставался лёгким
 export function trimChat(convId) {
   const chat = store.chats.get(Number(convId))
-  if (!chat || chat.list.length <= MAX_IN_MEMORY) return false
+  if (!chat || chat.hasNewer || chat.list.length <= MAX_IN_MEMORY) return false
   chat.list = chat.list.slice(-Math.floor(MAX_IN_MEMORY / 2))
   chat.hasMore = true
   emit('messages:' + convId, { type: 'reset', keepScroll: true })
@@ -225,6 +310,8 @@ export function upsertMessage(message) {
   const chat = store.chats.get(convId)
   if (!chat || chat.state === 'empty') return false
   let idx = chat.list.findIndex((m) => m.id === message.id)
+  // Лента показывает старый кусок переписки — новое подтянется, когда пользователь спустится
+  if (idx < 0 && chat.hasNewer && !(message.clientId && chat.list.some((m) => !m.id && m.clientId === message.clientId))) return false
   if (idx < 0 && message.clientId) idx = chat.list.findIndex((m) => !m.id && m.clientId === message.clientId)
   const isNew = idx < 0
   if (isNew) {
@@ -248,11 +335,15 @@ export function removeMessage(convId, id) {
 }
 
 // ---------- Отправка «мгновенно» ----------
-export async function sendMessage(convId, body, replyTo = null) {
+// attachments — уже загруженные файлы ({id, kind, name, url, ...}); upload — обещание их загрузки
+// (черновик виден сразу с превью, отправка — когда файлы на сервере)
+export async function sendMessage(convId, body, replyTo = null, { attachments = [], upload = null } = {}) {
   convId = Number(convId)
   const chat = chatOf(convId)
   const replySource = replyTo ? chat.list.find((m) => m.id === replyTo) : null
   const draft = {
+    attachments,
+    upload,
     id: null,
     clientId: uid(),
     conversationId: convId,
@@ -261,7 +352,7 @@ export async function sendMessage(convId, body, replyTo = null) {
     body,
     meta: null,
     replyTo,
-    reply: replySource ? { id: replySource.id, authorId: replySource.authorId, kind: replySource.kind, body: String(replySource.body).slice(0, 200), deleted: false } : null,
+    reply: replySource ? { id: replySource.id, authorId: replySource.authorId, kind: replySource.kind, body: String(replySource.body).slice(0, 200), attachment: replySource.attachments && replySource.attachments[0] ? { kind: replySource.attachments[0].kind, name: replySource.attachments[0].name } : null, deleted: false } : null,
     createdAt: Date.now(),
     editedAt: null,
     pending: true
@@ -275,7 +366,12 @@ export async function sendMessage(convId, body, replyTo = null) {
 
 async function deliver(convId, draft) {
   try {
-    const { message } = await api.sendMessage(convId, { body: draft.body, replyTo: draft.replyTo, clientId: draft.clientId })
+    if (draft.upload) {
+      // Файлы ещё грузятся: ждём; ошибка загрузки — ошибка отправки (можно повторить)
+      draft.attachments = await draft.upload
+      draft.upload = null
+    }
+    const { message } = await api.sendMessage(convId, { body: draft.body, replyTo: draft.replyTo, clientId: draft.clientId, attachments: (draft.attachments || []).map((a) => a.id) })
     upsertMessage(message)
     bumpConversation(convId, message)
     return message
@@ -297,8 +393,17 @@ export function retryMessage(convId, clientId) {
   if (!m) return
   m.failed = null
   m.pending = true
+  if (m.upload && m.retry) m.upload = m.retry() // файлы не загрузились — начать загрузку заново
   emit('messages:' + convId, { type: 'update', message: m })
   deliver(Number(convId), m).catch(() => {})
+}
+
+// Переслать сообщение в другой чат (в т. ч. в «Избранное»)
+export async function forwardMessage(targetConvId, messageId) {
+  const { message } = await api.sendMessage(targetConvId, { forwardFrom: messageId, clientId: uid() })
+  upsertMessage(message)
+  bumpConversation(targetConvId, message)
+  return message
 }
 
 export function discardDraft(convId, clientId) {
@@ -373,6 +478,25 @@ export function applyEvent(type, data) {
     }
     case 'conversation.update': {
       setConversation(data)
+      break
+    }
+    case 'conversation.remove': {
+      dropConversation(data.conversationId)
+      break
+    }
+    case 'pins.update': {
+      const conv = store.conversations.get(Number(data.conversationId))
+      if (conv) {
+        conv.pins = data.pins || []
+        emit('conversation:' + conv.id, conv)
+        emit('pins:' + conv.id, conv.pins)
+        persistConversations()
+      }
+      break
+    }
+    case 'user.update': {
+      // Кто-то (или вы сами на другом устройстве) сменил юзернейм — обновить везде
+      updateUser(data.user)
       break
     }
     case 'message.new': {
@@ -493,5 +617,6 @@ export function resetStore() {
   store.conversationsLoaded = false
   store.friendsLoaded = false
   store.activeConvId = null
+  store.savedId = null
   store.connected = false
 }

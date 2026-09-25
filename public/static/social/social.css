@@ -132,14 +132,6 @@ body.vl-ready .lobby-userbar { display: none; }
   outline: 2px solid var(--accent-soft); outline-offset: 2px;
 }
 
-.vl-field, .vl-input {
-  width: 100%; height: 44px; padding: 0 18px; border: 1px solid transparent; border-radius: 999px; box-sizing: border-box;
-  background: var(--vl-field); color: var(--text); font: 14px var(--vl-font); outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-.vl-field::placeholder, .vl-input::placeholder { color: var(--text-faint); }
-.vl-field:focus, .vl-input:focus { border-color: rgba(110, 168, 245, 0.55); box-shadow: 0 0 0 4px var(--accent-wash); }
-
 .vl-badge {
   min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; box-sizing: border-box;
   background: var(--accent); color: #fff; font: 600 12px/22px var(--vl-font); text-align: center;
@@ -222,14 +214,6 @@ body.vl-ready .lobby-userbar { display: none; }
 .vl-dm__sub.is-typing { color: var(--accent-soft); }
 .vl-dm__sub.is-call { color: var(--success-soft); }
 .vl-dm .vl-badge { align-self: flex-end; margin-bottom: 2px; }
-.vl-dm__close {
-  position: absolute; right: 8px; top: 8px; width: 24px; height: 24px; border: 0; border-radius: 50%;
-  background: var(--vl-field); color: var(--text-dim); cursor: pointer; display: none; place-items: center;
-}
-.vl-dm__close .vl-ico { width: 12px; height: 12px; }
-.vl-dm:hover .vl-dm__close { display: grid; }
-.vl-dm:hover .vl-dm__time { visibility: hidden; }
-.vl-dm__close:hover { color: #fff; background: rgba(242, 245, 249, 0.16); }
 .vl-dm.is-skeleton { pointer-events: none; }
 
 .vl-notif-banner {
@@ -454,7 +438,7 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-tile--more { justify-content: center; border: 0; color: var(--text-dim); font: 600 14px var(--vl-font); }
 
 .vl-friends__bottom { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 18px 16px 12px; }
-.vl-friends__bar { display: flex; align-items: center; gap: 12px; padding: 0 8px 12px; flex-wrap: wrap; }
+.vl-friends__bar { display: flex; align-items: center; gap: 12px; padding: 4px 8px 12px; flex-wrap: wrap; }
 .vl-chips { display: flex; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
 .vl-chip {
   position: relative; height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--vl-soft); color: rgba(242, 245, 249, 0.8);
@@ -465,12 +449,10 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-chip.is-active { background: #f2f5f9; color: #0f1115; font-weight: 600; }
 .vl-chip__count { font-variant-numeric: tabular-nums; opacity: 0.65; }
 .vl-chip.has-new::after { content: ""; position: absolute; top: 5px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent-soft); }
-.vl-add { display: flex; align-items: center; gap: 8px; flex: 0 1 360px; min-width: 240px; }
-.vl-add .vl-round { --s: 44px; }
-.vl-add__status { font-size: 13px; padding: 0 12px 10px; }
-.vl-add__status:empty { display: none; }
-.vl-add__status.is-error { color: var(--danger-soft); }
-.vl-add__status.is-success { color: var(--success-soft); }
+/* Добавить в друзья: поле как на входе (anker.js) и круглая кнопка на уровне «таблетки» */
+.vl-add { display: flex; align-items: flex-start; gap: 10px; padding: 0 8px; }
+.vl-add .vl-fld-host { flex: 1; min-width: 0; }
+.vl-add .vl-round { --s: 52px; margin-top: 22px; }
 .vl-friend-list { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; min-height: 0; scrollbar-width: thin; scrollbar-color: var(--vl-soft-2) transparent; }
 .vl-friend {
   --vl-ring: var(--vl-panel);
@@ -492,6 +474,30 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-empty__icon { width: 64px; height: 64px; border-radius: 50%; background: var(--vl-soft); display: grid; place-items: center; color: var(--text-faint); }
 .vl-empty__icon .vl-ico { width: 26px; height: 26px; }
 .vl-empty p { margin: 0; max-width: 360px; font-size: 14px; }
+
+/* ─────────── Поля оболочки: та же анимация, что на входе и регистрации ───────────
+   Поле собирает anker.js (подпись внутри «таблетки» всплывает над ней, под строкой
+   печатается подсказка); здесь только подгонка под панели. */
+.vl-fld-host .fld { margin-bottom: 30px; }
+.vl-fld-host .fld input { font-family: var(--vl-font); background: var(--vl-stage); }
+.vl-fld-host .fld input:hover { background: #07080b; }
+.vl-fld-host .fld__lbl, .vl-fld-host .fld__msg { font-family: var(--vl-font); }
+.vl-fld-status { min-height: 0; margin: -2px 20px 12px; font: 500 13px/1.35 var(--vl-font); color: var(--text-faint); }
+.vl-fld-status:empty { display: none; }
+.vl-fld-status.is-ok { color: var(--success-soft); }
+.vl-fld-status.is-err { color: var(--danger-soft); }
+.vl-picker .vl-fld-host .fld { margin-bottom: 26px; }
+
+/* ─────────── Быстрый звонок по ссылке: экран после выхода ─────────── */
+body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { display: none !important; }
+.vl-btn--ghost-text { margin-top: 10px; background: transparent; color: var(--text-dim); font-weight: 500; }
+.vl-btn--ghost-text:hover:not(:disabled) { background: var(--vl-hover); color: var(--text); }
+
+/* ─────────── Профиль (классы settings-* — общие с настройками звонка, см. style.css) ─────────── */
+.vl-profile { font-family: var(--vl-font); }
+.vl-profile-card { display: flex; align-items: center; gap: 16px; --vl-ring: var(--vl-raised); }
+.vl-profile-card__name { font: 700 19px/1.25 var(--vl-font); }
+.vl-profile-card__user { font-size: 14px; color: var(--text-dim); margin-top: 2px; }
 
 /* ─────────── Меню и окна ─────────── */
 .vl-menu {
@@ -522,7 +528,6 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-picker { display: flex; flex-direction: column; gap: 14px; max-height: min(560px, 90dvh); }
 .vl-picker__head { display: flex; align-items: center; justify-content: space-between; }
 .vl-picker__head .vl-modal__title { margin: 0; }
-.vl-picker .vl-input { background: var(--vl-field); }
 .vl-picker__list { overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 2px; }
 .vl-picker__row {
   --vl-ring: var(--vl-raised);
@@ -559,6 +564,348 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-call-btn.is-accept { background: var(--success); box-shadow: 0 10px 26px rgba(58, 168, 110, 0.35); }
 .vl-call-btn.is-decline { background: var(--danger); box-shadow: 0 10px 26px rgba(217, 74, 61, 0.35); }
 
+/* ─────────── Аватарки-картинки, «Избранное» ─────────── */
+.vl-avatar.has-img { background: #2a303b !important; }
+.vl-avatar__img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.vl-avatar.has-img .vl-avatar__txt { visibility: hidden; }
+.vl-avatar.is-saved { color: #fff; }
+.vl-avatar.is-saved .vl-ico { width: 44%; height: 44%; }
+.vl-avatar.is-clickable { cursor: pointer; transition: transform 0.2s var(--ease), filter 0.2s; }
+.vl-avatar.is-clickable:hover { transform: scale(1.05); filter: brightness(1.08); }
+.vl-dm__flag { display: inline-flex; color: var(--text-faint); flex: 0 0 auto; }
+.vl-dm__flag .vl-ico { width: 13px; height: 13px; }
+.vl-dm__pin { align-self: flex-end; margin-bottom: 3px; color: var(--text-faint); display: inline-flex; }
+.vl-dm__pin .vl-ico { width: 14px; height: 14px; transform: rotate(35deg); }
+.vl-dm.is-muted { opacity: 1; }
+.vl-dm.is-muted .vl-badge { background: var(--vl-soft-2); color: var(--text-dim); }
+
+/* ─────────── Шапка чата: кто, поиск, закреп ─────────── */
+.vl-chat__head-who {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px; margin-left: -8px; padding: 6px 12px 6px 8px; border: 0; border-radius: 18px;
+  background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background 0.2s var(--ease);
+}
+.vl-chat__head-who:hover { background: var(--vl-hover); --vl-ring: #181b21; }
+.vl-chat__head-who .vl-chat__head-text { flex: 1; }
+.vl-round[hidden] { display: none; }
+
+.vl-pinbar {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 10px; margin: -8px 20px 8px; padding: 6px 6px 6px 14px; border-radius: 16px;
+  background: var(--vl-raised); color: var(--accent-soft); animation: vl-rise 0.2s var(--ease) both;
+}
+.vl-pinbar[hidden] { display: none; }
+.vl-pinbar > .vl-ico { width: 16px; height: 16px; transform: rotate(35deg); flex: 0 0 auto; }
+.vl-pinbar__body { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; border: 0; background: none; padding: 2px 0; color: inherit; cursor: pointer; text-align: left; font: inherit; }
+.vl-pinbar__marks { display: flex; flex-direction: column; gap: 2px; align-self: stretch; justify-content: center; }
+.vl-pinbar__marks i { width: 2px; height: 6px; border-radius: 1px; background: rgba(110, 168, 245, 0.3); }
+.vl-pinbar__marks i.is-on { background: var(--accent-soft); }
+.vl-pinbar__text { min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.vl-pinbar__text b { font: 600 13px var(--vl-font); }
+.vl-pinbar__text span { color: var(--text-dim); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.vl-search { flex: 0 0 auto; position: relative; margin: -8px 20px 8px; z-index: 5; animation: vl-rise 0.18s var(--ease) both; }
+.vl-search[hidden] { display: none; }
+.vl-search__field {
+  display: flex; align-items: center; gap: 4px; height: 46px; padding: 0 6px 0 16px; border-radius: 23px; background: var(--vl-field);
+  border: 1px solid rgba(110, 168, 245, 0.35); box-shadow: 0 0 0 4px var(--accent-wash);
+}
+.vl-search__field > .vl-ico { width: 17px; height: 17px; color: var(--text-faint); flex: 0 0 auto; }
+.vl-search__input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; color: var(--text); font: 15px var(--vl-font); padding: 0 8px; }
+.vl-search__input::-webkit-search-cancel-button { display: none; }
+.vl-search__count { font: 500 13px var(--vl-font); color: var(--text-faint); padding: 0 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vl-search__results {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px); max-height: min(360px, 50vh); overflow-y: auto; padding: 6px; border-radius: 18px;
+  background: var(--vl-raised); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55); scrollbar-width: thin;
+}
+.vl-search__results[hidden] { display: none; }
+.vl-search__row {
+  width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 0; border-radius: 12px; background: transparent;
+  color: var(--text); text-align: left; cursor: pointer; font: 14px var(--vl-font); --vl-ring: var(--vl-raised);
+}
+.vl-search__row:hover, .vl-search__row.is-active { background: var(--vl-soft-2); }
+.vl-search__text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.vl-search__top { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.vl-search__top time { color: var(--text-faint); white-space: nowrap; }
+.vl-search__snip { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vl-search__snip mark, .vl-hit { background: rgba(224, 162, 58, 0.35); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+/* Обои: слой под лентой, слегка притемнён ради читаемости */
+.vl-chat__main.has-wall::before { content: ""; position: absolute; inset: 0; background: var(--vl-wall); z-index: 0; pointer-events: none; }
+.vl-chat__main.has-wall::after { content: ""; position: absolute; inset: 0; background: rgba(10, 12, 15, 0.18); z-index: 0; pointer-events: none; }
+.vl-chat__main > * { position: relative; z-index: 1; }
+.vl-chat__main > .vl-jump { position: absolute; z-index: 3; }
+.vl-chat__main.has-wall .vl-day span { padding: 5px 12px; border-radius: 999px; background: rgba(10, 12, 15, 0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.vl-chat__main.has-wall .vl-chat__intro { background: rgba(10, 12, 15, 0.45); border-radius: 24px; margin: 12px auto; padding: 24px 28px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+
+.vl-dropzone { position: absolute !important; inset: 10px; z-index: 6 !important; display: grid; place-items: center; border-radius: 22px; border: 2px dashed rgba(110, 168, 245, 0.6); background: rgba(10, 12, 15, 0.82); pointer-events: none; animation: vl-fade-in 0.15s ease both; }
+.vl-dropzone[hidden] { display: none; }
+.vl-dropzone__card { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--text-dim); font-size: 14px; }
+.vl-dropzone__card .vl-ico { width: 34px; height: 34px; color: var(--accent-soft); margin-bottom: 6px; animation: vl-swing 0.9s var(--ease) infinite alternate; }
+.vl-dropzone__card b { color: var(--text); font: 600 17px var(--vl-font); }
+
+/* ─────────── Вложения в пузыре ─────────── */
+.vl-bubble.has-files { display: flex; flex-direction: column; gap: 6px; }
+.vl-bubble.has-media { padding: 4px 4px 9px; }
+.vl-bubble.has-media > .vl-bubble__text, .vl-bubble.has-media > .vl-quote, .vl-bubble.has-media > .vl-fwd { margin-left: 10px; margin-right: 10px; width: auto; }
+.vl-bubble.has-media > .vl-quote { margin-top: 6px; }
+.vl-bubble.is-media-only { padding: 0; background: transparent !important; }
+.vl-media-grid { display: grid; gap: 3px; border-radius: 16px; overflow: hidden; }
+.vl-media-grid.n-2 { grid-template-columns: 1fr 1fr; width: min(380px, 62vw); }
+.vl-media-grid.n-3 { grid-template-columns: 1fr 1fr; width: min(380px, 62vw); }
+.vl-media-grid.n-3 .vl-media-cell:first-child { grid-column: 1 / 3; aspect-ratio: 2 / 1; }
+.vl-media-grid.n-4 { grid-template-columns: 1fr 1fr; width: min(380px, 62vw); }
+.vl-media-cell {
+  position: relative; display: block; padding: 0; border: 0; background: #0d1016; cursor: zoom-in; overflow: hidden; aspect-ratio: 1; max-width: 100%;
+}
+.vl-media-grid.n-1 .vl-media-cell { max-width: min(360px, 62vw); min-height: 90px; }
+.vl-media-cell[hidden] { display: none; }
+.vl-media-cell img, .vl-media-cell video { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.35s var(--ease), filter 0.2s; }
+.vl-media-cell:hover img, .vl-media-cell:hover video { transform: scale(1.03); filter: brightness(1.06); }
+.vl-media-cell__play {
+  position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%; display: grid; place-items: center;
+  background: rgba(10, 12, 15, 0.6); color: #fff; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition: transform 0.2s var(--ease);
+}
+.vl-media-cell__play .vl-ico { width: 20px; height: 20px; margin-left: 3px; }
+.vl-media-cell:hover .vl-media-cell__play { transform: scale(1.08); }
+.vl-media-cell__dur { position: absolute; left: 8px; top: 8px; display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px; border-radius: 999px; background: rgba(10, 12, 15, 0.6); color: #fff; font: 500 11px var(--vl-font); font-variant-numeric: tabular-nums; }
+.vl-media-cell__dur .vl-ico { width: 10px; height: 10px; }
+.vl-media-cell__more { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(10, 12, 15, 0.55); color: #fff; font: 700 22px var(--vl-font); }
+.vl-bubble__meta.is-over-media {
+  position: absolute; right: 8px; bottom: 8px; top: auto; float: none; margin: 0; padding: 4px 8px; border-radius: 999px;
+  background: rgba(10, 12, 15, 0.55); color: #fff !important; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.vl-upload-progress { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.2); overflow: hidden; margin: 2px 8px 0; }
+.vl-upload-progress i { display: block; height: 100%; background: currentColor; border-radius: 2px; transition: width 0.2s linear; }
+.vl-bubble.is-media-only .vl-upload-progress { position: absolute; left: 10px; right: 10px; bottom: 10px; margin: 0; background: rgba(10, 12, 15, 0.5); color: #fff; }
+.vl-msg.is-pending .vl-bubble.has-files { opacity: 0.85; }
+
+.vl-fwd { display: flex; align-items: center; gap: 6px; border: 0; background: none; padding: 0; color: var(--accent-soft); font: 13px var(--vl-font); cursor: pointer; text-align: left; }
+.vl-fwd .vl-ico { width: 14px; height: 14px; flex: 0 0 auto; }
+.vl-fwd b { font-weight: 600; }
+.vl-msg.is-mine .vl-fwd { color: rgba(255, 255, 255, 0.85); }
+.vl-fwd:hover b { text-decoration: underline; }
+
+.vl-filecard {
+  display: flex; align-items: center; gap: 12px; min-width: 220px; max-width: 340px; padding: 6px 10px 6px 6px; border-radius: 14px;
+  background: rgba(242, 245, 249, 0.06); color: inherit; text-decoration: none; transition: background 0.2s var(--ease);
+}
+.vl-filecard:hover { background: rgba(242, 245, 249, 0.1); }
+.vl-msg.is-mine .vl-filecard { background: rgba(255, 255, 255, 0.14); }
+.vl-msg.is-mine .vl-filecard:hover { background: rgba(255, 255, 255, 0.2); }
+.vl-filecard__ico { position: relative; width: 42px; height: 42px; flex: 0 0 auto; border-radius: 12px; display: grid; place-items: center; background: var(--accent); color: #fff; }
+.vl-msg.is-mine .vl-filecard__ico { background: #fff; color: var(--accent); }
+.vl-filecard__ico .vl-ico { width: 20px; height: 20px; }
+.vl-filecard__ico b { position: absolute; bottom: 5px; font: 700 8px/1 var(--vl-font); letter-spacing: 0.02em; }
+.vl-filecard__ico:has(b) .vl-ico { transform: translateY(-3px); }
+.vl-filecard__text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.vl-filecard__name { font: 500 14px var(--vl-font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vl-filecard__size { font-size: 12px; opacity: 0.65; }
+.vl-filecard__dl { display: inline-flex; opacity: 0.55; transition: opacity 0.2s, transform 0.25s var(--ease); }
+.vl-filecard__dl .vl-ico { width: 16px; height: 16px; }
+.vl-filecard:hover .vl-filecard__dl { opacity: 1; transform: translateY(2px); }
+.vl-filecard.is-pending { opacity: 0.8; }
+
+.vl-voice { --p: 0; display: flex; align-items: center; gap: 10px; min-width: 220px; max-width: 320px; }
+.vl-voice__btn {
+  width: 40px; height: 40px; flex: 0 0 auto; border: 0; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+  background: var(--accent); color: #fff; transition: transform 0.2s var(--ease), background 0.2s;
+}
+.vl-voice__btn:hover { transform: scale(1.06); }
+.vl-voice__btn:active { transform: scale(0.94); }
+.vl-voice__btn .vl-ico { width: 16px; height: 16px; }
+.vl-voice:not(.is-playing) .vl-voice__btn .vl-ico { margin-left: 2px; }
+.vl-voice.is-mine .vl-voice__btn { background: #fff; color: var(--accent); }
+.vl-voice__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.vl-voice__wave {
+  height: 26px; display: flex; align-items: center; gap: 2px; cursor: pointer; outline: none;
+  -webkit-mask: linear-gradient(90deg, #000 calc(var(--p) * 100%), rgba(0, 0, 0, 0.35) calc(var(--p) * 100%));
+          mask: linear-gradient(90deg, #000 calc(var(--p) * 100%), rgba(0, 0, 0, 0.35) calc(var(--p) * 100%));
+}
+.vl-voice__wave i { flex: 1; min-width: 2px; max-width: 3px; border-radius: 2px; background: var(--accent-soft); }
+.vl-voice.is-mine .vl-voice__wave i { background: #fff; }
+.vl-voice.is-playing .vl-voice__wave i { transition: height 0.2s; }
+.vl-voice__time { font-size: 12px; opacity: 0.7; font-variant-numeric: tabular-nums; }
+.vl-audiocard { display: flex; flex-direction: column; gap: 4px; }
+.vl-audiocard__name { font-size: 12.5px; opacity: 0.8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px; }
+
+/* Смахнуть влево — ответить: пузырь едет, справа проявляется стрелка */
+.vl-msg { --swipe: 0px; }
+.vl-msg__wrap { transition: transform 0.25s var(--ease); }
+.vl-msg.is-swiping .vl-msg__wrap { transform: translateX(var(--swipe)); transition: none; }
+.vl-msg__swipe {
+  position: absolute; right: -44px; top: 50%; width: 32px; height: 32px; margin-top: -16px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--vl-soft-2); color: var(--text); opacity: 0; transform: scale(0.6); transition: opacity 0.15s, transform 0.2s var(--ease), background 0.2s;
+  pointer-events: none;
+}
+.vl-msg.is-mine .vl-msg__swipe { right: auto; left: calc(100% + 12px); }
+.vl-msg__swipe .vl-ico { width: 15px; height: 15px; }
+.vl-msg.is-swiping .vl-msg__swipe { opacity: 0.7; transform: scale(0.85); }
+.vl-msg.is-swipe-ready .vl-msg__swipe { opacity: 1; transform: scale(1); background: var(--accent); color: #fff; }
+
+/* ─────────── Поле ввода: скрепка, лоток файлов, голосовое ─────────── */
+.vl-composer__field { padding-left: 6px; }
+.vl-composer__attach {
+  width: 40px; height: 40px; margin: 6px 0; flex: 0 0 auto; border: 0; border-radius: 50%; background: transparent; color: var(--text-dim);
+  display: grid; place-items: center; cursor: pointer; transition: background 0.2s, color 0.2s, transform 0.25s var(--ease);
+}
+.vl-composer__attach .vl-ico { width: 20px; height: 20px; transition: transform 0.35s var(--ease); }
+.vl-composer__attach:hover { background: var(--vl-soft); color: #fff; }
+.vl-composer__attach:hover .vl-ico { transform: rotate(-20deg); }
+.vl-composer__field[hidden] { display: none; }
+.vl-composer__send.is-mic { background: var(--vl-field); color: var(--text); box-shadow: none; }
+.vl-composer__send.is-mic:hover { background: rgba(242, 245, 249, 0.14); }
+.vl-composer__send.is-swap .vl-ico { animation: vl-swap 0.25s var(--ease) both; }
+@keyframes vl-swap { from { opacity: 0; transform: scale(0.5) rotate(-30deg); } }
+.vl-composer__box.is-recording .vl-composer__send { background: var(--danger); color: #fff; box-shadow: 0 8px 24px rgba(217, 74, 61, 0.35); }
+.vl-rec { align-items: center !important; gap: 12px !important; padding: 0 8px 0 20px !important; }
+.vl-rec__dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); animation: vl-blink 1s ease-in-out infinite; }
+@keyframes vl-blink { 50% { opacity: 0.25; } }
+.vl-rec__time { font: 600 15px var(--vl-font); font-variant-numeric: tabular-nums; min-width: 44px; }
+.vl-rec__hint { flex: 1; color: var(--text-faint); font-size: 14px; }
+.vl-rec .vl-btn--ghost-text { margin: 0; }
+
+.vl-tray { display: flex; gap: 8px; margin: 0 62px 8px 0; padding: 8px; border-radius: 20px; background: var(--vl-raised); overflow-x: auto; scrollbar-width: thin; animation: vl-rise 0.18s var(--ease) both; }
+.vl-tray[hidden] { display: none; }
+.vl-tray__item { position: relative; flex: 0 0 auto; width: 72px; height: 72px; border-radius: 14px; overflow: hidden; background: var(--vl-field); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.vl-tray__item.is-file, .vl-tray__item.is-audio { width: 150px; flex-direction: row; justify-content: flex-start; padding: 0 30px 0 10px; box-sizing: border-box; }
+.vl-tray__item img, .vl-tray__item video { width: 100%; height: 100%; object-fit: cover; }
+.vl-tray__ico { width: 34px; height: 34px; flex: 0 0 auto; border-radius: 10px; background: var(--accent); color: #fff; display: grid; place-items: center; }
+.vl-tray__ico .vl-ico { width: 17px; height: 17px; }
+.vl-tray__name { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.vl-tray__x {
+  position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border: 0; border-radius: 50%; display: grid; place-items: center;
+  background: rgba(10, 12, 15, 0.7); color: #fff; cursor: pointer; transition: transform 0.2s var(--ease), background 0.2s;
+}
+.vl-tray__x:hover { background: var(--danger); transform: scale(1.1); }
+.vl-tray__x .vl-ico { width: 11px; height: 11px; }
+
+/* Галочка «удалить и у собеседника» */
+.vl-check { display: flex; align-items: center; gap: 10px; margin: -6px 0 20px; font-size: 14px; cursor: pointer; user-select: none; }
+.vl-check input { position: absolute; opacity: 0; pointer-events: none; }
+.vl-check__box { width: 20px; height: 20px; flex: 0 0 auto; border-radius: 6px; border: 1.5px solid var(--vl-soft-2); display: grid; place-items: center; color: transparent; transition: background 0.15s, border-color 0.15s, color 0.15s; }
+.vl-check__box .vl-ico { width: 13px; height: 13px; stroke-width: 3; }
+.vl-check input:checked + .vl-check__box { background: var(--danger); border-color: var(--danger); color: #fff; }
+.vl-check input:focus-visible + .vl-check__box { outline: 2px solid var(--accent-soft); outline-offset: 2px; }
+
+/* ─────────── Просмотрщик фото и видео ─────────── */
+.vl-lightbox { position: fixed; inset: 0; z-index: 3200; background: rgba(5, 6, 8, 0.94); display: flex; flex-direction: column; animation: vl-fade-in 0.16s ease both; font-family: var(--vl-font); }
+.vl-lightbox.is-leaving { animation: vl-fade-in 0.16s ease reverse both; }
+.vl-lightbox__bar { display: flex; align-items: center; gap: 8px; padding: calc(env(safe-area-inset-top) + 12px) 14px 12px 20px; }
+.vl-lightbox__count { color: var(--text-dim); font-size: 14px; font-variant-numeric: tabular-nums; }
+.vl-lightbox__spacer { flex: 1; }
+.vl-lightbox__stage { flex: 1; min-height: 0; display: grid; place-items: center; padding: 0 64px 20px; }
+.vl-lightbox__stage img, .vl-lightbox__stage video { max-width: 100%; max-height: 100%; border-radius: 12px; animation: vl-pop 0.22s var(--ease) both; }
+.vl-lightbox__nav { position: absolute; top: 50%; margin-top: -21px; --s: 42px; }
+.vl-lightbox__nav.is-prev { left: 14px; }
+.vl-lightbox__nav.is-next { right: 14px; }
+.vl-lightbox__caption { padding: 0 20px calc(env(safe-area-inset-bottom) + 18px); text-align: center; color: var(--text-dim); font-size: 14px; white-space: pre-wrap; max-height: 20vh; overflow: auto; }
+
+/* ─────────── Профиль собеседника ─────────── */
+.vl-ucard-overlay { align-items: center; }
+.vl-ucard {
+  --vl-ring: var(--vl-raised);
+  position: relative; width: min(480px, 100%); max-height: min(760px, 92dvh); display: flex; flex-direction: column; overflow: hidden;
+  border-radius: 28px; background: var(--vl-raised); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  animation: vl-pop 0.26s var(--ease) both; font-family: var(--vl-font);
+}
+.vl-ucard__banner { flex: 0 0 auto; height: 150px; background: linear-gradient(135deg, #1b2a44, #0458cf 60%, #2a3b63); position: relative; overflow: hidden; }
+.vl-ucard.is-saved .vl-ucard__banner { background: linear-gradient(135deg, #0a3a86, #0458cf 55%, #3d7fe0); }
+.vl-ucard__banner.has-media { background: #0d1016; }
+.vl-ucard__banner img, .vl-ucard__banner video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: vl-fade-in 0.4s ease both; }
+.vl-ucard__banner::after { content: ""; position: absolute; inset: auto 0 0; height: 50%; background: linear-gradient(transparent, rgba(26, 30, 37, 0.5)); }
+.vl-ucard__close { position: absolute; top: 12px; right: 12px; z-index: 2; }
+.vl-ucard__head { position: relative; display: flex; align-items: flex-end; justify-content: space-between; gap: 6px 14px; padding: 0 20px 16px; margin-top: -48px; flex-wrap: wrap; }
+.vl-ucard__head .vl-ucard__who { order: 3; flex: 1 1 100%; }
+.vl-ucard__head .vl-ucard__actions { order: 2; }
+.vl-ucard__ava .vl-avatar { box-shadow: 0 0 0 6px var(--vl-raised); }
+.vl-ucard__ava .vl-presence { --vl-ring: var(--vl-raised); }
+.vl-ucard__who { min-width: 0; padding-top: 4px; }
+.vl-ucard__name { margin: 0; font: 700 22px/1.2 var(--vl-font); letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; }
+.vl-ucard__user { color: var(--text-dim); font-size: 14px; margin-top: 2px; }
+.vl-ucard__status, .vl-ucard__since { color: var(--text-faint); font-size: 13px; margin-top: 4px; }
+.vl-ucard__since[hidden], .vl-ucard__status[hidden] { display: none; }
+.vl-ucard__actions { display: flex; gap: 8px; align-items: center; padding-bottom: 4px; }
+.vl-ucard__actions .vl-ico { width: 15px; height: 15px; }
+.vl-ucard__tabs { display: flex; gap: 6px; padding: 0 16px 12px; overflow-x: auto; scrollbar-width: none; flex: 0 0 auto; border-bottom: 1px solid var(--vl-soft); }
+.vl-ucard__tabs .vl-chip { flex: 0 0 auto; height: 34px; font-size: 13.5px; }
+.vl-ucard__tabs .vl-chip .vl-ico { width: 15px; height: 15px; }
+.vl-ucard__pane { flex: 1 1 auto; min-height: 200px; overflow-y: auto; padding: 12px 12px 16px; scrollbar-width: thin; }
+.vl-ucard__loading, .vl-ucard__empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 180px; color: var(--text-faint); text-align: center; font-size: 14px; }
+.vl-ucard__empty p { margin: 0; max-width: 260px; }
+.vl-ucard__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; border-radius: 14px; overflow: hidden; }
+.vl-ucard__cell { position: relative; aspect-ratio: 1; padding: 0; border: 0; background: #0d1016; cursor: zoom-in; overflow: hidden; }
+.vl-ucard__cell img, .vl-ucard__cell video { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.3s var(--ease); }
+.vl-ucard__cell:hover img, .vl-ucard__cell:hover video { transform: scale(1.05); }
+.vl-ucard__list { display: flex; flex-direction: column; gap: 4px; }
+.vl-ucard__row { display: flex; align-items: center; gap: 10px; padding: 4px; border-radius: 14px; }
+.vl-ucard__row > :first-child { flex: 1; min-width: 0; max-width: none; }
+.vl-ucard__row .vl-filecard { background: transparent; }
+.vl-ucard__row .vl-filecard:hover { background: var(--vl-soft); }
+.vl-ucard__voice { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; }
+.vl-ucard__voice .vl-voice { max-width: none; }
+.vl-ucard__by { font: 600 13px var(--vl-font); }
+.vl-ucard__when { flex: 0 0 auto; border: 0; background: none; color: var(--text-faint); font: 12px var(--vl-font); cursor: pointer; padding: 6px 8px; border-radius: 10px; }
+.vl-ucard__when:hover { background: var(--vl-soft); color: var(--text); }
+.vl-ucard__link { display: flex; align-items: center; gap: 12px; padding: 6px; border-radius: 12px; color: inherit; text-decoration: none; min-width: 0; }
+.vl-ucard__link:hover { background: var(--vl-soft); }
+.vl-ucard__link-ico { width: 42px; height: 42px; flex: 0 0 auto; border-radius: 12px; background: var(--accent-wash); color: var(--accent-soft); display: grid; place-items: center; font: 700 17px var(--vl-font); }
+.vl-ucard__link-text { min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+.vl-ucard__link-text b { font: 600 14px var(--vl-font); }
+.vl-ucard__link-text span { color: var(--accent-soft); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vl-ucard__more { display: flex; margin: 12px auto 0; }
+
+/* ─────────── Обои: выбор ─────────── */
+.vl-wall { width: min(520px, 100%); }
+.vl-wall-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.vl-wall-tile { display: flex; flex-direction: column; gap: 6px; padding: 0; border: 0; background: none; color: var(--text-dim); font: 12.5px var(--vl-font); cursor: pointer; text-align: center; }
+.vl-wall-tile__bg {
+  aspect-ratio: 3 / 4; border-radius: 14px; display: grid; place-items: center; color: var(--text-faint); border: 2px solid transparent;
+  background: var(--vl-field); transition: transform 0.25s var(--ease), border-color 0.2s;
+}
+.vl-wall-tile__bg .vl-ico { width: 22px; height: 22px; }
+.vl-wall-tile:hover .vl-wall-tile__bg { transform: translateY(-3px); }
+.vl-wall-tile.is-active .vl-wall-tile__bg { border-color: var(--accent-soft); }
+.vl-wall-tile.is-active { color: var(--text); }
+.vl-wall-tile.is-upload .vl-wall-tile__bg { border: 2px dashed var(--vl-soft-2); }
+.vl-wall .vl-fld-status { margin: 12px 0 0; }
+
+/* ─────────── Свой профиль: превью фона и аватарки ─────────── */
+.vl-pcard { padding: 0 !important; overflow: hidden; flex-shrink: 0; --vl-ring: var(--vl-raised); }
+.vl-pcard__banner { height: 110px; background: linear-gradient(135deg, #1b2a44, #0458cf 60%, #2a3b63); position: relative; overflow: hidden; }
+.vl-pcard__banner.has-media { background: #0d1016; }
+.vl-pcard__banner img, .vl-pcard__banner video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.vl-pcard__row { display: flex; align-items: flex-start; gap: 14px; padding: 0 18px 16px; margin-top: -34px; position: relative; }
+.vl-pcard__row .vl-profile-card__text { padding-top: 42px; min-width: 0; }
+.vl-pcard__ava .vl-avatar { box-shadow: 0 0 0 5px var(--vl-raised); }
+.vl-pcard__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.vl-pcard__actions .vl-btn { display: inline-flex; align-items: center; gap: 8px; }
+.vl-pcard__actions .vl-ico { width: 15px; height: 15px; }
+.vl-pcard__actions .vl-btn--ghost-text { margin: 0; }
+.vl-pcard ~ .settings-card .vl-fld-status { margin: 10px 0 0; }
+
+/* ─────────── Быстрый звонок: кнопка «Чаты» в углу после выхода ─────────── */
+.vl-solo-chats {
+  position: fixed; z-index: 1500; top: calc(env(safe-area-inset-top) + 14px); left: 14px;
+  display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 18px 0 8px; border: 0; border-radius: 999px;
+  background: rgba(19, 22, 27, 0.85); color: var(--text); font: 600 15px var(--vl-font); cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  animation: vl-rise 0.3s var(--ease) both; transition: transform 0.25s var(--ease), background 0.2s;
+}
+.vl-solo-chats:hover { transform: translateY(-1px); background: rgba(30, 35, 44, 0.92); }
+.vl-solo-chats:active { transform: scale(0.97); }
+.vl-solo-chats__ico { position: relative; width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; }
+.vl-solo-chats__ico .vl-ico { width: 16px; height: 16px; transition: transform 0.35s var(--ease); }
+/* Три точки «печатает…» проявляются в облачке при наведении, облачко чуть качается */
+.vl-solo-chats__ico i { position: absolute; top: 12px; width: 2.5px; height: 2.5px; border-radius: 50%; background: #fff; opacity: 0; }
+.vl-solo-chats__ico i:nth-of-type(1) { left: 10.5px; }
+.vl-solo-chats__ico i:nth-of-type(2) { left: 14px; }
+.vl-solo-chats__ico i:nth-of-type(3) { left: 17.5px; }
+.vl-solo-chats:hover .vl-solo-chats__ico .vl-ico { transform: scale(1.12); }
+.vl-solo-chats:hover .vl-solo-chats__ico i { opacity: 1; animation: vl-dot 1s infinite ease-in-out; }
+.vl-solo-chats:hover .vl-solo-chats__ico i:nth-of-type(2) { animation-delay: 0.12s; }
+.vl-solo-chats:hover .vl-solo-chats__ico i:nth-of-type(3) { animation-delay: 0.24s; }
+body.in-call .vl-solo-chats, body:not(.vl-solo) .vl-solo-chats { display: none; }
+body.vl-solo .lobby-screen { padding-top: 64px; }
+
 /* ─────────── Телефон и узкие окна: без отступов, список — выезжающая панель ─────────── */
 .vl-fab-menu { display: none; }
 @media (max-width: 860px) {
@@ -579,7 +926,17 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
   .vl-msg__wrap { max-width: 86%; }
   .vl-msg__tools { display: none; }
   .vl-composer { padding: 0 10px 10px; }
-  .vl-reply-bar { margin-right: 0; }
+  .vl-reply-bar, .vl-tray { margin-right: 0; }
+  .vl-pinbar, .vl-search { margin: 0 10px 8px; }
+  .vl-chat__head-who { gap: 10px; padding: 4px 8px 4px 4px; margin-left: 0; }
+  .vl-chat__head-actions { gap: 4px; }
+  .vl-chat__head-actions .vl-round { --s: 38px; }
+  .vl-lightbox__stage { padding: 0 0 12px; }
+  .vl-lightbox__nav { display: none; }
+  .vl-ucard-overlay { padding: 0; align-items: end; }
+  .vl-ucard { width: 100%; max-height: 92dvh; border-radius: 28px 28px 0 0; }
+  .vl-wall-grid { grid-template-columns: repeat(3, 1fr); }
+  .vl-media-grid.n-1 .vl-media-cell { max-width: 70vw; }
   .vl-friends { gap: 0; }
   .vl-panel { border-radius: 0; }
   .vl-friends__top { padding: 12px 12px 16px; }
