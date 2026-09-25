@@ -263,21 +263,21 @@ export function createChatView({ convId, navigate, menuButton }) {
   })
   const dropZone = h('div', { class: 'vl-dropzone', hidden: true }, [h('div', { class: 'vl-dropzone__card' }, [icon('paperclip'), h('b', {}, 'Отпустите, чтобы прикрепить'), h('span', {}, 'Фото, видео и файлы до 64 МБ')])])
   const chatMain = h('div', { class: 'vl-chat__main' }, [scroller, jumpBtn, dropZone])
-  // Обои показываются целиком и сразу (плавным появлением), когда картинка уже загружена
+  // Обои — под всем чатом (лента и поле ввода), показываются целиком и сразу (плавным появлением), когда картинка уже загружена
   let wallToken = 0
   function applyWallpaper() {
     const c = conv()
     const id = (c && c.wallpaper) || ''
-    if (chatMain.dataset.wall === id) return
-    chatMain.dataset.wall = id
+    if (node.dataset.wall === id) return
+    node.dataset.wall = id
     const token = ++wallToken
     const show = () => {
       if (token !== wallToken || destroyed) return
       const css = wallpaperCss(id) // после загрузки — картинка уже из памяти
-      chatMain.style.setProperty('--vl-wall', css || 'none')
-      chatMain.classList.toggle('has-wall', !!css)
-      chatMain.classList.remove('wall-in')
-      if (css) { void chatMain.offsetWidth; chatMain.classList.add('wall-in') }
+      node.style.setProperty('--vl-wall', css || 'none')
+      node.classList.toggle('has-wall', !!css)
+      node.classList.remove('wall-in')
+      if (css) { void node.offsetWidth; node.classList.add('wall-in') }
     }
     preloadWallpaper(id).then(show, show)
   }
