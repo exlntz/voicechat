@@ -435,4 +435,28 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', schedule)
   else schedule()
+
+  /* ─────────────── Без всплывающих подсказок браузера ─────────────── */
+  // Системные «title»-подсказки (серые прямоугольники у курсора) выглядят чужеродно — убираем
+  // их везде. У кнопок и ссылок текст подсказки остаётся для экранных дикторов (aria-label).
+  function dropTitle(node) {
+    var t = node.getAttribute('title')
+    if (t == null) return
+    if (t && !node.hasAttribute('aria-label') && node.matches('button, a, [role="button"]') && !node.textContent.trim()) node.setAttribute('aria-label', t)
+    node.removeAttribute('title')
+  }
+  function dropTitles(root) {
+    if (root.nodeType !== 1) return
+    if (root.hasAttribute('title')) dropTitle(root)
+    var list = root.querySelectorAll('[title]')
+    for (var i = 0; i < list.length; i++) dropTitle(list[i])
+  }
+  new MutationObserver(function (records) {
+    for (var i = 0; i < records.length; i++) {
+      var r = records[i]
+      if (r.type === 'attributes') { if (r.target.nodeType === 1 && r.target.hasAttribute('title')) dropTitle(r.target) }
+      else for (var j = 0; j < r.addedNodes.length; j++) dropTitles(r.addedNodes[j])
+    }
+  }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['title'] })
+  dropTitles(document.documentElement)
 })()

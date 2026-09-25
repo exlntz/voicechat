@@ -595,6 +595,7 @@ function renderPage(title) {
 app.get('/', (c) => c.html(renderPage('Voice Lobby')))
 app.get('/room/:code', (c) => c.html(renderPage('Voice Lobby — комната')))
 app.get('/lobby', (c) => c.html(renderPage('Voice Lobby')))
+app.get('/call', (c) => c.html(renderPage('Voice Lobby — звонок')))
 app.get('/friends', (c) => c.html(renderPage('Voice Lobby — друзья')))
 app.get('/chats', (c) => c.html(renderPage('Voice Lobby — чаты')))
 app.get('/dm/:id', (c) => c.html(renderPage('Voice Lobby — сообщения')))

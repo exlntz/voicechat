@@ -625,7 +625,8 @@ body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { dis
   flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px; margin-left: -8px; padding: 6px 12px 6px 8px; border: 0; border-radius: 18px;
   background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background 0.2s var(--ease);
 }
-.vl-chat__head-who:hover { background: var(--vl-hover); --vl-ring: #181b21; }
+/* Имя в шапке — просто нажимается (открывает профиль), без подсветки и заливки */
+.vl-chat__head-who:hover { background: transparent; }
 .vl-chat__head-who .vl-chat__head-text { flex: 1; }
 .vl-round[hidden] { display: none; }
 
@@ -1264,3 +1265,4 @@ html[data-theme="light"] .vl-incoming-wrap { background: rgba(21, 32, 43, 0.32);
 @media (prefers-reduced-motion: reduce) {
   .vl-chat__history .vl-skel, .vl-msg.is-history-in { animation: none; }
 }
+.vl-chip > i { font-size: 14px; width: 16px; text-align: center; }
