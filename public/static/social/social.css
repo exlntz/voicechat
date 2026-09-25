@@ -646,6 +646,7 @@ body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { dis
 
 /* Обои: слой под лентой, слегка притемнён ради читаемости */
 .vl-chat__main.has-wall::before { content: ""; position: absolute; inset: 0; background: var(--vl-wall); z-index: 0; pointer-events: none; }
+.vl-chat__main.wall-in::before { animation: vl-fade-in 0.35s ease both; }
 .vl-chat__main.has-wall::after { content: ""; position: absolute; inset: 0; background: rgba(10, 12, 15, 0.18); z-index: 0; pointer-events: none; }
 .vl-chat__main > * { position: relative; z-index: 1; }
 .vl-chat__main > .vl-jump { position: absolute; z-index: 3; }
