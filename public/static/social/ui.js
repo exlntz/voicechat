@@ -283,6 +283,45 @@ export function setTicks(node, status) {
   return true
 }
 
+// ---- Телефон ----
+// На узком экране список чатов — отдельный главный экран (/chats), как в Телеграме
+const MOBILE_MQ = typeof matchMedia === 'function' ? matchMedia('(max-width: 860px)') : null
+export function isMobile() { return !!(MOBILE_MQ && MOBILE_MQ.matches) }
+export function onMobileChange(fn) { if (MOBILE_MQ && MOBILE_MQ.addEventListener) MOBILE_MQ.addEventListener('change', fn) }
+export function homePath() { return isMobile() ? '/chats' : '/friends' }
+
+// Долгое нажатие пальцем — то же, что ПКМ на компьютере (на iPhone события contextmenu нет).
+// Срабатывает через 450 мс, если палец не сдвинулся; следующий «клик» после него гасится.
+export function onLongPress(el, fn) {
+  let timer = 0
+  let start = null
+  let fired = 0
+  const cancel = () => { clearTimeout(timer); timer = 0; start = null }
+  el.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { cancel(); return }
+    const t = e.touches[0]
+    start = { x: t.clientX, y: t.clientY, target: e.target }
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+      timer = 0
+      if (!start) return
+      fired = Date.now()
+      try { if (navigator.vibrate) navigator.vibrate(12) } catch {}
+      fn({ clientX: start.x, clientY: start.y, target: start.target, preventDefault() {} })
+    }, 450)
+  }, { passive: true })
+  el.addEventListener('touchmove', (e) => {
+    if (!start) return
+    const t = e.touches[0]
+    if (Math.abs(t.clientX - start.x) > 10 || Math.abs(t.clientY - start.y) > 10) cancel()
+  }, { passive: true })
+  el.addEventListener('touchend', (e) => { if (Date.now() - fired < 600) e.preventDefault(); cancel() })
+  el.addEventListener('touchcancel', cancel, { passive: true })
+  // Android сам шлёт contextmenu после долгого нажатия — второе меню не нужно
+  el.addEventListener('contextmenu', (e) => { if (Date.now() - fired < 1000) { e.preventDefault(); e.stopImmediatePropagation() } }, true)
+  el.addEventListener('click', (e) => { if (Date.now() - fired < 600) { e.preventDefault(); e.stopImmediatePropagation() } }, true)
+}
+
 export function uid() {
   try { if (crypto.randomUUID) return crypto.randomUUID() } catch {}
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10)

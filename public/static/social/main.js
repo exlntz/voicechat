@@ -18,7 +18,7 @@ import { createFriendsView } from './friends.js'
 import { createChatView } from './chat.js'
 import { initNotifications, setBaseTitle } from './notify.js'
 import { initCalls, onCallEnded, isSwitching, inCall, callState } from './call-invite.js'
-import { h, icon, toast, displayName, setSelfId, waveBars } from './ui.js'
+import { h, icon, toast, displayName, setSelfId, waveBars, isMobile, onMobileChange, homePath } from './ui.js'
 
 const VL = window.VL
 const E = () => window.electronAPI || {}
@@ -38,6 +38,7 @@ let sessionActive = false
 export function parseRoute(path = location.pathname, search = location.search) {
   let m
   if ((m = path.match(/^\/dm\/(\d+)\/?$/))) return { name: 'dm', id: Number(m[1]) }
+  if (/^\/chats\/?$/.test(path)) return { name: 'chats' }
   if ((m = path.match(/^\/room\/([a-z0-9]+)\/?$/i))) return { name: 'room', code: m[1].toLowerCase() }
   if (/^\/lobby\/?$/.test(path)) return { name: 'lobby' }
   const tab = new URLSearchParams(search).get('tab') || ''
@@ -47,7 +48,7 @@ export function parseRoute(path = location.pathname, search = location.search) {
 export function navigate(path, { replace = false } = {}) {
   const url = new URL(path, location.origin)
   if (url.pathname + url.search !== location.pathname + location.search) {
-    history[replace ? 'replaceState' : 'pushState']({}, '', url.pathname + url.search)
+    history[replace ? 'replaceState' : 'pushState']({ fromChats: !replace && route.name === 'chats' }, '', url.pathname + url.search)
   }
   applyRoute(parseRoute(url.pathname, url.search))
 }
@@ -68,8 +69,14 @@ function applyRoute(next, { fromApp = false } = {}) {
       history.replaceState({}, '', '/room/' + code)
     }
   }
+  // Список чатов отдельным экраном — только на телефоне; на компьютере он всегда слева
+  if (next.name === 'chats' && !isMobile()) {
+    next = { name: 'friends', tab: '' }
+    history.replaceState({}, '', '/friends')
+  }
   route = next
   body.classList.remove('vl-drawer-open')
+  body.classList.toggle('vl-route-chats', next.name === 'chats')
 
   if (!fromApp) {
     if (isAppRoute(next)) {
@@ -85,9 +92,11 @@ function applyRoute(next, { fromApp = false } = {}) {
     }
   }
 
-  // Правая часть: друзья или личка
+  // Правая часть: друзья или личка (на экране «Чаты» телефона её не видно — оставляем как есть)
   if (isAppRoute(next)) {
     unmountView()
+  } else if (next.name === 'chats') {
+    // ничего: список чатов закрывает экран целиком
   } else {
     const key = next.name === 'dm' ? 'dm:' + next.id : 'friends'
     if (key !== viewKey) mountView(next, key)
@@ -98,10 +107,16 @@ function applyRoute(next, { fromApp = false } = {}) {
   updateTitle()
 }
 
+// Телефон: стрелка «назад» к списку чатов (на компьютере кнопки не видно — список и так слева)
 function menuButton() {
-  const b = h('button', { type: 'button', class: 'vl-round is-ghost vl-menu-btn', 'aria-label': 'Открыть список чатов' }, [icon('bars')])
-  b.addEventListener('click', () => body.classList.toggle('vl-drawer-open'))
+  const b = h('button', { type: 'button', class: 'vl-round is-ghost vl-menu-btn', 'aria-label': 'К списку чатов', title: 'Чаты' }, [icon('chevron-left')])
+  b.addEventListener('click', () => goHome())
   return b
+}
+function goHome() {
+  // Пришли из списка — просто шаг назад (не копим историю), иначе — на список
+  if (history.state && history.state.fromChats) history.back()
+  else navigate('/chats')
 }
 
 async function mountView(r, key) {
@@ -118,7 +133,7 @@ async function mountView(r, key) {
       try { conv = await ensureConversation(r.id) } catch (e) {
         if (viewKey !== key) return
         toast(e.message || 'Чат не найден', 'error')
-        navigate('/friends', { replace: true })
+        navigate(homePath(), { replace: true })
         return
       }
       if (viewKey !== key) return
@@ -309,7 +324,7 @@ async function startSession(me, prefillRoom = '') {
   Promise.all([loadFriends(), loadConversations()]).catch((e) => toast(e.message || 'Не удалось загрузить списки', 'error'))
 
   if (prefillRoom) history.replaceState({}, '', '/room/' + prefillRoom)
-  else if (location.pathname === '/' || location.pathname === '') history.replaceState({}, '', '/friends' + location.search)
+  else if (location.pathname === '/' || location.pathname === '') history.replaceState({}, '', (isMobile() ? '/chats' : '/friends') + location.search)
   applyRoute(parseRoute())
   if (pendingLink) { const link = pendingLink; pendingLink = null; navigate(link) }
 }
@@ -362,7 +377,8 @@ function showSoloChatsButton() {
     h('span', { class: 'vl-solo-chats__ico' }, [icon('message')]),
     h('span', {}, 'Чаты')
   ])
-  soloChatsBtn.addEventListener('click', () => exitSolo('/friends', { openLatestChat: true }))
+  // Телефон — на список чатов; компьютер — сразу в последнюю переписку
+  soloChatsBtn.addEventListener('click', () => (isMobile() ? exitSolo('/chats') : exitSolo('/friends', { openLatestChat: true })))
   body.appendChild(soloChatsBtn)
 }
 function hideSoloChatsButton() {
@@ -394,7 +410,7 @@ async function endSession({ callServer = false } = {}) {
   await cache.dropCache()
   resetStore()
   try { E().setBadge && E().setBadge(0, null) } catch {}
-  body.classList.remove('vl-ready', 'vl-show-app', 'vl-call-docked', 'vl-dock-open', 'vl-route-friends', 'vl-drawer-open')
+  body.classList.remove('vl-ready', 'vl-show-app', 'vl-call-docked', 'vl-dock-open', 'vl-route-friends', 'vl-drawer-open', 'vl-route-chats')
   body.classList.add('vl-auth')
   history.replaceState({}, '', '/')
   VL.state.currentUser = null
@@ -441,7 +457,7 @@ window.addEventListener('popstate', () => applyRoute(parseRoute()))
 let pendingLink = null
 function openDeepLink(link) {
   const path = String(link || '').replace(/^voicelobby:\/\//i, '/').replace(/^\/+/, '/')
-  if (!/^\/(dm\/\d+|room\/[a-z0-9]+|friends|lobby)/i.test(path)) return
+  if (!/^\/(dm\/\d+|room\/[a-z0-9]+|friends|chats|lobby)/i.test(path)) return
   if (!sessionActive) { pendingLink = path; return }
   navigate(path)
 }
@@ -463,7 +479,9 @@ on('connection', (up) => {
 })
 on('conversations', () => { if (route.name === 'dm') updateTitle() })
 // Чат удалили (вы на другом устройстве или собеседник — «у всех») — уйти из него
-on('conversation-removed', (id) => { if (route.name === 'dm' && route.id === id) navigate('/friends', { replace: true }) })
+on('conversation-removed', (id) => { if (route.name === 'dm' && route.id === id) navigate(homePath(), { replace: true }) })
+// Окно стало широким, а открыт экран «Чаты» — на компьютере его нет
+onMobileChange(() => { if (sessionActive && route.name === 'chats' && !isMobile()) navigate('/friends', { replace: true }) })
 
 setUnauthorizedHandler(() => { if (sessionActive) { toast('Сессия истекла — войдите снова', 'warning'); endSession() } })
 
@@ -475,10 +493,10 @@ async function boot() {
   initCalls({ navigate, onCallStart: () => updateLayout() })
   if (typeof E().onDeepLink === 'function') E().onDeepLink(openDeepLink)
   // Телефон: кнопка списка чатов поверх лобби/звонка и закрытие панели тапом мимо неё
-  const fab = h('button', { type: 'button', class: 'vl-fab-menu', 'aria-label': 'Открыть список чатов' }, [icon('bars')])
-  fab.addEventListener('click', () => body.classList.add('vl-drawer-open'))
+  // Телефон: над лобби и звонком — стрелка к списку чатов (звонок при этом не прерывается)
+  const fab = h('button', { type: 'button', class: 'vl-fab-menu', 'aria-label': 'К списку чатов', title: 'Чаты' }, [icon('chevron-left')])
+  fab.addEventListener('click', () => goHome())
   body.appendChild(fab)
-  mainRoot.addEventListener('click', (e) => { if (e.target === mainRoot && body.classList.contains('vl-drawer-open')) body.classList.remove('vl-drawer-open') })
   const me = await VL.fetchMe()
   if (!me) {
     body.classList.add('vl-auth')

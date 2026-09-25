@@ -531,7 +531,7 @@ body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { dis
 .vl-menu__item.is-danger:hover, .vl-menu__item.is-danger:focus-visible { background: var(--danger); color: #fff; }
 .vl-menu__sep { height: 1px; background: var(--vl-soft); margin: 4px 8px; }
 
-.vl-modal-overlay { position: fixed; inset: 0; z-index: 2500; background: rgba(5, 6, 8, 0.6); display: grid; place-items: center; padding: 16px; animation: vl-fade-in 0.15s ease both; }
+.vl-modal-overlay { position: fixed; inset: 0; z-index: 2700; background: rgba(5, 6, 8, 0.6); display: grid; place-items: center; padding: 16px; animation: vl-fade-in 0.15s ease both; }
 .vl-modal-overlay.is-leaving { animation: vl-fade-in 0.15s ease reverse both; }
 .vl-modal {
   width: min(420px, 100%); background: var(--vl-raised); border-radius: 24px; padding: 22px; box-sizing: border-box;
@@ -940,19 +940,49 @@ body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { dis
 body.in-call .vl-solo-chats, body:not(.vl-solo) .vl-solo-chats { display: none; }
 body.vl-solo .lobby-screen { padding-top: 64px; }
 
+/* Слои: окно профиля и уведомления — поверх списка чатов (на телефоне он на весь экран) */
+body.vl-shell .settings-overlay { z-index: 2600; } /* окна (обрезка аватарки, подтверждения) — 2700, выше него */
+body.vl-shell .toast-container { z-index: 3300; }
+
+/* «Идёт звонок — вернуться»: только на телефоне, на экране списка чатов */
+.vl-side__call {
+  display: none; align-items: center; gap: 10px; margin: 0 4px 12px; padding: 12px 16px; border: 0; border-radius: var(--vl-r-card);
+  background: var(--success-wash); color: var(--success-soft); font: 500 14px var(--vl-font); cursor: pointer; text-align: left;
+  animation: vl-rise 0.2s var(--ease) both;
+}
+.vl-side__call span { flex: 1; }
+.vl-side__call b { font-weight: 600; }
+
+/* Пальцем: долгое нажатие открывает меню — без системного выделения текста и «лупы» iPhone */
+@media (hover: none) {
+  .vl-bubble, .vl-dm, .vl-friend, .vl-tile { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  .vl-msg__edit { -webkit-user-select: text; user-select: text; }
+}
+
+/* Профиль на телефоне: разделы и «Выйти» переносятся на вторую строку, а не уезжают за край */
+@media (max-width: 600px) {
+  .vl-profile .settings-nav { flex-wrap: wrap; gap: 4px; border-radius: 20px; overflow: visible; }
+  .vl-profile .settings-nav__group { display: none; }
+  .vl-profile .settings-nav__item { flex: 1 1 auto; justify-content: center; }
+}
+
 /* ─────────── Телефон и узкие окна: без отступов, список — выезжающая панель ─────────── */
 .vl-fab-menu { display: none; }
 @media (max-width: 860px) {
   body.vl-ready #vl-shell { padding: 0; gap: 0; }
   body.vl-ready #vl-main { border-radius: 0; }
   body.vl-ready.vl-route-friends:not(.vl-show-app) #vl-main { padding: 0; }
+  /* Телефон: список чатов — отдельный главный экран (/chats) на всю ширину, как в Телеграме.
+     Чат, друзья и звонок открываются поверх, стрелка «назад» возвращает к списку. */
   body.vl-ready #vl-sidebar {
-    position: fixed; z-index: 2000; top: 0; bottom: 0; left: 0; width: min(86vw, 320px); border-radius: 0 var(--vl-r-panel) var(--vl-r-panel) 0;
-    padding-top: calc(env(safe-area-inset-top) + 16px); padding-bottom: calc(env(safe-area-inset-bottom) + 12px);
-    transform: translateX(-104%); transition: transform 0.28s var(--ease); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    position: fixed; z-index: 2000; top: 0; bottom: 0; left: 0; width: 100%; border-radius: 0;
+    padding: calc(env(safe-area-inset-top) + 14px) 10px calc(env(safe-area-inset-bottom) + 10px);
+    transform: translateX(-100%); visibility: hidden; transition: transform 0.28s var(--ease), visibility 0s linear 0.28s;
   }
-  body.vl-drawer-open #vl-sidebar { transform: none; }
-  body.vl-drawer-open #vl-main::after { content: ""; position: absolute; inset: 0; z-index: 1900; background: rgba(5, 6, 8, 0.55); animation: vl-fade-in 0.2s ease both; }
+  body.vl-ready.vl-route-chats #vl-sidebar { transform: none; visibility: visible; transition: transform 0.28s var(--ease); }
+  .vl-side__call:not([hidden]) { display: flex; }
+  .vl-side__head { padding-left: 8px; }
+  .vl-dm { padding: 10px 8px; }
   .vl-menu-btn { display: inline-grid !important; }
   .vl-view__head { height: 64px; padding: 0 10px; gap: 10px; }
   .vl-chat__head-name { font-size: 17px; }
@@ -960,6 +990,18 @@ body.vl-solo .lobby-screen { padding-top: 64px; }
   .vl-msg__wrap { max-width: 86%; }
   .vl-msg__tools { display: none; }
   .vl-composer { padding: 0 10px 10px; }
+  /* 16px — иначе iPhone приближает страницу при нажатии на поле */
+  .vl-composer__input, .vl-search__input, .vl-fld-host .fld input, .vl-msg__edit { font-size: 16px; }
+  .vl-composer__field { min-height: 48px; }
+  .vl-composer__send { width: 48px; height: 48px; }
+  .vl-composer__attach { margin: 4px 0; }
+  .vl-chat__head-who .vl-avatar { --size: 40px !important; }
+  body.vl-show-app .lobby-screen { padding-top: calc(env(safe-area-inset-top) + 58px); }
+  .vl-menu { min-width: min(240px, calc(100vw - 16px)); }
+  .vl-menu__item { height: 44px; font-size: 15px; }
+  .vl-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -8px; padding: 0 8px; }
+  .vl-chips::-webkit-scrollbar { display: none; }
+  .vl-chip { flex: 0 0 auto; }
   .vl-reply-bar, .vl-tray { margin-right: 0; }
   .vl-pinbar, .vl-search { margin: 0 10px 8px; }
   .vl-chat__head-who { gap: 10px; padding: 4px 8px 4px 4px; margin-left: 0; }
@@ -980,7 +1022,7 @@ body.vl-solo .lobby-screen { padding-top: 64px; }
   .vl-tile.is-featured { grid-column: auto; }
   .vl-tile__acts { opacity: 1; transform: none; }
   .vl-friends__bottom { padding: 12px 8px; border-top: 1px solid var(--vl-soft); }
-  .vl-add { flex: 1 1 100%; min-width: 0; }
+  .vl-add { flex: 0 0 auto; min-width: 0; padding: 0 4px; }
   .vl-friend__user { display: none; }
   .vl-island { top: 72px; max-width: calc(100% - 20px); }
   .vl-island__label { max-width: 36vw; }
