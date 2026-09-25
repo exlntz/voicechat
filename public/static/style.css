@@ -154,10 +154,8 @@ html, body {
 
 /* ---------- Фокус с клавиатуры ---------- */
 :focus { outline: none; }
-:focus-visible {
-  outline: 2px solid var(--accent-soft);
-  outline-offset: 2px;
-}
+/* Синих колец фокуса нет нигде: после Esc или закрытия окна кнопка не остаётся «обведённой» */
+*:focus, *:focus-visible { outline: none !important; }
 
 /* ---------- Полосы прокрутки ---------- */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -235,7 +233,7 @@ button {
 .fld input:not(:placeholder-shown) ~ .fld__lbl,
 .fld.is-filled .fld__lbl {
   transform: translateY(-26px) scale(0.84);
-  color: var(--accent-soft);
+  color: var(--text-faint);
 }
 
 /* Подчёркивание-«прочерк» при фокусе */
@@ -621,7 +619,7 @@ button {
   margin-bottom: 0;
   transition: border-color 0.3s var(--ease);
 }
-.auth-form-panel .fld { margin-bottom: 30px; }
+.auth-form-panel .fld { margin-bottom: 16px; }
 .auth-form-panel input::placeholder { color: transparent; }
 
 .auth-form-panel input:-webkit-autofill,
@@ -687,10 +685,7 @@ button {
   overflow: hidden;
   transition: background 0.3s var(--ease), border-color 0.3s var(--ease), transform 0.18s var(--ease), box-shadow 0.3s var(--ease);
 }
-.auth-submit-btn:hover,
-.auth-submit-btn:focus-visible,
-.lobby-card > button:hover,
-.lobby-card > button:focus-visible {
+.auth-submit-btn:hover, .lobby-card > button:hover {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
   box-shadow: 0 8px 24px var(--accent-glow);
@@ -840,8 +835,7 @@ button {
   overflow: hidden;
   transition: background 0.3s var(--ease), color 0.3s var(--ease), border-color 0.3s var(--ease), transform 0.18s var(--ease);
 }
-.auth-ghost-btn:hover,
-.auth-ghost-btn:focus-visible {
+.auth-ghost-btn:hover {
   background: #fff;
   border-color: #fff;
   color: var(--accent);
@@ -872,8 +866,7 @@ button {
   cursor: pointer;
   transition: background 0.25s var(--ease), color 0.25s var(--ease);
 }
-.auth-switch-link:hover,
-.auth-switch-link:focus-visible { background: var(--accent-wash); color: #fff; }
+.auth-switch-link:hover { background: var(--accent-wash); color: #fff; }
 
 /* На узких экранах (телефон) двухпанельный слайдер не влезает — показываем только
    текущую форму на всю ширину карточки, переключение — крупной кнопкой под ней */
@@ -943,8 +936,7 @@ button {
       "err     err"
       "preview devices"
       "toggles devices"
-      "room    join"
-      "hint    hint";
+      "room    join";
     align-items: start;
   }
   .lobby-card > .ank-brand,
@@ -956,8 +948,7 @@ button {
   .lobby-card > .device-settings { grid-area: devices; }
   .lobby-card > .fld,
   .lobby-card > input { grid-area: room; }
-  .lobby-card > button { grid-area: join; align-self: end; margin: 0 0 26px; }
-  .lobby-card > .hint-text { grid-area: hint; margin-top: 4px; }
+  .lobby-card > button { grid-area: join; align-self: end; margin: 0; }
 }
 
 /* Шапка карточки: знак + название продукта (собирает anker.js) */
@@ -1027,10 +1018,7 @@ button {
   cursor: pointer;
   transition: color 0.25s var(--ease), border-color 0.25s var(--ease), background 0.25s var(--ease), transform 0.18s var(--ease);
 }
-.lobby-card .btn-secondary:hover,
-.lobby-card .btn-secondary:focus-visible,
-.lobby-logout-btn:hover,
-.lobby-logout-btn:focus-visible {
+.lobby-card .btn-secondary:hover, .lobby-logout-btn:hover {
   color: var(--text);
   border-color: var(--border-strong);
   background: rgba(var(--ink-rgb), 0.06);
@@ -1048,8 +1036,7 @@ button {
   color: var(--danger-soft);
   font-weight: 600;
 }
-.lobby-logout-btn:hover,
-.lobby-logout-btn:focus-visible {
+.lobby-logout-btn:hover {
   border-color: var(--danger);
   background: var(--danger);
   color: #fff;
@@ -1678,8 +1665,7 @@ body.inapp-fullscreen { overflow: hidden; }
   cursor: pointer;
   transition: background .25s var(--ease), border-color .25s var(--ease), transform .18s var(--ease), box-shadow .25s var(--ease);
 }
-.solo-copy-btn:hover,
-.solo-copy-btn:focus-visible {
+.solo-copy-btn:hover {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
   box-shadow: 0 8px 24px var(--accent-glow);
@@ -1829,7 +1815,7 @@ body.inapp-fullscreen { overflow: hidden; }
   display: flex; align-items: center; justify-content: center;
   transition: color .25s var(--ease), border-color .25s var(--ease), background .25s var(--ease), transform .18s var(--ease);
 }
-.ctrl-btn:hover, .ctrl-btn:focus-visible {
+.ctrl-btn:hover {
   background: rgba(var(--ink-rgb), 0.10);
   border-color: var(--border-strong);
   color: var(--text);
@@ -1869,8 +1855,7 @@ body.inapp-fullscreen { overflow: hidden; }
   border-color: transparent;
   background: rgba(var(--ink-rgb), 0.07);
 }
-.controls-pill .ctrl-btn:hover,
-.controls-pill .ctrl-btn:focus-visible { background: rgba(var(--ink-rgb), 0.15); border-color: transparent; }
+.controls-pill .ctrl-btn:hover { background: rgba(var(--ink-rgb), 0.15); border-color: transparent; }
 .controls-pill .ctrl-btn.active { background: var(--accent); border-color: var(--accent); }
 .controls-pill .ctrl-btn.active:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 .controls-pill .ctrl-btn.off,
@@ -1896,7 +1881,7 @@ body.inapp-fullscreen { overflow: hidden; }
   border-radius: var(--radius);
   font: 600 15px/1 var(--font);
 }
-.leave-btn:hover, .leave-btn:focus-visible {
+.leave-btn:hover {
   background: var(--danger);
   border-color: var(--danger);
   color: #fff;
@@ -2263,7 +2248,6 @@ body.inapp-fullscreen { overflow: hidden; }
 }
 .switch input:checked + .switch__track { background: var(--accent); }
 .switch input:checked + .switch__track::after { transform: translateX(18px); }
-.switch input:focus-visible + .switch__track { outline: 2px solid var(--accent-soft); outline-offset: 2px; }
 /* Телефон: 80% слишком тесно — окно почти на весь экран */
 @media (max-width: 600px) {
   .settings-sheet { width: calc(100vw - 24px); height: calc(100dvh - 48px); }
@@ -2338,7 +2322,7 @@ body.inapp-fullscreen { overflow: hidden; }
 }
 @media (hover: hover) { .settings-card select.native-select { font-size: 14px; } }
 .settings-card select.native-select:hover { border-color: var(--border-strong); }
-.settings-card select.native-select:focus { border-color: var(--accent-soft); background-color: var(--accent-wash); }
+
 
 /* ---- Выпадающий список (makeDropdown в app.js) ----
    Кнопка выглядит как прежнее поле выбора, меню — как контекстное меню сайта.
@@ -2364,7 +2348,6 @@ body.inapp-fullscreen { overflow: hidden; }
 .dd-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dd-chevron { flex-shrink: 0; font-size: 11px; color: var(--accent-soft); transition: transform 0.25s var(--ease); }
 .dd-btn:hover { border-color: var(--border-strong); }
-.dd-btn:focus-visible,
 .dd-btn.open { border-color: var(--accent-soft); background-color: var(--accent-wash); outline: none; }
 .dd-btn.open .dd-chevron { transform: rotate(180deg); }
 .dd-btn:disabled { cursor: default; color: var(--text-faint); border-color: var(--border); background: rgba(var(--ink-rgb), 0.02); }
@@ -2402,10 +2385,8 @@ body.inapp-fullscreen { overflow: hidden; }
 .dd-check { flex-shrink: 0; font-size: 12px; color: var(--accent-soft); visibility: hidden; }
 .dd-item.selected { color: var(--text); }
 .dd-item.selected .dd-check { visibility: visible; }
-.dd-item:hover,
-.dd-item:focus-visible { background: var(--accent); color: #fff; }
-.dd-item:hover .dd-check,
-.dd-item:focus-visible .dd-check { color: #fff; }
+.dd-item:hover { background: var(--accent); color: #fff; }
+.dd-item:hover .dd-check { color: #fff; }
 /* Живой индикатор уровня микрофона */
 .lvl-dots { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
 .lvl-dots span {
@@ -2739,7 +2720,7 @@ body.pip-body > .room-screen { height: 100%; }
   font: 600 15px/1 var(--font);
   cursor: pointer;
 }
-.pip-placeholder__btn:hover, .pip-placeholder__btn:focus-visible { background: var(--accent-hover); }
+.pip-placeholder__btn:hover { background: var(--accent-hover); }
 
 /* ═══════════════ МЯГКИЙ СТИЛЬ (направление S1) ═══════════════
    Слой поверх базовых правил: цвета и кнопки прежние, меняется подача.
@@ -2828,9 +2809,7 @@ body.pip-body > .room-screen { height: 100%; }
 .settings-card select.native-select { padding-right: 36px; background-position: right 16px center; }
 .dd-btn:hover,
 .settings-card select.native-select:hover { background-color: #0b0d11; }
-.dd-btn:focus-visible,
-.dd-btn.open,
-.settings-card select.native-select:focus {
+.dd-btn.open {
   background-color: var(--accent-wash);
   outline: 2px solid var(--accent-soft);
   outline-offset: -2px;
@@ -2856,10 +2835,7 @@ body.pip-body > .room-screen { height: 100%; }
   transition: background-color 0.25s var(--ease), outline-color 0.25s var(--ease);
 }
 .fld input:hover { background: #0b0d11; }
-.fld input:focus {
-  outline: 2px solid var(--accent-soft);
-  outline-offset: -2px;
-}
+
 .fld.is-err input { outline: 2px solid var(--danger); outline-offset: -2px; }
 .fld.is-ok input { outline: 2px solid rgba(58, 168, 110, 0.7); outline-offset: -2px; }
 .fld__bar { display: none; }
@@ -2943,7 +2919,7 @@ body.pip-body > .room-screen { height: 100%; }
 }
 .ank-fill__dot.is-instant { transition: none; }
 @media (hover: hover) {
-  .has-fill:hover:not(:focus-visible) {
+  .has-fill:hover {
     transition-property: background, background-color, color, border-color, box-shadow, transform;
     transition-duration: 0s, 0s, 0.3s, 0.3s, 0.3s, 0.18s;
     transition-delay: 99999s, 99999s, 0s, 0s, 0s, 0s;
@@ -3056,9 +3032,7 @@ body.pip-body > .room-screen { height: 100%; }
   cursor: default;
 }
 .room-topbar .room-info.is-live .room-status { cursor: pointer; }
-.room-topbar .room-info.is-live .room-status:hover,
-.room-topbar .room-status:focus-visible,
-.room-topbar .room-status.is-open { background: rgba(var(--ink-rgb), 0.08); }
+.room-topbar .room-info.is-live .room-status:hover, .room-topbar .room-status.is-open { background: rgba(var(--ink-rgb), 0.08); }
 
 .conn-card {
   position: absolute;
@@ -3083,9 +3057,7 @@ body.pip-body > .room-screen { height: 100%; }
   pointer-events: none;
 }
 .room-info:not(.is-live) .conn-card { display: none; }
-.room-status:hover .conn-card,
-.room-status:focus-visible .conn-card,
-.room-status.is-open .conn-card {
+.room-status:hover .conn-card, .room-status.is-open .conn-card {
   opacity: 1;
   visibility: visible;
   transform: translate(-50%, 0);
@@ -3159,8 +3131,7 @@ body.pip-body > .room-screen { height: 100%; }
   70% { transform: rotate(-6deg); }
   100% { transform: rotate(0deg); }
 }
-.leave-btn:hover .leave-ico,
-.leave-btn:focus-visible .leave-ico { animation: leave-ico-rock 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1; }
+.leave-btn:hover .leave-ico { animation: leave-ico-rock 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1; }
 /* Микрофон и камера: один раз «пульс» при наведении */
 @keyframes ctl-ico-pop {
   0% { transform: scale(1); }
@@ -3170,7 +3141,7 @@ body.pip-body > .room-screen { height: 100%; }
 }
 .ctrl-btn:hover .ctl-ico { animation: ctl-ico-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1) 1; }
 @media (prefers-reduced-motion: reduce) {
-  .leave-btn:hover .leave-ico, .leave-btn:focus-visible .leave-ico { animation: none; }
+  .leave-btn:hover .leave-ico { animation: none; }
   .ctl-ico__slash, .ctl-ico__cut { transition: none; }
 }
 
@@ -3206,8 +3177,7 @@ body.pip-body > .room-screen { height: 100%; }
   color: #fff;
   box-shadow: none;
 }
-.controls-pill .leave-btn:hover,
-.controls-pill .leave-btn:focus-visible { background: var(--danger); color: #fff; box-shadow: none; }
+.controls-pill .leave-btn:hover { background: var(--danger); color: #fff; box-shadow: none; }
 @media (max-width: 600px) {
   .controls-pill .leave-btn { height: 48px; min-height: 48px; padding: 0 20px; }
 }
@@ -3376,3 +3346,158 @@ html[data-theme="light"] .controls-pill .ctrl-btn.off .ctl-ico__cut { stroke: #f
 html[data-theme="light"] .controls-pill .ctrl-btn.off:hover,
 html[data-theme="light"] .controls-pill .ctrl-btn.danger:hover { background: var(--danger); color: #fff; }
 html[data-theme="light"] .controls-pill .ctrl-btn.off:hover .ctl-ico__cut { stroke: var(--danger); }
+
+/* ═══════════════ Звонок в стиле «Голос» ═══════════════
+   Шапка — отдельная строка над плитками: слева логотип, справа секундомер и связь,
+   «Скопировать ссылку» и «Участники». Плитки — скругление 28px на однотонном фоне,
+   крупный кружок с инициалами и имя Unbounded внизу слева; громкость — у имени. */
+.room-topbar { padding: 16px 20px 0; background: none; }
+html[data-theme="light"] .room-topbar { background: none; }
+.room-screen:not(.is-compact):not(.is-docked) .room-main > .stage { padding-top: 76px; }
+.room-topbar__right { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.room-topbar .room-info { height: 44px; padding: 0 6px; font: 600 15px/1 'Golos Text', var(--font); color: var(--text-dim); }
+.room-topbar .conn-card { left: auto; right: -8px; transform: translateY(-4px); }
+.room-status:hover .conn-card, .room-status.is-open .conn-card { transform: translateY(0); }
+
+.room-copy-btn {
+  display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 18px 0 16px;
+  border: 0; border-radius: 999px; background: rgba(var(--ink-rgb), 0.08); color: var(--text);
+  font: 600 14px/1 'Golos Text', var(--font); white-space: nowrap; cursor: pointer;
+  transition: background 0.25s var(--ease), color 0.25s var(--ease);
+  --ank-fill: rgba(var(--ink-rgb), 0.16);
+}
+.room-copy-btn i { font-size: 14px; color: var(--accent-soft); }
+.room-copy-btn:hover { background: rgba(var(--ink-rgb), 0.16); }
+.room-copy-btn.is-copied, .room-copy-btn.is-copied:hover { background: var(--success); color: #fff; --ank-fill: var(--success); }
+.room-copy-btn.is-copied i { color: #fff; }
+html[data-theme="light"] .room-copy-btn { background: #ffffff; box-shadow: inset 0 0 0 1px rgba(21, 32, 43, 0.12); --ank-fill: #eef1f4; }
+html[data-theme="light"] .room-copy-btn:hover { background: #f4f6f8; }
+html[data-theme="light"] .room-copy-btn.is-copied { background: var(--success); box-shadow: none; }
+
+.room-topbar .room-people-btn, .room-topbar .room-popout-btn { width: 44px; height: 44px; font-size: 15px; border-radius: 50%; }
+.room-topbar .ctrl-btn { background: rgba(var(--ink-rgb), 0.08); }
+.room-topbar .ctrl-btn:hover { background: rgba(var(--ink-rgb), 0.16); }
+/* «Участники»: при наведении значок коротко подпрыгивает */
+.room-people-btn:hover i { animation: room-people-hop 0.55s var(--ease) 1; }
+@keyframes room-people-hop {
+  0%, 100% { transform: translateY(0) scale(1); }
+  35% { transform: translateY(-3px) scale(1.08); }
+  65% { transform: translateY(1px) scale(0.97); }
+}
+
+/* Плитки */
+.tile { border-radius: 28px; border: 0; background: #181b21; }
+.tile .no-video-placeholder { background: #181b21; }
+.tile.speaking { border-color: transparent; box-shadow: 0 0 0 3px var(--success); }
+.room-main.is-spotlight .sidebar-participants .tile.speaking { box-shadow: 0 0 0 2px var(--success); }
+.room-main.is-spotlight .sidebar-participants .tile, .room-main.is-spotlight .sidebar-participants .no-video-placeholder { background: #181b21; }
+.tile .avatar-circle {
+  width: clamp(64px, 24%, 112px); background: #262b34; box-shadow: none; color: var(--text);
+  font: 600 clamp(22px, 3.2vw, 40px)/1 'Unbounded', 'Golos Text', var(--font); letter-spacing: -0.02em;
+}
+.tile.is-local .avatar-circle { background: var(--accent); color: #fff; }
+.tile.speaking .avatar-circle { box-shadow: 0 0 0 10px rgba(58, 168, 110, 0.16), 0 0 0 22px rgba(58, 168, 110, 0.07); }
+html[data-theme="light"] .tile,
+html[data-theme="light"] .tile .no-video-placeholder,
+html[data-theme="light"] .room-main.is-spotlight .sidebar-participants .tile,
+html[data-theme="light"] .room-main.is-spotlight .sidebar-participants .no-video-placeholder { background: #e3e8ee; }
+html[data-theme="light"] .tile .avatar-circle { background: #ffffff; color: var(--text); }
+html[data-theme="light"] .tile.is-local .avatar-circle { background: var(--accent); color: #fff; }
+
+/* Имя — Unbounded внизу слева; поверх видео — на подложке-таблетке */
+.tile .tile-label {
+  left: 16px; bottom: 14px; max-width: calc(100% - 96px); padding: 6px 12px; gap: 8px;
+  border: 0; border-radius: 999px; background: transparent;
+  font: 600 17px/1.2 'Unbounded', 'Golos Text', var(--font); letter-spacing: -0.01em; color: var(--text);
+  overflow: visible;
+}
+.tile .tile-label span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile .tile-label i { font-size: 14px; }
+.tile .tile-label .host-crown { color: #f3c566; }
+.tile:has(> .no-video-placeholder[style*="none"]) .tile-label { background: rgba(10, 12, 15, 0.62); color: #f2f5f9; }
+html[data-theme="light"] .tile:has(> .no-video-placeholder[style*="none"]) .tile-label { background: rgba(255, 255, 255, 0.88); color: var(--text); }
+html[data-theme="light"] .tile .tile-label { background: transparent; }
+
+/* Громкость собеседника — в его рамке, рядом с именем: раскрывается при наведении на плитку */
+.tile .tile-label .volume-control {
+  position: static; display: inline-flex; max-width: 0; overflow: hidden; margin-left: -8px; padding: 0;
+  border: 0; background: transparent; opacity: 0; gap: 8px;
+  transition: max-width 0.3s var(--ease), opacity 0.25s var(--ease), margin 0.3s var(--ease);
+}
+.tile:hover .tile-label .volume-control { max-width: 130px; opacity: 1; margin-left: 2px; }
+.tile .tile-label .volume-control input[type="range"] { width: 90px; }
+@media (hover: none) {
+  .tile .tile-label .volume-control { max-width: 130px; opacity: 1; margin-left: 2px; }
+}
+.room-main.is-spotlight .sidebar-participants .tile-label .volume-control { display: none; }
+
+/* Кнопки на плитке — круглые */
+.tile-fullscreen-btn, .tile-kick-btn { border-radius: 50%; border: 0; }
+
+/* Участники: плавающая панель со скруглением, строки-«таблетки», имена жирным Golos */
+.panel-overlay .panel {
+  width: min(360px, calc(100vw - 24px)); height: calc(100% - 24px); margin: 12px;
+  border: 0; border-radius: 28px; background: var(--surface); box-shadow: var(--shadow-md);
+  padding: 20px 16px; padding-top: calc(18px + env(safe-area-inset-top)); font-family: 'Golos Text', var(--font);
+}
+.panel-overlay .panel-head { margin: 0 0 14px; padding-left: 6px; }
+.panel-overlay .panel h3 { display: flex; align-items: center; gap: 10px; font: 700 22px/1.2 'Unbounded', 'Golos Text', var(--font); letter-spacing: -0.02em; }
+.panel-count {
+  min-width: 28px; height: 28px; padding: 0 9px; box-sizing: border-box; border-radius: 14px;
+  background: rgba(var(--ink-rgb), 0.08); color: var(--text-dim);
+  font: 600 14px/28px 'Golos Text', var(--font); text-align: center; letter-spacing: 0;
+}
+.panel-overlay .panel-close { width: 40px; height: 40px; border-radius: 50%; background: rgba(var(--ink-rgb), 0.07); }
+.panel-overlay .panel-close:hover { background: rgba(var(--ink-rgb), 0.14); }
+.panel-participant {
+  gap: 12px; padding: 8px 16px 8px 8px; margin-bottom: 8px;
+  border: 0; border-radius: 999px; background: rgba(var(--ink-rgb), 0.05);
+  font: 600 15px/1.25 'Golos Text', var(--font);
+}
+.panel-participant:last-child { margin-bottom: 0; }
+.panel-participant .avatar-circle { width: 40px; height: 40px; background: #262b34; color: var(--text); font: 600 14px/1 'Golos Text', var(--font); box-shadow: none; flex-shrink: 0; }
+.panel-participant .avatar-circle.is-local { background: var(--accent); color: #fff; }
+.panel-participant__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel-participant__you { font-weight: 500; color: var(--text-faint); }
+.panel-participant .host-crown { color: #f3c566; font-size: 14px; }
+.panel-participant__muted { color: var(--danger-soft); font-size: 14px; }
+html[data-theme="light"] .panel-overlay { background: rgba(21, 32, 43, 0.32); }
+html[data-theme="light"] .panel-participant .avatar-circle { background: #e3e8ee; }
+html[data-theme="light"] .panel-participant .avatar-circle.is-local { background: var(--accent); color: #fff; }
+
+/* Телефон и низкие окна: шапка ниже и компактнее, плитки начинаются под ней */
+@media (max-width: 600px) {
+  .room-topbar { padding: 10px 12px 0; }
+  .room-screen:not(.is-compact):not(.is-docked) .room-main > .stage { padding-top: 60px; }
+  .room-copy-btn { width: 40px; height: 40px; padding: 0; justify-content: center; }
+  .room-copy-btn__label { display: none; }
+  .room-topbar .room-people-btn, .room-topbar .room-popout-btn { width: 40px; height: 40px; }
+  .room-topbar .room-info { padding: 0 2px; font-size: 14px; }
+  .tile .tile-label { font-size: 14px; left: 12px; bottom: 10px; }
+}
+@media (max-height: 480px) and (orientation: landscape) {
+  .room-topbar { padding: 8px 14px 0; }
+  .room-screen:not(.is-compact):not(.is-docked) .room-main > .stage { padding-top: 56px; }
+  .room-copy-btn, .room-topbar .room-people-btn, .room-topbar .room-popout-btn { height: 40px; }
+  .room-topbar .room-people-btn, .room-topbar .room-popout-btn { width: 40px; }
+}
+@media (prefers-reduced-motion: reduce) { .room-people-btn:hover i { animation: none; } }
+/* Значок «камера выключена» у имени лишний: без камеры и так виден кружок с инициалами */
+.tile .tile-label .fa-video-slash { display: none !important; }
+.tile .tile-label { max-width: calc(100% - 76px); }
+/* Узкая плитка (телефон, много участников): громкость — отдельной таблеткой над именем */
+.tile.camera-tile { container-type: inline-size; }
+@container (max-width: 300px) {
+  .tile .tile-label { max-width: calc(100% - 64px); font-size: 14px; }
+  .tile .tile-label .volume-control {
+    position: absolute; left: 0; top: auto; right: auto; bottom: calc(100% + 6px); max-width: none; margin: 0; padding: 6px 10px;
+    border-radius: 999px; background: rgba(10, 12, 15, 0.62);
+  }
+  .tile:hover .tile-label .volume-control { margin: 0; }
+  .tile .tile-label .volume-control input[type="range"] { width: 80px; }
+}
+html[data-theme="light"] .tile .tile-label .volume-control { background: transparent; }
+@container (max-width: 300px) { html[data-theme="light"] .tile .tile-label .volume-control { background: rgba(255, 255, 255, 0.88); } }
+/* Карточка приглашения — такая же рамка, как у плитки */
+.solo-invite { border: 0; border-radius: 28px; background: #181b21; }
+html[data-theme="light"] .solo-invite { background: #ffffff; }

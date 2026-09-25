@@ -178,6 +178,46 @@ export function openProfile({ logout }) {
     ])
     paintPreview()
 
+    // Отображаемое имя — его видят друзья в чатах и участники звонка
+    const nameInput = h('input', { type: 'text', placeholder: 'Отображаемое имя', maxlength: '40', autocomplete: 'off', spellcheck: 'false' })
+    nameInput.value = me.displayName || me.username
+    const nameStatus = h('div', { class: 'vl-fld-status', role: 'status' })
+    const nameSave = h('button', { type: 'button', class: 'vl-btn vl-btn--primary vl-btn--pill', disabled: true }, 'Сохранить')
+    const nameCard = h('div', { class: 'settings-card' }, [
+      h('div', { class: 'settings-card-head' }, [h('span', { class: 'settings-card-title' }, [icon('user'), 'Имя'])]),
+      h('p', { class: 'settings-card-note' }, 'Так вас видят друзья в чатах и участники звонка.'),
+      h('div', { class: 'vl-fld-host' }, [nameInput]),
+      nameStatus,
+      h('div', { class: 'settings-card-actions' }, [nameSave])
+    ])
+    const NAME_RE = /^[\p{L}\p{N}_\- ]{1,40}$/u
+    const wantedName = () => nameInput.value.replace(/\s+/g, ' ').trim()
+    function refreshName() {
+      const v = wantedName()
+      const same = v === (store.me.displayName || store.me.username)
+      const valid = NAME_RE.test(v)
+      nameSave.disabled = same || !valid
+      nameStatus.textContent = !v || same || valid ? '' : 'Только буквы, цифры, пробел, _ и -'
+      nameStatus.className = 'vl-fld-status' + (!v || same || valid ? '' : ' is-err')
+    }
+    nameInput.addEventListener('input', refreshName)
+    nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !nameSave.disabled) nameSave.click() })
+    nameSave.addEventListener('click', async () => {
+      nameSave.disabled = true
+      try {
+        const p = await api.patch('/api/profile', { displayName: wantedName() })
+        updateUser(p.user)
+        nameInput.value = p.user.displayName
+        preview.querySelector('.vl-profile-card__name').textContent = p.user.displayName
+        nameStatus.textContent = ''
+        toast('Имя изменено', 'success')
+      } catch (e) {
+        nameStatus.textContent = e.message
+        nameStatus.className = 'vl-fld-status is-err'
+        nameSave.disabled = false
+      }
+    })
+
     const input = h('input', { type: 'text', placeholder: 'Новый юзернейм', maxlength: '25', autocomplete: 'off', spellcheck: 'false' })
     input.value = '@' + me.username
     if (window.VL.atPrefixField) window.VL.atPrefixField(input)
@@ -251,7 +291,7 @@ export function openProfile({ logout }) {
       h('p', { class: 'settings-card-note' }, 'Только на этом устройстве.'),
       themeRow
     ])
-    return [preview, themeCard, mediaCard, card]
+    return [preview, themeCard, mediaCard, nameCard, card]
   }
 
   // ---------- Конфиденциальность: «был в сети» ----------
