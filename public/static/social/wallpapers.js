@@ -17,9 +17,31 @@ export const PRESETS = [
 // CSS-фон по id обоев (null — без обоев)
 export function wallpaperCss(id) {
   if (!id) return ''
-  if (id.startsWith('file:')) return `url("/api/files/${id.slice(5)}") center / cover no-repeat, #0d1016`
+  if (id.startsWith('file:')) return `url("${blobUrls.get(id) || `/api/files/${id.slice(5)}`}") center / cover no-repeat, #0d1016`
   const p = PRESETS.find((x) => x.id === id)
   return p ? p.css : ''
+}
+
+// Своя картинка: сначала скачать целиком в память и раскодировать, потом показывать —
+// иначе браузер рисует её полосами сверху вниз по мере загрузки. Фон берёт картинку из памяти
+// (blob:), поэтому второй загрузки нет. Готовые обои — CSS, их ждать не нужно.
+const ready = new Map() // id -> Promise
+const blobUrls = new Map() // id -> blob: URL уже загруженной картинки
+export function preloadWallpaper(id) {
+  if (!id || !id.startsWith('file:')) return Promise.resolve()
+  if (ready.has(id)) return ready.get(id)
+  const p = fetch(`/api/files/${id.slice(5)}`, { credentials: 'same-origin' })
+    .then((r) => { if (!r.ok) throw new Error('wallpaper ' + r.status); return r.blob() })
+    .then(async (blob) => {
+      const url = URL.createObjectURL(blob)
+      const img = new Image()
+      img.src = url
+      try { await img.decode() } catch {}
+      blobUrls.set(id, url)
+    })
+    .catch(() => { ready.delete(id) }) // не вышло — покажем как есть и попробуем снова в следующий раз
+  ready.set(id, p)
+  return p
 }
 
 export function openWallpaperPicker(conv) {

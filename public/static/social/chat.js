@@ -23,7 +23,7 @@ import { renderAttachments, openLightbox } from './media-ui.js'
 import { prepareAttachment, uploadFile, waveformOf } from './upload.js'
 import { openForwardPicker } from './forward.js'
 import { openUserCard } from './user-card.js'
-import { wallpaperCss, openWallpaperPicker } from './wallpapers.js'
+import { wallpaperCss, openWallpaperPicker, preloadWallpaper } from './wallpapers.js'
 
 const MAX_LEN = 4000
 const MAX_FILES = 10
@@ -259,13 +259,23 @@ export function createChatView({ convId, navigate, menuButton }) {
   })
   const dropZone = h('div', { class: 'vl-dropzone', hidden: true }, [h('div', { class: 'vl-dropzone__card' }, [icon('paperclip'), h('b', {}, 'Отпустите, чтобы прикрепить'), h('span', {}, 'Фото, видео и файлы до 64 МБ')])])
   const chatMain = h('div', { class: 'vl-chat__main' }, [scroller, jumpBtn, dropZone])
+  // Обои показываются целиком и сразу (плавным появлением), когда картинка уже загружена
+  let wallToken = 0
   function applyWallpaper() {
     const c = conv()
-    const css = wallpaperCss(c && c.wallpaper)
-    if (chatMain.dataset.wall === (css || '')) return
-    chatMain.dataset.wall = css || ''
-    chatMain.classList.toggle('has-wall', !!css)
-    chatMain.style.setProperty('--vl-wall', css || 'none')
+    const id = (c && c.wallpaper) || ''
+    if (chatMain.dataset.wall === id) return
+    chatMain.dataset.wall = id
+    const token = ++wallToken
+    const show = () => {
+      if (token !== wallToken || destroyed) return
+      const css = wallpaperCss(id) // после загрузки — картинка уже из памяти
+      chatMain.style.setProperty('--vl-wall', css || 'none')
+      chatMain.classList.toggle('has-wall', !!css)
+      chatMain.classList.remove('wall-in')
+      if (css) { void chatMain.offsetWidth; chatMain.classList.add('wall-in') }
+    }
+    preloadWallpaper(id).then(show, show)
   }
 
   // ---------- Поле ввода ----------

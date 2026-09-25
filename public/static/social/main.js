@@ -18,6 +18,7 @@ import { createFriendsView } from './friends.js'
 import { createChatView } from './chat.js'
 import { initNotifications, setBaseTitle } from './notify.js'
 import { initCalls, onCallEnded, isSwitching, inCall, callState } from './call-invite.js'
+import { preloadWallpaper } from './wallpapers.js'
 import { h, icon, toast, displayName, setSelfId, waveBars, isMobile, onMobileChange, homePath } from './ui.js'
 
 const VL = window.VL
@@ -477,7 +478,11 @@ on('connection', (up) => {
   body.classList.toggle('vl-offline', !up)
   if (up && autoIdle) pushStatus()
 })
-on('conversations', () => { if (route.name === 'dm') updateTitle() })
+on('conversations', () => {
+  if (route.name === 'dm') updateTitle()
+  // Свои обои чатов — заранее, в фоне: чат откроется уже с готовым фоном
+  for (const c of store.conversations.values()) if (c.wallpaper) preloadWallpaper(c.wallpaper)
+})
 // Чат удалили (вы на другом устройстве или собеседник — «у всех») — уйти из него
 on('conversation-removed', (id) => { if (route.name === 'dm' && route.id === id) navigate(homePath(), { replace: true }) })
 // Окно стало широким, а открыт экран «Чаты» — на компьютере его нет
