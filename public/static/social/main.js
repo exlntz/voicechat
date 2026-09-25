@@ -23,6 +23,7 @@ import { preloadWallpaper } from './wallpapers.js'
 import { h, icon, toast, displayName, setSelfId, waveBars, isMobile, onMobileChange, homePath, initHoverFill } from './ui.js'
 
 const VL = window.VL
+VL.store = store // app.js берёт отсюда свежую аватарку для звонка
 const E = () => window.electronAPI || {}
 const body = document.body
 const sidebarRoot = document.getElementById('vl-sidebar')

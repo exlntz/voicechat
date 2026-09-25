@@ -362,7 +362,8 @@ app.post('/api/join', async (c) => {
     identity,
     name: displayName,
     ttl: '12h',
-    metadata: JSON.stringify({ isHost })
+    // Аватарка — чтобы в звонке у участника был кружок с его фото, а не только буквы
+    metadata: JSON.stringify({ isHost, avatar: (authUser && authUser.avatarUrl) || null })
   })
 
   at.addGrant({
