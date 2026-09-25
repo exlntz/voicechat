@@ -6,6 +6,7 @@ import { store, updateUser } from './store.js'
 import { h, icon, avatar, displayName, toast } from './ui.js'
 import { uploadFile, prepareImage, probeMedia } from './upload.js'
 import { openLightbox } from './media-ui.js'
+import { cropAvatar } from './crop.js'
 
 let current = null // открытое окно
 
@@ -57,7 +58,7 @@ export function openProfile({ logout }) {
   ])
   const overlay = h('div', { class: 'settings-overlay vl-profile-overlay' }, [sheet])
   overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) closeProfile() })
-  const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.vl-lightbox')) { e.preventDefault(); closeProfile() } }
+  const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.vl-lightbox, .vl-crop-overlay')) { e.preventDefault(); closeProfile() } }
   document.addEventListener('keydown', onKey, true)
   document.body.appendChild(overlay)
   current = { overlay, onKey }
@@ -119,17 +120,21 @@ export function openProfile({ logout }) {
     pickBanner.addEventListener('click', () => bannerInput.click())
     const setMediaStatus = (text, kind) => { mediaStatus.textContent = text; mediaStatus.className = 'vl-fld-status' + (kind ? ' is-' + kind : '') }
     async function upload(purpose, raw) {
+      // Аватарка: сначала выбрать область под кружком (GIF остаётся живым, без обрезки)
+      if (purpose === 'avatar' && raw.type !== 'image/gif') {
+        if (raw.size > 20 * 1024 * 1024) { setMediaStatus('Картинка больше 20 МБ', 'err'); return }
+        try {
+          raw = await cropAvatar(raw)
+        } catch (e) { setMediaStatus(e.message, 'err'); return }
+        if (!raw) return // «Отмена»
+      }
       pickAva.disabled = pickBanner.disabled = true
       setMediaStatus('Загружаем…', '')
       try {
         let file = raw
         let meta = {}
         if (purpose === 'avatar') {
-          // Картинку не обрезаем: в кружке она по центру, а по нажатию открывается целиком
-          if (raw.size > 20 * 1024 * 1024) throw new Error('Картинка больше 20 МБ')
-          const prepared = await prepareImage(raw, { maxSide: 1600 })
-          file = prepared.file
-          meta = prepared.meta
+          // Уже вырезана в cropAvatar (квадрат до 1024 px); GIF — как есть
           if (file.size > 5 * 1024 * 1024) throw new Error('GIF-аватарка больше 5 МБ')
         } else if (raw.type.startsWith('video/')) {
           if (raw.size > 30 * 1024 * 1024) throw new Error('Видео для фона — до 30 МБ')
