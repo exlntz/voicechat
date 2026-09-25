@@ -1266,3 +1266,11 @@ html[data-theme="light"] .vl-incoming-wrap { background: rgba(21, 32, 43, 0.32);
   .vl-chat__history .vl-skel, .vl-msg.is-history-in { animation: none; }
 }
 .vl-chip > i { font-size: 14px; width: 16px; text-align: center; }
+
+/* Телефон: стрелка «к чатам» не ложится поверх открытых панелей звонка */
+body:has(.panel-overlay) .vl-fab-menu,
+body:has(.settings-overlay) .vl-fab-menu,
+body:has(.vl-modal-overlay) .vl-fab-menu { display: none !important; }
+/* «Комната по коду»: подпись одной строкой; на узком экране пояснение прячем */
+.vl-picker__code .vl-picker__name { white-space: nowrap; }
+@media (max-width: 480px) { .vl-picker__code .vl-picker__user { display: none; } }
