@@ -16,7 +16,7 @@ import {
 import { api } from './api.js'
 import {
   h, icon, avatar, setPresenceDot, displayName, presenceText, richText, timeHM, dayLabel,
-  dayKey, showMenu, toast, isSavedConv, attachmentLabel, fmtClock, msgStatus, ticks, setTicks, onLongPress, homePath
+  dayKey, showMenu, toast, isSavedConv, attachmentLabel, fmtClock, msgStatus, ticks, setTicks, onLongPress, homePath, contactName
 } from './ui.js'
 import { startCall, joinCallFromMessage, callState, inCall } from './call-invite.js'
 import { renderAttachments, openLightbox } from './media-ui.js'
@@ -24,6 +24,7 @@ import { prepareAttachment, uploadFile, waveformOf } from './upload.js'
 import { openForwardPicker } from './forward.js'
 import { openUserCard } from './user-card.js'
 import { wallpaperCss, openWallpaperPicker, preloadWallpaper } from './wallpapers.js'
+import { openContactDialog } from './contact-dialog.js'
 
 const MAX_LEN = 4000
 const MAX_FILES = 10
@@ -70,6 +71,7 @@ export function createChatView({ convId, navigate, menuButton }) {
     if (!c) return
     showMenu([
       { label: saved ? 'Медиа и файлы' : 'Профиль', icon: saved ? 'image' : 'user', onClick: () => openCard() },
+      saved ? null : { label: contactName(peer.id) ? 'Изменить контакт' : 'Добавить в контакты', icon: contactName(peer.id) ? 'pen' : 'user-plus', onClick: () => openContactDialog(userById(peer.id) || peer) },
       { label: 'Обои', icon: 'palette', onClick: () => openWallpaperPicker(c) },
       saved ? null : { label: c.muted ? 'Включить уведомления' : 'Выключить уведомления', icon: c.muted ? 'bell' : 'bell-slash', onClick: () => toggleMute() },
       { label: c.pinned ? 'Открепить чат' : 'Закрепить чат', icon: c.pinned ? 'thumbtack-slash' : 'thumbtack', onClick: () => api.updateConversation(convId, { pinned: !c.pinned }).catch((e) => toast(e.message, 'error')) },
@@ -111,7 +113,9 @@ export function createChatView({ convId, navigate, menuButton }) {
       const cur = userById(peer.id) || peer
       const p = presenceOf(peer.id)
       const img = headAvatar.querySelector('.vl-avatar__img')
-      if ((img ? img.getAttribute('src') : null) !== (cur.avatarUrl || null)) {
+      // Аватарка или имя (инициалы) поменялись — пересобрать кружок
+      if ((img ? img.getAttribute('src') : null) !== (cur.avatarUrl || null) || headAvatar.dataset.name !== displayName(cur)) {
+        headAvatar.dataset.name = displayName(cur)
         const fresh = avatar(cur, { size: 44, presence: p })
         headAvatar.replaceChildren(...fresh.childNodes)
         headAvatar.className = fresh.className
@@ -909,7 +913,7 @@ export function createChatView({ convId, navigate, menuButton }) {
     } else if (chat.hasMore) {
       items.push({ key: 'loader', sig: chat.loadingOlder ? '1' : '0', build: () => h('div', { class: 'vl-chat__loader' }, [h('span', { class: 'vl-spinner' }), 'Загружаем историю…']) })
     } else {
-      items.push({ key: 'intro', sig: String((userById(peer.id) || peer).avatarUrl || ''), build: buildIntro })
+      items.push({ key: 'intro', sig: String((userById(peer.id) || peer).avatarUrl || '') + '|' + displayName(userById(peer.id) || peer), build: buildIntro })
     }
     if (unreadAfter != null && unreadMarkerId == null) {
       const first = chat.list.find((m) => m.id && m.id > unreadAfter && m.authorId !== me.id)
@@ -1081,6 +1085,7 @@ export function createChatView({ convId, navigate, menuButton }) {
   unsub.push(on('presence', (id) => { if (id == null || id === peer.id) renderHeader() }))
   unsub.push(on('friends', () => { renderBlocked(); renderHeader() }))
   unsub.push(on('me', () => { renderHeader(); renderList() }))
+  unsub.push(on('contacts', () => { renderHeader(); renderList() }))
   // «был(а) в сети N мин. назад» в шапке стареет — обновляем раз в минуту
   const headerTimer = setInterval(renderHeader, 60000)
   unsub.push(() => clearInterval(headerTimer))

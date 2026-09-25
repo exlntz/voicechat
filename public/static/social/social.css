@@ -811,8 +811,13 @@ body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { dis
 .vl-lightbox__bar { display: flex; align-items: center; gap: 8px; padding: calc(env(safe-area-inset-top) + 12px) 14px 12px 20px; }
 .vl-lightbox__count { color: var(--text-dim); font-size: 14px; font-variant-numeric: tabular-nums; }
 .vl-lightbox__spacer { flex: 1; }
-.vl-lightbox__stage { flex: 1; min-height: 0; display: grid; place-items: center; padding: 0 64px 20px; }
-.vl-lightbox__stage img, .vl-lightbox__stage video { max-width: 100%; max-height: 100%; border-radius: 12px; animation: vl-pop 0.22s var(--ease) both; }
+/* Фото целиком в окне: в grid высота «100%» не считалась, и высокое фото вылезало вниз —
+   теперь flex с явной высотой, картинка вписывается (contain) */
+.vl-lightbox__stage { flex: 1 1 0; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 64px 20px; overflow: hidden; }
+.vl-lightbox__stage img, .vl-lightbox__stage video {
+  display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; min-height: 0; object-fit: contain;
+  border-radius: 12px; animation: vl-pop 0.22s var(--ease) both;
+}
 .vl-lightbox__nav { position: absolute; top: 50%; margin-top: -21px; --s: 42px; }
 .vl-lightbox__nav.is-prev { left: 14px; }
 .vl-lightbox__nav.is-next { right: 14px; }
@@ -896,6 +901,19 @@ body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { dis
 .vl-crop__bar .vl-ico { width: 18px; height: 18px; flex: 0 0 auto; }
 .vl-crop__bar .vl-ico.is-small { width: 13px; height: 13px; }
 .vl-crop__zoom { flex: 1; accent-color: var(--accent); cursor: pointer; }
+
+/* ─────────── Контакт: своё имя для человека ─────────── */
+.vl-contact { display: flex; flex-direction: column; gap: 14px; }
+.vl-contact__who { --vl-ring: var(--vl-raised); display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; background: var(--vl-soft); }
+.vl-contact__text { min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.vl-contact__text b { font: 600 15px var(--vl-font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vl-contact__text span { color: var(--text-faint); font-size: 13px; }
+.vl-contact .vl-fld-host .fld { margin-bottom: 26px; }
+.vl-contact__note { margin: -14px 0 0; font-size: 13px; }
+.vl-contact .vl-modal__actions { align-items: center; }
+.vl-contact__spacer { flex: 1; }
+.vl-contact__remove { margin: 0; color: var(--danger-soft); padding: 0 10px; }
+.vl-contact__remove:hover:not(:disabled) { background: var(--danger-wash); color: var(--danger-soft); }
 
 /* ─────────── Обои: выбор ─────────── */
 .vl-wall { width: min(520px, 100%); }

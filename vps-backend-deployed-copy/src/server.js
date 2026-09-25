@@ -18,6 +18,7 @@ import { registerFriendRoutes } from './social/friends.js'
 import { registerChatRoutes } from './social/chats.js'
 import { registerProfileRoutes } from './social/profile.js'
 import { registerMediaRoutes } from './social/media.js'
+import { registerContactRoutes } from './social/contacts.js'
 
 const scrypt = promisify(scryptCb)
 
@@ -192,6 +193,7 @@ const profile = registerProfileRoutes(app, { db, hub })
 // Файлы (вложения, аватарки, фоны) лежат рядом с базой: data/uploads/
 const media = registerMediaRoutes(app, { db, dataDir: dirname(DB_PATH), profile })
 const chats = registerChatRoutes(app, { db, hub, friends, media, createCallRoom })
+registerContactRoutes(app, { db, hub })
 hub.mount(app)
 
 // ---------- API: регистрация ----------

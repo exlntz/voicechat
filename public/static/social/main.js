@@ -9,7 +9,7 @@ import { api, setUnauthorizedHandler } from './api.js'
 import * as cache from './cache.js'
 import {
   store, on, emit, loadFriends, loadConversations, hydrateFromCache, ensureConversation, dmWith,
-  setConversation, refreshChat, resetStore, sortedConversations
+  setConversation, refreshChat, resetStore, sortedConversations, loadContacts
 } from './store.js'
 import { startEvents, stopEvents } from './events.js'
 import { createSidebar } from './sidebar.js'
@@ -322,7 +322,7 @@ async function startSession(me, prefillRoom = '') {
   hydrateFromCache().catch(() => {})
   store.myStatus = effectiveStatus()
   startEvents()
-  Promise.all([loadFriends(), loadConversations()]).catch((e) => toast(e.message || 'Не удалось загрузить списки', 'error'))
+  Promise.all([loadFriends(), loadConversations(), loadContacts()]).catch((e) => toast(e.message || 'Не удалось загрузить списки', 'error'))
 
   if (prefillRoom) history.replaceState({}, '', '/room/' + prefillRoom)
   else if (location.pathname === '/' || location.pathname === '') history.replaceState({}, '', (isMobile() ? '/chats' : '/friends') + location.search)
@@ -467,7 +467,7 @@ function openDeepLink(link) {
 on('resync', async () => {
   // Сервер не смог доиграть пропущенное (перезапуск, долгий обрыв) — перечитываем всё
   try {
-    await Promise.all([loadFriends(), loadConversations()])
+    await Promise.all([loadFriends(), loadConversations(), loadContacts()])
     for (const [id, chat] of store.chats) {
       if (id === store.activeConvId) refreshChat(id).catch(() => {})
       else if (chat.state === 'ready') chat.state = 'cache'
