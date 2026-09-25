@@ -60,6 +60,8 @@ const ICONS = {
   'arrow-down': '<path d="M12 5v14M19 12l-7 7-7-7"/>',
   circle: '<circle cx="12" cy="12" r="5" fill="currentColor" stroke="none"/>',
   moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  desktop: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
   'circle-minus': '<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/>',
   at: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>',
   message: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
@@ -126,6 +128,12 @@ export function setSelfId(id) { selfId = Number(id) || 0 }
 export function avatarColor(id) {
   return Number(id) && Number(id) === selfId ? '#0458cf' : '#2a303b'
 }
+// Для страницы — через переменные темы: в тёмной все подложки нейтральные, в светлой —
+// мягкие пастельные, у каждого человека своя (по id), синим — только вы
+function avatarFill(id) {
+  const n = Number(id) || 0
+  return n && n === selfId ? 'var(--accent)' : `var(--vl-ava-${n % 6})`
+}
 
 // Инициалы — только из букв и цифр, по целым символам (эмодзи «🎸» не разрезать пополам)
 export function initialsOf(name) {
@@ -139,7 +147,7 @@ export function initialsOf(name) {
 // Аватарка: картинка, если загружена, иначе инициалы. «Избранное» — закладка на синем.
 export function avatar(user, { size = 32, presence = null, saved = false } = {}) {
   const url = user && user.avatarUrl
-  const node = h('span', { class: `vl-avatar${url ? ' has-img' : ''}${saved ? ' is-saved' : ''}`, style: { '--size': size + 'px', background: saved ? 'var(--accent)' : avatarColor(user && user.id) }, 'aria-hidden': 'true' }, [
+  const node = h('span', { class: `vl-avatar${url ? ' has-img' : ''}${saved ? ' is-saved' : ''}${saved || (user && Number(user.id) === selfId) ? ' is-self' : ''}`, style: { '--size': size + 'px', background: saved ? 'var(--accent)' : avatarFill(user && user.id) }, 'aria-hidden': 'true' }, [
     saved ? icon('bookmark') : h('span', { class: 'vl-avatar__txt' }, initialsOf(displayName(user)))
   ])
   if (url && !saved) {
@@ -327,7 +335,7 @@ const FILL_SEL = [
   '.vl-round', '.vl-btn', '.vl-pill', '.vl-chip', '.vl-dm:not(.is-skeleton)', '.vl-me__btn', '.vl-composer__send', '.vl-composer__attach',
   '.vl-menu__item', '.vl-picker__row', '.vl-search__row', '.vl-friend:not(.is-skeleton)', '.vl-tile:not(.is-skeleton)', '.settings-nav__item',
   '.vl-call-btn', '.vl-jump', '.vl-solo-chats', '.vl-side__call', '.vl-voice__btn', '.vl-quote', '.vl-filecard', '.vl-ucard__when',
-  '.vl-ucard__link', '.vl-pinbar__body', '.vl-fwd', '.vl-tray__x', '.vl-chat__head-who', '.vl-wall-tile__bg'
+  '.vl-ucard__link', '.vl-pinbar__body', '.vl-fwd', '.vl-tray__x', '.vl-chat__head-who', '.vl-wall-tile__bg', '.vl-side__search-x'
 ].join(',')
 const FILL_MS = 420
 export function initHoverFill() {
@@ -510,3 +518,33 @@ window.addEventListener('resize', closeMenu)
 export function toast(message, type = 'info') {
   if (window.VL && typeof window.VL.showToast === 'function') window.VL.showToast(message, type)
 }
+
+// ---------- Тема оформления (на этом устройстве) ----------
+// 'light' | 'dark' | 'system'. Атрибут data-theme ставит ещё скрипт в <head> — здесь только смена.
+export function getThemeChoice() {
+  try { return localStorage.getItem('vl:theme') || 'light' } catch { return 'light' }
+}
+function resolveTheme(choice) {
+  if (choice === 'system') return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  return choice === 'dark' ? 'dark' : 'light'
+}
+export function applyTheme(choice = getThemeChoice()) {
+  const t = resolveTheme(choice)
+  const root = document.documentElement
+  root.dataset.theme = t
+  root.style.colorScheme = t
+  const meta = document.querySelector('meta[name="theme-color"]')
+  if (meta) meta.content = t === 'light' ? '#eef1f4' : '#0f1115'
+  window.dispatchEvent(new CustomEvent('vl-theme', { detail: t }))
+}
+export function setThemeChoice(choice) {
+  try { localStorage.setItem('vl:theme', choice) } catch {}
+  applyTheme(choice)
+}
+// «Как в системе»: переключаемся вместе с системой
+if (window.matchMedia) {
+  const mq = matchMedia('(prefers-color-scheme: dark)')
+  const onSys = () => { if (getThemeChoice() === 'system') applyTheme('system') }
+  if (mq.addEventListener) mq.addEventListener('change', onSys)
+}
+

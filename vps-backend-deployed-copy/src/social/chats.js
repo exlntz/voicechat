@@ -566,6 +566,30 @@ export function registerChatRoutes(app, { db, hub, friends, media, push, createC
     return c.json({ messages: hits.map((id) => messageView(q.message.get(id))) })
   })
 
+  // ---------- Поиск по всем чатам (поле «Найти друга или сообщение» слева) ----------
+  // Те же правила видимости, что и в чате; самые свежие совпадения первыми.
+  app.get('/api/search', (c) => {
+    const me = Number(c.get('user').id)
+    const needle = String(c.req.query('q') || '').trim().toLocaleLowerCase('ru').slice(0, 100)
+    if (needle.length < 2) return c.json({ messages: [] })
+    if (!rateLimit(`search:${me}`, 30, 10000)) return c.json({ error: 'rate_limited', message: 'Слишком часто' }, 429)
+    const hits = []
+    for (const r of q.myConvs.all(me)) {
+      const convId = Number(r.conversation_id)
+      const mine = q.member.get(convId, me)
+      if (!mine) continue
+      let n = 0
+      for (const m of q.searchScan.all(convId, Number(mine.cleared_before) || 0, me)) {
+        if (String(m.body).toLocaleLowerCase('ru').includes(needle)) {
+          hits.push(Number(m.id))
+          if (++n >= 20) break
+        }
+      }
+    }
+    hits.sort((a, b) => b - a)
+    return c.json({ messages: hits.slice(0, 40).map((id) => messageView(q.message.get(id))) })
+  })
+
   // ---------- Медиа, файлы, голосовые, ссылки (как вкладки профиля в Телеграме) ----------
   const MEDIA_KINDS = { media: ['image', 'video'], files: ['file', 'audio'], voice: ['voice'] }
   app.get('/api/conversations/:id/media', (c) => {

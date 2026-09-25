@@ -59,7 +59,9 @@ export function createChatView({ convId, navigate, menuButton }) {
   const headWho = h('button', { type: 'button', class: 'vl-chat__head-who', title: 'Профиль, медиа и файлы' }, [headAvatar, h('span', { class: 'vl-chat__head-text' }, [headName, headSub])])
   headWho.addEventListener('click', () => openCard())
   const searchBtn = h('button', { type: 'button', class: 'vl-round is-lg', title: 'Поиск по чату', 'aria-label': 'Поиск по чату' }, [icon('magnifying-glass')])
-  const callBtn = h('button', { type: 'button', class: 'vl-round is-lg', title: 'Позвонить', 'aria-label': 'Позвонить', hidden: saved }, [icon('phone')])
+  // «Позвонить» — тёмная таблетка с подписью (на телефоне остаётся только значок)
+  const callLabel = h('span', { class: 'vl-chat__call-label' }, 'Позвонить')
+  const callBtn = h('button', { type: 'button', class: 'vl-btn vl-btn--ink vl-btn--pill vl-chat__call', title: 'Позвонить', 'aria-label': 'Позвонить', hidden: saved }, [icon('phone'), callLabel])
   const moreBtn = h('button', { type: 'button', class: 'vl-round is-lg', title: 'Ещё', 'aria-label': 'Ещё' }, [icon('ellipsis-vertical')])
   searchBtn.addEventListener('click', () => openSearch())
   callBtn.addEventListener('click', () => {
@@ -122,13 +124,16 @@ export function createChatView({ convId, navigate, menuButton }) {
       }
       setPresenceDot(headAvatar, p)
       headName.textContent = displayName(cur)
-      headSub.textContent = `@${cur.username} · ${presenceText(p)}`
+      headSub.textContent = presenceText(p)
+      headSub.classList.toggle('is-online', !!p && p.status !== 'offline' && (p.status === 'online' || !!p.inCall))
+      headWho.title = `@${cur.username} — профиль, медиа и файлы`
       input.placeholder = `Написать @${cur.username || 'собеседнику'}`
     }
     moreBtn.classList.toggle('is-on', !!(c && c.muted))
     const here = inCall() && callState.conversationId === convId
     callBtn.classList.toggle('is-live', here)
     callBtn.title = here ? 'Открыть звонок' : 'Позвонить'
+    callLabel.textContent = here ? 'В звонок' : 'Позвонить'
     applyWallpaper()
   }
 
@@ -1090,6 +1095,10 @@ export function createChatView({ convId, navigate, menuButton }) {
   const headerTimer = setInterval(renderHeader, 60000)
   unsub.push(() => clearInterval(headerTimer))
   unsub.push(on('typing:' + convId, renderTyping))
+  // Нажали на найденное сообщение в поиске слева, а этот чат уже открыт
+  const onJumpReq = (e) => { if (e.detail && e.detail.convId === convId) jumpTo(e.detail.id) }
+  window.addEventListener('vl-jump', onJumpReq)
+  unsub.push(() => window.removeEventListener('vl-jump', onJumpReq))
   const onCallChange = () => { renderHeader(); renderList() }
   window.addEventListener('vl-call-state', onCallChange)
   unsub.push(() => window.removeEventListener('vl-call-state', onCallChange))

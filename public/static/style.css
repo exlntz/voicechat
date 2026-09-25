@@ -11,6 +11,8 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
+  /* Цвет «чернил» для полупрозрачных линий и подложек: светлый на тёмной теме, тёмный на светлой */
+  --ink-rgb: 242, 245, 249;
   /* ---- Поверхности ---- */
   --bg: #0f1115;           /* фон приложения (совпадает с backgroundColor окна Electron) */
   --surface: #15181e;      /* карточки, топбар, панель управления */
@@ -19,12 +21,12 @@
 
   /* ---- Текст ---- */
   --text: #f2f5f9;
-  --text-dim: rgba(242, 245, 249, 0.70);
-  --text-faint: rgba(242, 245, 249, 0.48);
+  --text-dim: rgba(var(--ink-rgb), 0.70);
+  --text-faint: rgba(var(--ink-rgb), 0.48);
 
   /* ---- Границы ---- */
-  --border: rgba(242, 245, 249, 0.12);
-  --border-strong: rgba(242, 245, 249, 0.26);
+  --border: rgba(var(--ink-rgb), 0.12);
+  --border-strong: rgba(var(--ink-rgb), 0.26);
 
   /* ---- Акцент: синий ---- */
   --accent: #0458cf;           /* заливки, основные кнопки (текст на них — белый) */
@@ -59,6 +61,35 @@
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28), 0 4px 12px rgba(0, 0, 0, 0.20);
   --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.30), 0 16px 40px rgba(0, 0, 0, 0.38);
+}
+
+/* ---------- Светлая тема (Профиль → Оформление → Тема) ----------
+   Фарфоровый фон, белые панели, тёмные «чернила», кобальтовый акцент.
+   Атрибут ставит скрипт в <head> до отрисовки, поэтому тема не мигает. */
+html[data-theme="light"] {
+  --ink-rgb: 21, 32, 43;
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --surface-2: #ffffff;
+  --surface-3: #e6eaef;
+  --text: #15202b;
+  --text-dim: #4a5561;
+  --text-faint: #66717d;
+  --border: rgba(21, 32, 43, 0.12);
+  --border-strong: rgba(21, 32, 43, 0.24);
+  --accent: #2447d8;
+  --accent-hover: #3858e6;
+  --accent-soft: #2447d8;
+  --accent-wash: rgba(36, 71, 216, 0.10);
+  --accent-glow: rgba(36, 71, 216, 0.22);
+  --danger: #d33a2c;
+  --danger-soft: #c2372a;
+  --danger-wash: rgba(211, 58, 44, 0.10);
+  --success: #1f9d6b;
+  --success-soft: #178257;
+  --success-wash: rgba(31, 157, 107, 0.12);
+  --shadow-sm: 0 1px 2px rgba(21, 32, 43, 0.06), 0 4px 12px rgba(21, 32, 43, 0.06);
+  --shadow-md: 0 2px 6px rgba(21, 32, 43, 0.08), 0 16px 40px rgba(21, 32, 43, 0.14);
 }
 
 * { box-sizing: border-box; }
@@ -132,12 +163,12 @@ html, body {
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(242, 245, 249, 0.18);
+  background: rgba(var(--ink-rgb), 0.18);
   border: 3px solid transparent;
   background-clip: padding-box;
   border-radius: var(--radius-pill);
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(242, 245, 249, 0.30); background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(var(--ink-rgb), 0.30); background-clip: padding-box; }
 
 ::selection { background: var(--accent); color: #fff; }
 
@@ -630,7 +661,7 @@ button {
   cursor: pointer;
   transition: color 0.25s var(--ease), background 0.25s var(--ease);
 }
-.password-toggle-btn:hover { color: var(--accent-soft); background: rgba(242, 245, 249, 0.06); }
+.password-toggle-btn:hover { color: var(--accent-soft); background: rgba(var(--ink-rgb), 0.06); }
 
 /* ---- Главная кнопка формы ---- */
 .auth-submit-btn,
@@ -956,7 +987,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: rgba(242, 245, 249, 0.04);
+  background: rgba(var(--ink-rgb), 0.04);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 10px 12px;
@@ -1002,7 +1033,7 @@ button {
 .lobby-logout-btn:focus-visible {
   color: var(--text);
   border-color: var(--border-strong);
-  background: rgba(242, 245, 249, 0.06);
+  background: rgba(var(--ink-rgb), 0.06);
 }
 .lobby-card .btn-secondary:active,
 .lobby-logout-btn:active { transform: scale(0.98); }
@@ -1088,7 +1119,7 @@ button {
   overflow: hidden;
   transition: color 0.25s var(--ease), border-color 0.25s var(--ease), background 0.25s var(--ease);
 }
-.join-toggle-btn:hover { background: rgba(242, 245, 249, 0.05); color: var(--text); }
+.join-toggle-btn:hover { background: rgba(var(--ink-rgb), 0.05); color: var(--text); }
 .join-toggle-btn.on {
   color: #fff;
   border-color: var(--accent);
@@ -1197,7 +1228,7 @@ button {
   min-width: 0;
   height: 38px;
   padding: 0 14px 0 14px;
-  background: rgba(242, 245, 249, 0.035);
+  background: rgba(var(--ink-rgb), 0.035);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   font: 500 14px/1 var(--font);
@@ -1239,7 +1270,7 @@ button {
   color: var(--text-faint);
   transition: color .2s var(--ease);
 }
-.room-topbar .room-code-badge:hover { background: rgba(242, 245, 249, 0.08); }
+.room-topbar .room-code-badge:hover { background: rgba(var(--ink-rgb), 0.08); }
 .room-topbar .room-code-badge:hover .room-code-badge__icon { color: var(--text); }
 
 .room-topbar .host-indicator {
@@ -1330,7 +1361,7 @@ button {
   background: rgba(6, 8, 12, 0.78);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  border: 1px solid rgba(242, 245, 249, 0.12);
+  border: 1px solid rgba(var(--ink-rgb), 0.12);
   padding: 6px 11px;
   border-radius: var(--radius-sm);
   font-size: 13px;
@@ -1361,7 +1392,7 @@ button {
   width: 40px;
   height: 40px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(242, 245, 249, 0.16);
+  border: 1px solid rgba(var(--ink-rgb), 0.16);
   background: rgba(6, 8, 12, 0.78);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
@@ -1409,7 +1440,7 @@ button {
   background: rgba(6, 8, 12, 0.78);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  border: 1px solid rgba(242, 245, 249, 0.12);
+  border: 1px solid rgba(var(--ink-rgb), 0.12);
   padding: 7px 11px;
   border-radius: var(--radius-sm);
   opacity: 0;
@@ -1435,7 +1466,7 @@ input[type="range"] {
   appearance: none;
   height: 4px;
   border-radius: var(--radius-pill);
-  background: rgba(242, 245, 249, 0.20);
+  background: rgba(var(--ink-rgb), 0.20);
   outline: none;
 }
 input[type="range"]::-webkit-slider-thumb {
@@ -1715,7 +1746,7 @@ body.inapp-fullscreen { overflow: hidden; }
 .room-main.is-spotlight .sidebar-participants .tile {
   aspect-ratio: 16/10;
   background: #1a1d24;
-  border: 1px solid rgba(242, 245, 249, 0.08);
+  border: 1px solid rgba(var(--ink-rgb), 0.08);
   border-radius: 14px;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
   transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
@@ -1777,7 +1808,7 @@ body.inapp-fullscreen { overflow: hidden; }
   background: rgba(15, 17, 21, 0.72);
   -webkit-backdrop-filter: blur(16px) saturate(1.2);
   backdrop-filter: blur(16px) saturate(1.2);
-  border: 1px solid rgba(242, 245, 249, 0.10);
+  border: 1px solid rgba(var(--ink-rgb), 0.10);
   border-radius: var(--radius-pill);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
 }
@@ -1791,7 +1822,7 @@ body.inapp-fullscreen { overflow: hidden; }
   width: 52px; height: 52px;
   border-radius: 50%;
   border: 1px solid var(--border-strong);
-  background: rgba(242, 245, 249, 0.04);
+  background: rgba(var(--ink-rgb), 0.04);
   color: var(--text);
   font-size: 17px;
   cursor: pointer;
@@ -1799,9 +1830,9 @@ body.inapp-fullscreen { overflow: hidden; }
   transition: color .25s var(--ease), border-color .25s var(--ease), background .25s var(--ease), transform .18s var(--ease);
 }
 .ctrl-btn:hover, .ctrl-btn:focus-visible {
-  background: rgba(242, 245, 249, 0.10);
+  background: rgba(var(--ink-rgb), 0.10);
   border-color: var(--border-strong);
-  color: #fff;
+  color: var(--text);
 }
 .ctrl-btn:active { transform: scale(.95); }
 /* Включённое состояние — синяя заливка, белая иконка */
@@ -1836,10 +1867,10 @@ body.inapp-fullscreen { overflow: hidden; }
 /* Размер кнопок — прежний (.ctrl-btn и его адаптив ниже), здесь только вид внутри капсулы */
 .controls-pill .ctrl-btn {
   border-color: transparent;
-  background: rgba(242, 245, 249, 0.07);
+  background: rgba(var(--ink-rgb), 0.07);
 }
 .controls-pill .ctrl-btn:hover,
-.controls-pill .ctrl-btn:focus-visible { background: rgba(242, 245, 249, 0.15); border-color: transparent; }
+.controls-pill .ctrl-btn:focus-visible { background: rgba(var(--ink-rgb), 0.15); border-color: transparent; }
 .controls-pill .ctrl-btn.active { background: var(--accent); border-color: var(--accent); }
 .controls-pill .ctrl-btn.active:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 .controls-pill .ctrl-btn.off,
@@ -1920,7 +1951,7 @@ body.inapp-fullscreen { overflow: hidden; }
   cursor: pointer;
   transition: opacity .2s var(--ease), background .2s var(--ease);
 }
-.toast__close:hover { opacity: 1; background: rgba(242, 245, 249, 0.08); }
+.toast__close:hover { opacity: 1; background: rgba(var(--ink-rgb), 0.08); }
 .toast.is-leaving { animation: toast-out .25s var(--ease-io) forwards; }
 @keyframes toast-in {
   from { opacity: 0; transform: translateX(18px); }
@@ -1994,7 +2025,7 @@ body.inapp-fullscreen { overflow: hidden; }
   cursor: pointer;
   transition: color .25s var(--ease), background .25s var(--ease);
 }
-.panel-close:hover { color: var(--text); background: rgba(242, 245, 249, 0.07); }
+.panel-close:hover { color: var(--text); background: rgba(var(--ink-rgb), 0.07); }
 
 /* ---- Контекстное меню на тайле демонстрации ---- */
 .screen-ctx-menu,
@@ -2169,8 +2200,8 @@ body.inapp-fullscreen { overflow: hidden; }
   transition: background .2s var(--ease), color .2s var(--ease);
 }
 .settings-nav__item i { width: 18px; text-align: center; font-size: 15px; color: var(--text-faint); transition: color .2s var(--ease); }
-.settings-nav__item:hover { background: rgba(242, 245, 249, 0.05); color: var(--text); }
-.settings-nav__item.active { background: rgba(242, 245, 249, 0.08); color: var(--text); }
+.settings-nav__item:hover { background: rgba(var(--ink-rgb), 0.05); color: var(--text); }
+.settings-nav__item.active { background: rgba(var(--ink-rgb), 0.08); color: var(--text); }
 .settings-nav__item.active i { color: var(--accent-soft); }
 
 .settings-body {
@@ -2216,7 +2247,7 @@ body.inapp-fullscreen { overflow: hidden; }
 .switch__track {
   position: absolute; inset: 0;
   border-radius: var(--radius-pill);
-  background: rgba(242, 245, 249, 0.16);
+  background: rgba(var(--ink-rgb), 0.16);
   transition: background .25s var(--ease);
   pointer-events: none;
 }
@@ -2293,7 +2324,7 @@ body.inapp-fullscreen { overflow: hidden; }
   padding: 10px 32px 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background-color: rgba(242, 245, 249, 0.04);
+  background-color: rgba(var(--ink-rgb), 0.04);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236ea8f5' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
@@ -2323,7 +2354,7 @@ body.inapp-fullscreen { overflow: hidden; }
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: rgba(242, 245, 249, 0.04);
+  background: rgba(var(--ink-rgb), 0.04);
   color: var(--text);
   font: 400 14px/1.3 var(--font);
   text-align: left;
@@ -2336,7 +2367,7 @@ body.inapp-fullscreen { overflow: hidden; }
 .dd-btn:focus-visible,
 .dd-btn.open { border-color: var(--accent-soft); background-color: var(--accent-wash); outline: none; }
 .dd-btn.open .dd-chevron { transform: rotate(180deg); }
-.dd-btn:disabled { cursor: default; color: var(--text-faint); border-color: var(--border); background: rgba(242, 245, 249, 0.02); }
+.dd-btn:disabled { cursor: default; color: var(--text-faint); border-color: var(--border); background: rgba(var(--ink-rgb), 0.02); }
 .dd-btn:disabled .dd-chevron { opacity: 0.4; }
 
 .dd-menu {
@@ -2380,7 +2411,7 @@ body.inapp-fullscreen { overflow: hidden; }
 .lvl-dots span {
   width: 7px; height: 14px;
   border-radius: 4px;
-  background: rgba(242, 245, 249, 0.14);
+  background: rgba(var(--ink-rgb), 0.14);
   transition: background 0.12s var(--ease), box-shadow 0.12s var(--ease);
 }
 .lvl-dots span.on { background: var(--accent-soft); box-shadow: 0 0 8px rgba(110, 168, 245, 0.5); }
@@ -2723,7 +2754,7 @@ body.pip-body > .room-screen { height: 100%; }
   --radius-sm: 16px;
   --soft-card: 36px;
   /* почти невидимая волосяная линия там, где разделитель всё же нужен */
-  --border: rgba(242, 245, 249, 0.06);
+  --border: rgba(var(--ink-rgb), 0.06);
 }
 
 /* ---- Карточки: без рамок, тоном ---- */
@@ -2889,7 +2920,7 @@ body.pip-body > .room-screen { height: 100%; }
 .lobby-logout-btn, .leave-btn { --ank-fill: var(--danger); }
 .join-toggle-btn { --ank-fill: var(--surface-3); }
 .join-toggle-btn.on { --ank-fill: #143063; }
-.ctrl-btn { --ank-fill: rgba(242, 245, 249, 0.10); }
+.ctrl-btn { --ank-fill: rgba(var(--ink-rgb), 0.10); }
 .ctrl-btn.active { --ank-fill: var(--accent-hover); }
 .ctrl-btn.danger, .ctrl-btn.off { --ank-fill: var(--danger); }
 
@@ -2905,7 +2936,7 @@ body.pip-body > .room-screen { height: 100%; }
 .ank-fill__dot {
   position: absolute;
   border-radius: 50%;
-  background: var(--ank-fill, rgba(242, 245, 249, 0.10));
+  background: var(--ank-fill, rgba(var(--ink-rgb), 0.10));
   transform: scale(0);
   transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
@@ -2952,7 +2983,7 @@ body.pip-body > .room-screen { height: 100%; }
   font: 600 15px/1 var(--font);
   color: var(--text);
 }
-.room-topbar .room-sep { background: rgba(242, 245, 249, 0.18); }
+.room-topbar .room-sep { background: rgba(var(--ink-rgb), 0.18); }
 .room-topbar .status-dot { width: 9px; height: 9px; }
 .room-topbar .status-dot:not(.connecting):not(.disconnected) { box-shadow: 0 0 0 3px rgba(58, 168, 110, 0.22); }
 .room-timer { display: none; font-variant-numeric: tabular-nums; }
@@ -2963,9 +2994,9 @@ body.pip-body > .room-screen { height: 100%; }
   height: 32px;
   margin: 0;
   padding: 0 10px 0 12px;
-  background: rgba(242, 245, 249, 0.10);
+  background: rgba(var(--ink-rgb), 0.10);
 }
-.room-topbar .room-code-badge:hover { background: rgba(242, 245, 249, 0.18); }
+.room-topbar .room-code-badge:hover { background: rgba(var(--ink-rgb), 0.18); }
 .room-topbar .host-indicator { color: var(--text-dim); font-weight: 500; }
 
 /* Круглые кнопки справа — полупрозрачные поверх видео */
@@ -3006,7 +3037,7 @@ body.pip-body > .room-screen { height: 100%; }
 .room-info[data-q="lost"], .room-info[data-q="unknown"] { --q: #8a93a3; }
 
 .conn-bars { display: none; align-items: flex-end; gap: 2px; height: 13px; }
-.conn-bars i { display: block; width: 3.5px; border-radius: 2px; background: rgba(242, 245, 249, 0.2); }
+.conn-bars i { display: block; width: 3.5px; border-radius: 2px; background: rgba(var(--ink-rgb), 0.2); }
 .conn-bars i:nth-child(1) { height: 5px; }
 .conn-bars i:nth-child(2) { height: 9px; }
 .conn-bars i:nth-child(3) { height: 13px; }
@@ -3027,7 +3058,7 @@ body.pip-body > .room-screen { height: 100%; }
 .room-topbar .room-info.is-live .room-status { cursor: pointer; }
 .room-topbar .room-info.is-live .room-status:hover,
 .room-topbar .room-status:focus-visible,
-.room-topbar .room-status.is-open { background: rgba(242, 245, 249, 0.08); }
+.room-topbar .room-status.is-open { background: rgba(var(--ink-rgb), 0.08); }
 
 .conn-card {
   position: absolute;
@@ -3150,14 +3181,14 @@ body.pip-body > .room-screen { height: 100%; }
   width: 1px;
   height: 28px;
   margin: 0 4px;
-  background: rgba(242, 245, 249, 0.12);
+  background: rgba(var(--ink-rgb), 0.12);
   flex-shrink: 0;
 }
 .controls-pill .ctrl-btn,
 .controls-pill .ctrl-btn.off,
 .controls-pill .ctrl-btn.danger,
 .controls-pill .ctrl-btn.active { border-color: transparent; }
-.controls-pill .ctrl-btn:not(.active):not(.off):not(.danger) { background: rgba(242, 245, 249, 0.07); }
+.controls-pill .ctrl-btn:not(.active):not(.off):not(.danger) { background: rgba(var(--ink-rgb), 0.07); }
 .controls-pill .ctrl-btn.off,
 .controls-pill .ctrl-btn.danger { background: #3a1a1c; }
 
@@ -3238,7 +3269,7 @@ body.pip-body > .room-screen { height: 100%; }
    Раньше окно было светлее остального интерфейса, с рамками и линиями-разделителями.
    Теперь оно в той же гамме, что чаты и друзья: тёмная панель без рамок, разделы слева —
    «таблетки» (выбранный — синий), карточки справа чуть светлее панели, всё на скруглениях.
-   Шрифт — Onest (подключён в social/social.css; без него — системный). */
+   Шрифт — Golos Text (подключён в social/social.css; без него — системный). */
 .settings-overlay {
   background: rgba(5, 6, 8, 0.62);
   -webkit-backdrop-filter: blur(8px);
@@ -3249,21 +3280,21 @@ body.pip-body > .room-screen { height: 100%; }
   border: 0;
   border-radius: 28px;
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  font-family: 'Onest', var(--font);
+  font-family: 'Golos Text', var(--font);
 }
 .settings-head {
   padding: 18px 18px 8px 28px;
   border-bottom: 0;
 }
-.settings-sheet .settings-head h3 { font: 700 22px/1.2 'Onest', var(--font); letter-spacing: -0.02em; }
+.settings-sheet .settings-head h3 { font: 700 22px/1.2 'Golos Text', var(--font); letter-spacing: -0.02em; }
 .settings-head .panel-close,
 .settings-head .vl-round {
   width: 40px; height: 40px; border: 0; border-radius: 50%;
-  background: rgba(242, 245, 249, 0.07); color: var(--text-dim);
+  background: rgba(var(--ink-rgb), 0.07); color: var(--text-dim);
   display: grid; place-items: center;
   transition: background .2s var(--ease), color .2s, transform .2s var(--ease);
 }
-.settings-head .panel-close:hover { background: rgba(242, 245, 249, 0.14); color: #fff; transform: translateY(-1px); }
+.settings-head .panel-close:hover { background: rgba(var(--ink-rgb), 0.14); color: var(--text); transform: translateY(-1px); }
 .settings-layout { grid-template-columns: 236px minmax(0, 1fr); padding: 0 14px 14px; gap: 14px; }
 .settings-nav {
   border-right: 0;
@@ -3271,16 +3302,16 @@ body.pip-body > .room-screen { height: 100%; }
   border-radius: 22px;
   background: #0f1216;
 }
-.settings-nav__group { padding: 8px 12px 10px; font: 500 12px/1.2 'Onest', var(--font); color: var(--text-faint); }
+.settings-nav__group { padding: 8px 12px 10px; font: 500 12px/1.2 'Golos Text', var(--font); color: var(--text-faint); }
 .settings-nav__item {
   min-height: 44px;
   border-radius: 14px;
-  font: 500 15px/1.2 'Onest', var(--font);
-  color: rgba(242, 245, 249, 0.75);
+  font: 500 15px/1.2 'Golos Text', var(--font);
+  color: rgba(var(--ink-rgb), 0.75);
 }
 .settings-nav__item i,
 .settings-nav__item .vl-ico { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-faint); }
-.settings-nav__item:hover { background: rgba(242, 245, 249, 0.06); color: #fff; }
+.settings-nav__item:hover { background: rgba(var(--ink-rgb), 0.06); color: var(--text); }
 .settings-nav__item.active { background: var(--accent); color: #fff; font-weight: 600; }
 .settings-nav__item.active i,
 .settings-nav__item.active .vl-ico { color: #fff; }
@@ -3289,7 +3320,7 @@ body.pip-body > .room-screen { height: 100%; }
 .settings-nav__item.is-danger:hover { background: var(--danger-wash); color: var(--danger-soft); }
 .settings-nav__spacer { flex: 1; min-height: 12px; }
 .settings-body { padding: 10px 14px calc(18px + env(safe-area-inset-bottom)); gap: 10px; }
-.settings-section-title { margin: 4px 0 6px; font: 700 20px/1.2 'Onest', var(--font); letter-spacing: -0.01em; }
+.settings-section-title { margin: 4px 0 6px; font: 700 20px/1.2 'Golos Text', var(--font); letter-spacing: -0.01em; }
 .settings-sheet .settings-card {
   background: #1a1e25;
   border: 0;
@@ -3297,10 +3328,10 @@ body.pip-body > .room-screen { height: 100%; }
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 .settings-body .settings-card { padding: 20px 22px; }
-.settings-sheet .settings-card-head { font: 600 15px/1.3 'Onest', var(--font); }
+.settings-sheet .settings-card-head { font: 600 15px/1.3 'Golos Text', var(--font); }
 .settings-sheet .settings-card-title i,
 .settings-sheet .settings-card-title .vl-ico { width: 17px; height: 17px; color: var(--accent-soft); }
-.settings-sheet .settings-row { border-top-color: rgba(242, 245, 249, 0.07); }
+.settings-sheet .settings-row { border-top-color: rgba(var(--ink-rgb), 0.07); }
 .settings-sheet .settings-row--first { margin-top: 4px; padding-top: 0; border-top: 0; }
 .settings-card-note { margin: -4px 0 14px; font-size: 13px; line-height: 1.5; color: var(--text-faint); }
 .settings-row + .settings-card-note { margin: 10px 0 0; }
@@ -3315,3 +3346,33 @@ body.pip-body > .room-screen { height: 100%; }
   .settings-nav__spacer { display: none; }
   .settings-head { padding-left: 20px; }
 }
+
+/* ═══════════════ Светлая тема: места с собственными тёмными цветами ═══════════════ */
+html[data-theme="light"] .settings-overlay { background: rgba(21, 32, 43, 0.32); }
+html[data-theme="light"] .settings-sheet { background: #ffffff; box-shadow: 0 30px 90px rgba(21, 32, 43, 0.22); }
+html[data-theme="light"] .settings-nav { background: #eef1f4; }
+html[data-theme="light"] .settings-sheet .settings-card { background: #f4f6f8; box-shadow: none; }
+html[data-theme="light"] .settings-sheet .dd-btn,
+html[data-theme="light"] .settings-card select.native-select:hover,
+html[data-theme="light"] .fld input:hover { background-color: #ffffff; }
+html[data-theme="light"] .join-toggle-btn.on { color: var(--accent); }
+html[data-theme="light"] .join-toggle-btn.on:hover { background: rgba(36, 71, 216, 0.16); }
+html[data-theme="light"] .join-toggle-btn.on { --ank-fill: rgba(36, 71, 216, 0.16); }
+html[data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(21, 32, 43, 0.18); background-clip: padding-box; }
+html[data-theme="light"] .room-main.is-spotlight .sidebar-participants .tile,
+html[data-theme="light"] .room-main.is-spotlight .sidebar-participants .no-video-placeholder { background: #dfe4ea; }
+
+/* Звонок в светлой теме: светлая тень сверху, белая капсула кнопок, светлые плитки без камеры */
+html[data-theme="light"] .room-topbar { background: linear-gradient(180deg, rgba(238, 241, 244, 0.92) 0%, rgba(238, 241, 244, 0.5) 55%, rgba(238, 241, 244, 0) 100%); }
+html[data-theme="light"] .room-topbar .ctrl-btn { background: rgba(255, 255, 255, 0.9); color: var(--text); box-shadow: 0 1px 0 rgba(21, 32, 43, 0.08); }
+html[data-theme="light"] .room-topbar .ctrl-btn:hover { background: #ffffff; }
+html[data-theme="light"] .controls-pill { background: rgba(255, 255, 255, 0.9); border-color: rgba(21, 32, 43, 0.06); box-shadow: 0 12px 32px rgba(21, 32, 43, 0.14); }
+html[data-theme="light"] .tile { background: #dfe4ea; }
+html[data-theme="light"] .tile .no-video-placeholder { background: radial-gradient(circle at 50% 38%, #f7f9fb 0%, #e9edf2 60%, #dde3ea 100%); }
+html[data-theme="light"] .tile .tile-label { background: rgba(255, 255, 255, 0.88); border-color: rgba(21, 32, 43, 0.08); }
+html[data-theme="light"] .controls-pill .ctrl-btn.off,
+html[data-theme="light"] .controls-pill .ctrl-btn.danger { background: #fde6e3; color: var(--danger); }
+html[data-theme="light"] .controls-pill .ctrl-btn.off .ctl-ico__cut { stroke: #fde6e3; }
+html[data-theme="light"] .controls-pill .ctrl-btn.off:hover,
+html[data-theme="light"] .controls-pill .ctrl-btn.danger:hover { background: var(--danger); color: #fff; }
+html[data-theme="light"] .controls-pill .ctrl-btn.off:hover .ctl-ico__cut { stroke: var(--danger); }

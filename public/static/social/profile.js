@@ -3,7 +3,7 @@
 // слева разделы, справа карточки (те же классы settings-*, одно оформление на весь сайт).
 import { api } from './api.js'
 import { store, updateUser } from './store.js'
-import { h, icon, avatar, displayName, toast, bannerMedia, bannerKey } from './ui.js'
+import { h, icon, avatar, displayName, toast, bannerMedia, bannerKey, getThemeChoice, setThemeChoice } from './ui.js'
 import { uploadFile } from './upload.js'
 import { openLightbox } from './media-ui.js'
 import { cropAvatar, cropBanner } from './crop.js'
@@ -234,7 +234,24 @@ export function openProfile({ logout }) {
         save.disabled = false
       }
     })
-    return [preview, mediaCard, card]
+    // Тема: светлая, тёмная или как в системе — хранится на этом устройстве
+    const themeRow = h('div', { class: 'vl-theme-pick', role: 'radiogroup', 'aria-label': 'Тема' })
+    const THEMES = [['light', 'sun', 'Светлая'], ['dark', 'moon', 'Тёмная'], ['system', 'desktop', 'Как в системе']]
+    function paintTheme() {
+      const cur = getThemeChoice()
+      themeRow.replaceChildren(...THEMES.map(([id, ico, label]) => {
+        const b = h('button', { type: 'button', role: 'radio', 'aria-checked': cur === id ? 'true' : 'false', class: `vl-chip${cur === id ? ' is-active' : ''}` }, [icon(ico), label])
+        b.addEventListener('click', () => { setThemeChoice(id); paintTheme() })
+        return b
+      }))
+    }
+    paintTheme()
+    const themeCard = h('div', { class: 'settings-card' }, [
+      h('div', { class: 'settings-card-head' }, [h('span', { class: 'settings-card-title' }, [icon('palette'), 'Тема'])]),
+      h('p', { class: 'settings-card-note' }, 'Только на этом устройстве.'),
+      themeRow
+    ])
+    return [preview, themeCard, mediaCard, card]
   }
 
   // ---------- Конфиденциальность: «был в сети» ----------
