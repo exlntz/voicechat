@@ -72,6 +72,9 @@ export function initSocialSchema(db) {
   try { db.exec('ALTER TABLE users ADD COLUMN avatar_file TEXT') } catch {}
   try { db.exec('ALTER TABLE users ADD COLUMN banner_file TEXT') } catch {}
   try { db.exec('ALTER TABLE users ADD COLUMN banner_kind TEXT') } catch {}
+  // Рамка фона {x, y, w, h} в долях 0..1 — для видео и GIF (их не обрезаешь в браузере, не
+  // потеряв анимацию): картинка целиком, а показывается выбранная область
+  try { db.exec('ALTER TABLE users ADD COLUMN banner_crop TEXT') } catch {}
 
   // Настройки чата для себя: закреплён в списке (время закрепления), история очищена до id,
   // обои (id готовых или file:<id> своей картинки)
@@ -143,7 +146,7 @@ function fixLegacyUsernames(db) {
 }
 
 // Публичный вид пользователя — без хешей и прочего
-export const USER_COLS = 'id, username, display_name, avatar_file, banner_file, banner_kind'
+export const USER_COLS = 'id, username, display_name, avatar_file, banner_file, banner_kind, banner_crop'
 export function fileUrl(id) {
   return id ? `/api/files/${id}` : null
 }
@@ -155,8 +158,23 @@ export function publicUser(row) {
     displayName: row.display_name || row.displayName || row.username,
     avatarUrl: fileUrl(row.avatar_file),
     bannerUrl: fileUrl(row.banner_file),
-    bannerKind: row.banner_file ? (row.banner_kind || 'image') : null
+    bannerKind: row.banner_file ? (row.banner_kind || 'image') : null,
+    bannerCrop: row.banner_file ? parseCrop(row.banner_crop) : null
   }
+}
+function parseCrop(raw) {
+  if (!raw) return null
+  try { return cleanCrop(JSON.parse(raw)) } catch { return null }
+}
+// Рамка: доли 0..1, внутри картинки; иначе null (показываем по центру)
+export function cleanCrop(c) {
+  if (!c || typeof c !== 'object') return null
+  const v = ['x', 'y', 'w', 'h'].map((k) => Number(c[k]))
+  if (v.some((n) => !Number.isFinite(n))) return null
+  const [x, y, w, h] = v
+  if (w <= 0.01 || h <= 0.01 || x < -0.001 || y < -0.001 || x + w > 1.001 || y + h > 1.001) return null
+  const r = (n) => Math.round(n * 10000) / 10000
+  return { x: r(Math.max(0, x)), y: r(Math.max(0, y)), w: r(Math.min(1, w)), h: r(Math.min(1, h)) }
 }
 
 let userStmt = null

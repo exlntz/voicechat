@@ -106,7 +106,7 @@ function createSession(userId) {
 function getUserByToken(token) {
   if (!token) return null
   const row = db.prepare(
-    'SELECT u.id as id, u.username as username, u.display_name as display_name, u.avatar_file as avatar_file, u.banner_file as banner_file, u.banner_kind as banner_kind, s.expires_at as expiresAt FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?'
+    'SELECT u.id as id, u.username as username, u.display_name as display_name, u.avatar_file as avatar_file, u.banner_file as banner_file, u.banner_kind as banner_kind, u.banner_crop as banner_crop, s.expires_at as expiresAt FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?'
   ).get(token)
   if (!row) return null
   if (new Date(row.expiresAt).getTime() < Date.now()) {
@@ -247,9 +247,9 @@ app.post('/api/auth/login', async (c) => {
   }
 
   const usernameLower = username.toLowerCase()
-  const findUser = db.prepare('SELECT id, username, display_name, avatar_file, banner_file, banner_kind, password_hash, password_salt FROM users WHERE username_lower = ?')
+  const findUser = db.prepare('SELECT id, username, display_name, avatar_file, banner_file, banner_kind, banner_crop, password_hash, password_salt FROM users WHERE username_lower = ?')
   // Старые юзернеймы, начинавшиеся с цифры или «_», переименованы в user_… — пускаем и по старому
-  const findLegacy = db.prepare('SELECT id, username, display_name, avatar_file, banner_file, banner_kind, password_hash, password_salt FROM users WHERE legacy_username_lower = ?')
+  const findLegacy = db.prepare('SELECT id, username, display_name, avatar_file, banner_file, banner_kind, banner_crop, password_hash, password_salt FROM users WHERE legacy_username_lower = ?')
   const row = findUser.get(usernameLower) || (/^[^a-z]/.test(usernameLower) ? findLegacy.get(usernameLower) : null)
   if (!row) {
     return c.json({ error: 'invalid_credentials', message: 'Неверный логин или пароль' }, 401)

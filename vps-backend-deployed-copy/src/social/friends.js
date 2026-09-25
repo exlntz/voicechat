@@ -11,7 +11,7 @@ export function registerFriendRoutes(app, { db, hub }) {
   const insertRow = db.prepare('INSERT INTO friendships (user_a, user_b, status, requested_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
   const updateRow = db.prepare('UPDATE friendships SET status = ?, requested_by = ?, updated_at = ? WHERE user_a = ? AND user_b = ?')
   const deleteRow = db.prepare('DELETE FROM friendships WHERE user_a = ? AND user_b = ?')
-  const listRows = db.prepare(`SELECT f.*, u.id AS uid, u.username, u.display_name, u.avatar_file, u.banner_file, u.banner_kind
+  const listRows = db.prepare(`SELECT f.*, u.id AS uid, u.username, u.display_name, u.avatar_file, u.banner_file, u.banner_kind, u.banner_crop
     FROM friendships f JOIN users u ON u.id = CASE WHEN f.user_a = ? THEN f.user_b ELSE f.user_a END
     WHERE f.user_a = ? OR f.user_b = ?`)
   const byUsername = db.prepare(`SELECT ${USER_COLS} FROM users WHERE username_lower = ?`)

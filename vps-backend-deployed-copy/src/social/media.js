@@ -12,7 +12,7 @@ import { randomBytes } from 'node:crypto'
 import { mkdirSync, appendFileSync, writeFileSync, statSync, renameSync, unlinkSync, openSync, readSync, closeSync, createReadStream, existsSync } from 'node:fs'
 import { Readable } from 'node:stream'
 import { join } from 'node:path'
-import { rateLimit, fileUrl } from './db.js'
+import { rateLimit, fileUrl, cleanCrop } from './db.js'
 
 export const CHUNK_SIZE = 768 * 1024
 const MB = 1024 * 1024
@@ -69,7 +69,7 @@ export function registerMediaRoutes(app, { db, dataDir, profile }) {
       JOIN conversation_members cm ON cm.conversation_id = m.conversation_id AND cm.user_id = ?
       WHERE mf.file_id = ? LIMIT 1`),
     setAvatar: db.prepare('UPDATE users SET avatar_file = ? WHERE id = ?'),
-    setBanner: db.prepare('UPDATE users SET banner_file = ?, banner_kind = ? WHERE id = ?')
+    setBanner: db.prepare('UPDATE users SET banner_file = ?, banner_kind = ?, banner_crop = ? WHERE id = ?')
   }
   const uploads = new Map() // uploadId -> {userId, purpose, name, mime, size, voice, received, next, path, createdAt}
 
@@ -159,7 +159,11 @@ export function registerMediaRoutes(app, { db, dataDir, profile }) {
     q.insert.run(fileId, me, u.purpose, kind, u.name, mime, u.size, Object.keys(meta).length ? JSON.stringify(meta) : null, Date.now())
 
     if (u.purpose === 'avatar') { q.setAvatar.run(fileId, me); profile.broadcastUser(me) }
-    if (u.purpose === 'banner') { q.setBanner.run(fileId, kind === 'video' ? 'video' : 'image', me); profile.broadcastUser(me) }
+    if (u.purpose === 'banner') {
+      const crop = cleanCrop(m.crop)
+      q.setBanner.run(fileId, kind === 'video' ? 'video' : 'image', crop ? JSON.stringify(crop) : null, me)
+      profile.broadcastUser(me)
+    }
     return c.json({ file: fileView(q.file.get(fileId)) })
   })
 
@@ -171,7 +175,7 @@ export function registerMediaRoutes(app, { db, dataDir, profile }) {
   })
   app.delete('/api/profile/banner', (c) => {
     const me = Number(c.get('user').id)
-    q.setBanner.run(null, null, me)
+    q.setBanner.run(null, null, null, me)
     profile.broadcastUser(me)
     return c.json(profile.profileOf(me))
   })

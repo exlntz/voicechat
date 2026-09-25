@@ -136,6 +136,27 @@ export function avatar(user, { size = 32, presence = null, saved = false } = {})
   return node
 }
 
+// Фон профиля (картинка, GIF или видео) с выбранной рамкой: медиа растягивается так, чтобы
+// рамка {x, y, w, h} (доли 0..1) ровно заняла полосу 3:1. Без рамки — по центру (cover).
+export function bannerMedia(user) {
+  const el = user.bannerKind === 'video'
+    ? h('video', { src: user.bannerUrl, autoplay: true, muted: true, loop: true, playsinline: true, preload: 'auto' })
+    : h('img', { src: user.bannerUrl, alt: '', draggable: 'false' })
+  const c = user.bannerCrop
+  if (c && c.w > 0 && c.h > 0) {
+    el.classList.add('is-cropped')
+    el.style.width = (100 / c.w) + '%'
+    el.style.height = (100 / c.h) + '%'
+    el.style.left = (-c.x / c.w * 100) + '%'
+    el.style.top = (-c.y / c.h * 100) + '%'
+  }
+  if (el.tagName === 'VIDEO') { el.muted = true; el.play().catch(() => {}) }
+  return el
+}
+export function bannerKey(user) {
+  return user && user.bannerUrl ? user.bannerUrl + JSON.stringify(user.bannerCrop || null) : ''
+}
+
 // Имя чата и аватар: для «Избранного» — своё, для лички — собеседник
 export function isSavedConv(conv) { return !!conv && conv.type === 'saved' }
 export function convTitle(conv, peer) { return isSavedConv(conv) ? 'Избранное' : displayName(peer) }
