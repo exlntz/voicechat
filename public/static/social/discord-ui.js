@@ -1,20 +1,40 @@
-// Presentation adapter: the original session, routing and call shell stays in shell.js.
+// Presentation adapter: session, routing and call ownership stays in the unchanged shell.js.
 import { store, on, sortedConversations } from './store.js'
-import { h, icon, avatar, displayName, isMobile } from './ui.js'
+import { h, icon, avatar, displayName } from './ui.js'
 import { filterDestinations, moveSelection } from './quick-switcher.js'
+
+let stylePromise
+export function loadDiscordStyles() {
+  if (stylePromise) return stylePromise
+  stylePromise = new Promise(resolve => {
+    let link = document.querySelector('link[href="/static/discord.css"]')
+    if (link?.sheet) { resolve(); return }
+    const created = !link
+    if (!link) link = h('link', { rel: 'stylesheet', href: '/static/discord.css' })
+    let timeout
+    function finish() {
+      clearTimeout(timeout)
+      link.removeEventListener('load', finish)
+      link.removeEventListener('error', finish)
+      resolve()
+    }
+    link.addEventListener('load', finish, { once: true })
+    link.addEventListener('error', finish, { once: true })
+    timeout = setTimeout(finish, 4000)
+    if (created) document.head.appendChild(link)
+  })
+  return stylePromise
+}
 
 let initialized = false
 export function initDiscordUI({ navigate, openDmWith }) {
   if (initialized) return
-  initialized = true
-  if (!document.querySelector('link[href="/static/discord.css"]')) {
-    document.head.appendChild(h('link', { rel: 'stylesheet', href: '/static/discord.css' }))
-  }
   const body = document.body
   const shell = document.getElementById('vl-shell')
   const sidebar = document.getElementById('vl-sidebar')
   const viewRoot = document.getElementById('vl-view')
   if (!shell || !sidebar || !viewRoot) return
+  initialized = true
   const ready = () => body.classList.contains('vl-ready') && !!store.me
   const shortcut = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘ K' : 'Ctrl K'
   let rail = null
@@ -86,9 +106,11 @@ export function initDiscordUI({ navigate, openDmWith }) {
   function openSwitcher() {
     if (!ready()) return
     if (dialog?.open) { closeSwitcher(); return }
-    // Do not steal focus from profile/settings, incoming-call dialogs, or another modal.
-    if (document.querySelector('dialog[open], .settings-overlay, .vl-modal-overlay')) return
+    const modalOpen = [...document.querySelectorAll('dialog[open], .settings-overlay, .vl-modal-overlay, [aria-modal="true"]')]
+      .some(node => node.getClientRects().length > 0)
+    if (modalOpen) return
     const previousFocus = document.activeElement
+    const ownerId = store.me.id
     const input = h('input', { type: 'search', class: 'dc-switcher__input', placeholder: 'Куда отправимся?',
       autocomplete: 'off', spellcheck: 'false', role: 'combobox', 'aria-label': 'Найти чат или друга',
       'aria-autocomplete': 'list', 'aria-expanded': 'true', 'aria-controls': 'dc-switcher-results', 'aria-describedby': 'dc-switcher-help' })
@@ -115,15 +137,23 @@ export function initDiscordUI({ navigate, openDmWith }) {
     }
     async function activate(index) {
       const item = results[index]
-      if (!item || activating || !ready()) return
+      if (!item || activating || !ready() || store.me.id !== ownerId) return
       activating = true
       navigated = true
       currentDialog.close()
-      if (item.path) navigate(item.path)
-      else await openDmWith(item.userId)
-      schedule()
+      try {
+        if (item.path) navigate(item.path)
+        else {
+          const conversation = await openDmWith(item.userId)
+          if (!conversation && ready() && store.me.id === ownerId && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
+        }
+      } catch (error) {
+        console.error('Quick switcher navigation failed', error)
+        if (ready() && store.me.id === ownerId && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
+      } finally { schedule() }
     }
     function render(reset = false) {
+      if (!ready() || store.me.id !== ownerId) { closeSwitcher(); return }
       const oldId = results[selected]?.id
       results = filterDestinations(destinations(), input.value)
       selected = reset ? 0 : Math.max(0, results.findIndex(item => item.id === oldId))
@@ -150,20 +180,21 @@ export function initDiscordUI({ navigate, openDmWith }) {
       if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) closeSwitcher()
     })
     currentDialog.addEventListener('keydown', event => {
+      event.stopPropagation()
       if (event.isComposing) return
       if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && event.target === input) {
         event.preventDefault(); selected = moveSelection(selected, event.key === 'ArrowDown' ? 1 : -1, results.length); updateSelection(true)
       } else if (event.key === 'Enter' && event.target === input) {
         event.preventDefault(); void activate(selected)
       }
-      // Prevent underlying chat/call shortcuts from seeing dialog keystrokes.
-      event.stopPropagation()
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); closeSwitcher() }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault(); if (!event.repeat) closeSwitcher()
+      }
     })
     currentDialog.addEventListener('close', () => {
       currentDialog.remove()
       if (dialog === currentDialog) { dialog = null; refreshDialog = null }
-      if (!navigated && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
+      if (!navigated && ready() && store.me.id === ownerId && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
     }, { once: true })
     body.appendChild(currentDialog)
     refreshDialog = () => render()
@@ -186,7 +217,10 @@ export function initDiscordUI({ navigate, openDmWith }) {
         if (conv.unread) link.appendChild(h('span', { class: 'dc-rail__badge', 'aria-label': 'Непрочитанных: ' + conv.unread }, String(Math.min(99, conv.unread))))
         return link
       }))
-      if (focusedPath) [...railList.querySelectorAll('a')].find(link => link.getAttribute('href') === focusedPath)?.focus({ preventScroll: true })
+      if (focusedPath) {
+        const target = [...railList.querySelectorAll('a')].find(link => link.getAttribute('href') === focusedPath) || rail.querySelector('button')
+        target?.focus({ preventScroll: true })
+      }
     }
     for (const link of rail.querySelectorAll('a')) {
       const active = link.getAttribute('href') === location.pathname || (link.getAttribute('href') === '/lobby' && location.pathname.startsWith('/room/'))
@@ -208,16 +242,25 @@ export function initDiscordUI({ navigate, openDmWith }) {
     }
     const chat = store.chats.get(id)
     if (!chat || !store.me) return
+    const rows = [...viewRoot.querySelectorAll('.vl-msg[data-key]')]
+    const scroller = viewRoot.querySelector('.vl-chat__scroll')
+    const bottom = scroller && scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 4
+    const top = scroller?.getBoundingClientRect().top || 0
+    const anchor = !bottom && rows.find(row => row.getBoundingClientRect().bottom > top)
+    const anchorTop = anchor?.getBoundingClientRect().top
     const messages = new Map(chat.list.map(message => [message.id ? 'm' + message.id : 'c' + message.clientId, message]))
-    for (const row of viewRoot.querySelectorAll('.vl-msg[data-key]')) {
+    let changed = false
+    for (const row of rows) {
       const message = messages.get(row.dataset.key)
       if (!message) continue
       const conv = store.conversations.get(id)
       const user = Number(message.authorId) === Number(store.me.id) ? store.me : store.users.get(Number(message.authorId)) || conv?.peer
       const name = displayName(user)
       const stamp = new Date(message.createdAt)
+      if (!Number.isFinite(stamp.getTime())) continue
       const signature = JSON.stringify([id, name, user?.avatarUrl, message.createdAt])
       if (row.dataset.dcAuthor === signature) continue
+      changed = true
       row.dataset.dcAuthor = signature
       row.classList.add('dc-message')
       row.querySelector(':scope > .dc-message__avatar')?.remove()
@@ -226,6 +269,10 @@ export function initDiscordUI({ navigate, openDmWith }) {
       const heading = h('div', { class: 'dc-message__header' }, [h('span', { class: 'dc-message__name' }, name),
         h('time', { datetime: stamp.toISOString(), title: stamp.toLocaleString('ru-RU'), class: 'dc-message__time' }, stamp.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }))])
       row.prepend(avatarNode, heading)
+    }
+    if (changed && scroller) {
+      if (bottom) scroller.scrollTop = scroller.scrollHeight
+      else if (anchor?.isConnected) scroller.scrollTop += anchor.getBoundingClientRect().top - anchorTop
     }
   }
 
@@ -255,7 +302,6 @@ export function initDiscordUI({ navigate, openDmWith }) {
   function schedule() { if (!frame) frame = requestAnimationFrame(sync) }
   new MutationObserver(schedule).observe(body, { attributes: true, attributeFilter: ['class'] })
   new MutationObserver(schedule).observe(sidebar, { childList: true, subtree: true })
-  // Ignore adapter-owned nodes so decorating a message never creates an observer loop.
   new MutationObserver(records => {
     if (records.some(record => [...record.addedNodes].some(node => node.nodeType === 1 &&
       (node.matches('.vl-msg, .vl-view') || node.querySelector('.vl-msg'))))) schedule()
@@ -264,11 +310,14 @@ export function initDiscordUI({ navigate, openDmWith }) {
   window.addEventListener('popstate', schedule)
   window.addEventListener('vl:navigate', schedule)
   window.addEventListener('keydown', event => {
-    if (!event.isComposing && !event.altKey && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && ready()) {
+    if (event.defaultPrevented || event.repeat || event.isComposing || event.altKey || !ready()) return
+    const target = event.target
+    const editable = target instanceof Element && target.closest('input, textarea, select, [contenteditable="true"]')
+    // Allow the app shortcut from the ordinary composer, but preserve editing/form shortcuts.
+    if (editable && !editable.matches('.vl-composer__input')) return
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
       event.preventDefault(); openSwitcher()
     }
   })
-  // Ctrl+K remains available on mobile keyboards; mobile navigation keeps its existing routes.
-  void isMobile
   schedule()
 }
