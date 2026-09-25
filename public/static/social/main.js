@@ -43,6 +43,8 @@ export function parseRoute(path = location.pathname, search = location.search) {
   if (/^\/chats\/?$/.test(path)) return { name: 'chats' }
   if ((m = path.match(/^\/room\/([a-z0-9]+)\/?$/i))) return { name: 'room', code: m[1].toLowerCase() }
   if (/^\/lobby\/?$/.test(path)) return { name: 'lobby' }
+  // «Комната по коду» из меню «Звонок»: экран входа в звонок отдельно, без чатов
+  if (/^\/call\/?$/.test(path)) return { name: 'call' }
   const tab = new URLSearchParams(search).get('tab') || ''
   return { name: 'friends', tab }
 }
@@ -346,8 +348,10 @@ function enterSolo(me, code) {
   VL.state.currentUser = me
   body.classList.remove('vl-auth')
   body.classList.add('vl-solo')
-  history.replaceState({}, '', '/room/' + code)
+  history.replaceState({}, '', code ? '/room/' + code : '/call')
   VL.renderLobby(code)
+  // Пришли из чатов («Комната по коду») — вернуться к ним можно сразу, ещё до звонка
+  if (!code) showSoloChatsButton()
 }
 
 async function exitSolo(path, { openLatestChat = false } = {}) {
@@ -517,6 +521,7 @@ async function boot() {
   VL.state.currentUser = me
   const initial = parseRoute()
   if (initial.name === 'room') { enterSolo(me, initial.code); return }
+  if (initial.name === 'call') { enterSolo(me, ''); return }
   await startSession(me)
 }
 

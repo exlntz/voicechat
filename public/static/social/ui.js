@@ -335,7 +335,7 @@ const FILL_SEL = [
   '.vl-round', '.vl-btn', '.vl-pill', '.vl-chip', '.vl-dm:not(.is-skeleton)', '.vl-me__btn', '.vl-composer__send', '.vl-composer__attach',
   '.vl-menu__item', '.vl-picker__row', '.vl-search__row', '.vl-friend:not(.is-skeleton)', '.vl-tile:not(.is-skeleton)', '.settings-nav__item',
   '.vl-call-btn', '.vl-jump', '.vl-solo-chats', '.vl-side__call', '.vl-voice__btn', '.vl-quote', '.vl-filecard', '.vl-ucard__when',
-  '.vl-ucard__link', '.vl-pinbar__body', '.vl-fwd', '.vl-tray__x', '.vl-chat__head-who', '.vl-wall-tile__bg', '.vl-side__search-x'
+  '.vl-ucard__link', '.vl-pinbar__body', '.vl-fwd', '.vl-tray__x', '.vl-wall-tile__bg', '.vl-side__search-x'
 ].join(',')
 const FILL_MS = 420
 export function initHoverFill() {
@@ -541,6 +541,8 @@ export function setThemeChoice(choice) {
   try { localStorage.setItem('vl:theme', choice) } catch {}
   applyTheme(choice)
 }
+// Для app.js (настройки звонка): тот же выбор темы
+if (window.VL) Object.assign(window.VL, { getThemeChoice, setThemeChoice })
 // «Как в системе»: переключаемся вместе с системой
 if (window.matchMedia) {
   const mq = matchMedia('(prefers-color-scheme: dark)')

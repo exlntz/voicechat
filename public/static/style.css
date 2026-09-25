@@ -3413,7 +3413,7 @@ html[data-theme="light"] .tile.is-local .avatar-circle { background: var(--accen
 }
 .tile .tile-label span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tile .tile-label i { font-size: 14px; }
-.tile .tile-label .host-crown { color: #f3c566; }
+.tile .tile-label .host-crown { color: var(--accent-soft); }
 .tile:has(> .no-video-placeholder[style*="none"]) .tile-label { background: rgba(10, 12, 15, 0.62); color: #f2f5f9; }
 html[data-theme="light"] .tile:has(> .no-video-placeholder[style*="none"]) .tile-label { background: rgba(255, 255, 255, 0.88); color: var(--text); }
 html[data-theme="light"] .tile .tile-label { background: transparent; }
@@ -3459,7 +3459,7 @@ html[data-theme="light"] .tile .tile-label { background: transparent; }
 .panel-participant .avatar-circle.is-local { background: var(--accent); color: #fff; }
 .panel-participant__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .panel-participant__you { font-weight: 500; color: var(--text-faint); }
-.panel-participant .host-crown { color: #f3c566; font-size: 14px; }
+.panel-participant .host-crown { color: var(--accent-soft); font-size: 14px; }
 .panel-participant__muted { color: var(--danger-soft); font-size: 14px; }
 html[data-theme="light"] .panel-overlay { background: rgba(21, 32, 43, 0.32); }
 html[data-theme="light"] .panel-participant .avatar-circle { background: #e3e8ee; }

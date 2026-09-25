@@ -2999,7 +2999,8 @@ async function enterRoom(joinData) {
     // Разделы: слева меню, справа содержимое. Пока раздел один — «Звук»;
     // новые добавляются в SECTIONS и сразу появляются в меню.
     const SECTIONS = [
-      { group: 'Звонок', id: 'sound', icon: 'fas fa-volume-high', title: 'Звук', build: () => [inCallDevices.micCard, inCallDevices.spkCard, inCallDevices.camCard] }
+      { group: 'Звонок', id: 'sound', icon: 'fas fa-volume-high', title: 'Звук', build: () => [inCallDevices.micCard, inCallDevices.spkCard, inCallDevices.camCard] },
+      { group: 'Звонок', id: 'look', icon: 'fas fa-palette', title: 'Оформление', build: () => [buildThemeCard()] }
     ]
     const nav = el('nav', { class: 'settings-nav', 'aria-label': 'Разделы настроек' })
     const content = el('div', { class: 'settings-body' })
@@ -3028,6 +3029,36 @@ async function enterRoom(joinData) {
     devicePopup = overlay
     refreshInCallDeviceLists()
     startInCallMeter()
+  }
+
+  // «Оформление» в настройках звонка: та же тема, что в профиле (хранится на устройстве)
+  function buildThemeCard() {
+    const THEMES = [['light', 'fas fa-sun', 'Светлая'], ['dark', 'fas fa-moon', 'Тёмная'], ['system', 'fas fa-desktop', 'Как в системе']]
+    const getChoice = () => (VL.getThemeChoice ? VL.getThemeChoice() : (localStorage.getItem('vl:theme') || 'dark'))
+    const row = el('div', { class: 'vl-theme-pick', role: 'radiogroup', 'aria-label': 'Тема' })
+    const paint = () => {
+      const cur = getChoice()
+      row.replaceChildren(...THEMES.map(([id, ico, label]) => {
+        const b = el('button', { type: 'button', role: 'radio', 'aria-checked': cur === id ? 'true' : 'false', class: `vl-chip${cur === id ? ' is-active' : ''}` }, [el('i', { class: ico, 'aria-hidden': 'true' }), label])
+        b.addEventListener('click', () => {
+          if (VL.setThemeChoice) VL.setThemeChoice(id)
+          else {
+            try { localStorage.setItem('vl:theme', id) } catch {}
+            const t = id === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : id
+            document.documentElement.dataset.theme = t
+            document.documentElement.style.colorScheme = t
+          }
+          paint()
+        })
+        return b
+      }))
+    }
+    paint()
+    return el('div', { class: 'settings-card' }, [
+      el('div', { class: 'settings-card-head' }, [el('span', { class: 'settings-card-title' }, [el('i', { class: 'fas fa-palette' }), 'Тема'])]),
+      el('p', { class: 'settings-card-note' }, 'Только на этом устройстве.'),
+      row
+    ])
   }
 
   settingsBtn.addEventListener('click', (e) => {

@@ -242,7 +242,8 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
       h('span', { class: 'vl-picker__name' }, 'Комната по коду'),
       h('span', { class: 'vl-picker__user' }, 'создать или войти')
     ])
-    codeLink.addEventListener('click', () => { done(); navigate('/lobby') })
+    // Отдельный экран входа в звонок, без чатов (как по ссылке на звонок)
+    codeLink.addEventListener('click', () => { done(); location.assign('/call') })
     const pick = (u) => { done(); if (forCall) callFriend(u.id); else openDmWith(u.id) }
     const list = h('div', { class: 'vl-picker__list' })
     const close = h('button', { type: 'button', class: 'vl-round is-ghost', 'aria-label': 'Закрыть' }, [icon('xmark')])
