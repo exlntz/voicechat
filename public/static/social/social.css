@@ -856,7 +856,7 @@ body.vl-solo #vl-sidebar, body.vl-solo #vl-view, body.vl-solo .vl-fab-menu { dis
 .vl-ucard__more { display: flex; margin: 12px auto 0; }
 
 /* Аватарку и фон можно открыть целиком */
-.vl-ucard__ava.is-openable, .vl-pcard__ava.is-openable, .vl-ucard__banner.is-openable, .vl-pcard__banner.has-media { cursor: zoom-in; }
+.vl-ucard__ava.is-openable, .vl-pcard__ava.is-openable, .vl-ucard__banner.is-openable, .vl-pcard__banner.has-media { cursor: pointer; }
 .vl-ucard__ava.is-openable .vl-avatar, .vl-pcard__ava.is-openable .vl-avatar { transition: transform 0.25s var(--ease), filter 0.2s; }
 .vl-ucard__ava.is-openable:hover .vl-avatar, .vl-pcard__ava.is-openable:hover .vl-avatar { transform: scale(1.04); filter: brightness(1.08); }
 
