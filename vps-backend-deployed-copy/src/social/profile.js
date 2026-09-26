@@ -11,7 +11,7 @@ export function cleanUsername(raw) {
 
 export function registerProfileRoutes(app, { db, hub }) {
   const q = {
-    user: db.prepare(`SELECT ${USER_COLS}, show_last_seen FROM users WHERE id = ?`),
+    user: db.prepare(`SELECT ${USER_COLS}, show_last_seen, created_at FROM users WHERE id = ?`),
     byLower: db.prepare('SELECT id FROM users WHERE username_lower = ?'),
     setUsername: db.prepare('UPDATE users SET username = ?, username_lower = ? WHERE id = ?'),
     setShowLastSeen: db.prepare('UPDATE users SET show_last_seen = ? WHERE id = ?'),
@@ -25,7 +25,8 @@ export function registerProfileRoutes(app, { db, hub }) {
   function profileOf(id) {
     const row = q.user.get(id)
     if (!row) return null
-    return { user: publicUser(row), settings: { showLastSeen: !!row.show_last_seen } }
+    // createdAt — только в своём профиле (дата регистрации, SQLite хранит её в UTC)
+    return { user: publicUser(row), settings: { showLastSeen: !!row.show_last_seen, createdAt: row.created_at ? String(row.created_at).replace(' ', 'T') + 'Z' : null } }
   }
 
   // Проверка юзернейма: формат и свободен ли (свой текущий — «свободен»)

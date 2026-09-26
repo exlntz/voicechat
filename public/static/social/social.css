@@ -311,7 +311,7 @@ body.vl-offline .vl-me__sub { color: var(--vl-idle); }
 .vl-msg__wrap { position: relative; display: flex; align-items: center; gap: 8px; max-width: min(72%, 640px); }
 .vl-msg.is-mine .vl-msg__wrap { flex-direction: row-reverse; }
 .vl-bubble {
-  position: relative; min-width: 0; padding: 9px 14px; font: 15px/1.45 var(--vl-font);
+  position: relative; min-width: 0; padding: 9px 14px; font: var(--vl-msg-size, 15px)/1.45 var(--vl-font);
   background: var(--vl-field); color: var(--text); border-radius: 20px 20px 20px 6px;
 }
 .vl-msg.is-theirs.pos-middle .vl-bubble, .vl-msg.is-theirs.pos-last .vl-bubble { border-radius: 6px 20px 20px 6px; }

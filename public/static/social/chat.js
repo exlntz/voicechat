@@ -127,7 +127,7 @@ export function createChatView({ convId, navigate, menuButton }) {
       headSub.textContent = presenceText(p)
       headSub.classList.toggle('is-online', !!p && p.status !== 'offline' && (p.status === 'online' || !!p.inCall))
       headWho.title = `@${cur.username} — профиль, медиа и файлы`
-      input.placeholder = `Написать @${cur.username || 'собеседнику'}`
+      input.placeholder = 'Сообщение...'
     }
     moreBtn.classList.toggle('is-on', !!(c && c.muted))
     const here = inCall() && callState.conversationId === convId
@@ -290,7 +290,7 @@ export function createChatView({ convId, navigate, menuButton }) {
   // ---------- Поле ввода ----------
   const replyBar = h('div', { class: 'vl-reply-bar', hidden: true })
   const tray = h('div', { class: 'vl-tray', hidden: true })
-  const input = h('textarea', { class: 'vl-composer__input', rows: '1', maxlength: String(MAX_LEN + 500), placeholder: `Написать @${peer.username || 'собеседнику'}`, 'aria-label': 'Сообщение' })
+  const input = h('textarea', { class: 'vl-composer__input', rows: '1', maxlength: String(MAX_LEN + 500), placeholder: 'Сообщение...', 'aria-label': 'Сообщение' })
   const sendBtn = h('button', { type: 'button', class: 'vl-composer__send', title: 'Отправить', 'aria-label': 'Отправить' }, [icon('paper-plane')])
   const counter = h('span', { class: 'vl-composer__counter', hidden: true })
   const attachBtn = h('button', { type: 'button', class: 'vl-composer__attach', title: 'Прикрепить файл', 'aria-label': 'Прикрепить файл' }, [icon('paperclip')])

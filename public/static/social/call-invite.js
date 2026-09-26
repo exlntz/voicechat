@@ -5,7 +5,7 @@
 // поверх всех окон (electronAPI.showIncomingCall), страница только передаёт данные.
 import { api } from './api.js'
 import { store, on, userById, emit } from './store.js'
-import { h, icon, avatar, displayName, toast, avatarColor, initialsOf } from './ui.js'
+import { h, icon, avatar, displayName, toast, avatarColor, initialsOf, getPref } from './ui.js'
 import { startRingtone, notify, getAudioCtx } from './notify.js'
 
 const E = () => window.electronAPI || {}
@@ -182,7 +182,7 @@ function renderIncoming(call) {
   acceptBtn.addEventListener('click', () => accept(call))
   declineBtn.addEventListener('click', () => decline(call))
   document.body.appendChild(overlay)
-  const stopRing = store.myStatus === 'dnd' ? () => {} : startRingtone()
+  const stopRing = store.myStatus === 'dnd' || getPref('ringSound', '1') === '0' ? () => {} : startRingtone()
   current = { call, node: overlay, stopRing }
   acceptBtn.focus()
 }

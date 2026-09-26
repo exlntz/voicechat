@@ -3,7 +3,7 @@
 // слева разделы, справа карточки (те же классы settings-*, одно оформление на весь сайт).
 import { api } from './api.js'
 import { store, updateUser } from './store.js'
-import { h, icon, avatar, displayName, toast, bannerMedia, bannerKey, getThemeChoice, setThemeChoice } from './ui.js'
+import { h, icon, avatar, displayName, toast, bannerMedia, bannerKey, getThemeChoice, setThemeChoice, getPref, setPref } from './ui.js'
 import { uploadFile } from './upload.js'
 import { openLightbox } from './media-ui.js'
 import { cropAvatar, cropBanner } from './crop.js'
@@ -34,7 +34,8 @@ export function openProfile({ logout }) {
 
   const SECTIONS = [
     { id: 'look', title: 'Оформление', icon: 'pen', build: buildLook },
-    { id: 'privacy', title: 'Конфиденциальность', icon: 'ban', build: buildPrivacy }
+    { id: 'privacy', title: 'Конфиденциальность', icon: 'ban', build: buildPrivacy },
+    { id: 'account', title: 'Аккаунт', icon: 'user', build: buildAccount }
   ]
   const navButtons = new Map()
   function show(id) {
@@ -291,7 +292,24 @@ export function openProfile({ logout }) {
       h('p', { class: 'settings-card-note' }, 'Только на этом устройстве.'),
       themeRow
     ])
-    return [preview, themeCard, mediaCard, nameCard, card]
+    // Размер текста в чатах — тоже только на этом устройстве
+    const FONTS = [['s', 'Мелкий'], ['m', 'Средний'], ['l', 'Крупный']]
+    const fontRow = h('div', { class: 'vl-theme-pick', role: 'radiogroup', 'aria-label': 'Размер текста в чатах' })
+    function paintFont() {
+      const cur = getPref('chatFont', 'm')
+      fontRow.replaceChildren(...FONTS.map(([id, label]) => {
+        const b = h('button', { type: 'button', role: 'radio', 'aria-checked': cur === id ? 'true' : 'false', class: `vl-chip${cur === id ? ' is-active' : ''}` }, label)
+        b.addEventListener('click', () => { setPref('chatFont', id); paintFont() })
+        return b
+      }))
+    }
+    paintFont()
+    const fontCard = h('div', { class: 'settings-card' }, [
+      h('div', { class: 'settings-card-head' }, [h('span', { class: 'settings-card-title' }, [icon('message'), 'Размер текста в чатах'])]),
+      h('p', { class: 'settings-card-note' }, 'Только на этом устройстве.'),
+      fontRow
+    ])
+    return [preview, themeCard, fontCard, mediaCard, nameCard, card]
   }
 
   // ---------- Конфиденциальность: «был в сети» ----------
@@ -325,7 +343,32 @@ export function openProfile({ logout }) {
       row,
       note
     ])
-    return window.electronAPI ? [lastSeenCard] : [lastSeenCard, buildPushCard()]
+    return window.electronAPI ? [lastSeenCard, buildRingCard()] : [lastSeenCard, buildRingCard(), buildPushCard()]
+  }
+
+  // ---------- Звук входящего звонка (на этом устройстве) ----------
+  function buildRingCard() {
+    const toggle = h('input', { type: 'checkbox', role: 'switch' })
+    toggle.checked = getPref('ringSound', '1') !== '0'
+    toggle.addEventListener('change', () => setPref('ringSound', toggle.checked ? '1' : '0'))
+    return h('div', { class: 'settings-card' }, [
+      h('div', { class: 'settings-card-head' }, [h('span', { class: 'settings-card-title' }, [icon('phone'), 'Звонки'])]),
+      h('label', { class: 'settings-row settings-row--first' }, [
+        h('span', { class: 'settings-row__text' }, 'Звук входящего звонка'),
+        h('span', { class: 'switch' }, [toggle, h('span', { class: 'switch__track', 'aria-hidden': 'true' })])
+      ])
+    ])
+  }
+
+  // ---------- Аккаунт: юзернейм и дата регистрации ----------
+  function buildAccount() {
+    const created = settings.createdAt ? new Date(settings.createdAt) : null
+    const createdText = created && !isNaN(created) ? created.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'
+    return [h('div', { class: 'settings-card' }, [
+      h('div', { class: 'settings-card-head' }, [h('span', { class: 'settings-card-title' }, [icon('user'), 'Аккаунт'])]),
+      h('div', { class: 'settings-row settings-row--first' }, [h('span', { class: 'settings-row__text' }, 'Юзернейм'), h('span', { class: 'settings-row__value' }, '@' + store.me.username)]),
+      h('div', { class: 'settings-row' }, [h('span', { class: 'settings-row__text' }, 'Аккаунт создан'), h('span', { class: 'settings-row__value' }, createdText)])
+    ])]
   }
 
   // ---------- Уведомления на этом устройстве (push: приходят и при закрытом сайте) ----------
