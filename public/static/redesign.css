@@ -1,0 +1,457 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   redesign.css — новый дизайн «Голос» (макет в канвасе «Голос — моушн-редизайн»).
+
+   Подключается ПОСЛЕДНИМ, после style.css и social/social.css, и только
+   перекрашивает/переставляет существующую разметку — логика сайта не меняется.
+   Откат дизайна = убрать <link> на этот файл.
+
+   Светлая тема: тёплый серый фон, чёрно-белые элементы.
+   Тёмная тема: чёрная OLED, без белых плашек.
+   Шрифт — Geist (свой, из /static/fonts/geist, с кириллицей).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@font-face { font-family: 'Geist'; font-style: normal; font-display: swap; font-weight: 400; src: url('/static/fonts/geist/geist-cyrillic-400-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Geist'; font-style: normal; font-display: swap; font-weight: 400; src: url('/static/fonts/geist/geist-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Geist'; font-style: normal; font-display: swap; font-weight: 500; src: url('/static/fonts/geist/geist-cyrillic-500-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Geist'; font-style: normal; font-display: swap; font-weight: 500; src: url('/static/fonts/geist/geist-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Geist'; font-style: normal; font-display: swap; font-weight: 600; src: url('/static/fonts/geist/geist-cyrillic-600-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Geist'; font-style: normal; font-display: swap; font-weight: 600; src: url('/static/fonts/geist/geist-latin-600-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Geist'; font-style: normal; font-display: swap; font-weight: 700; src: url('/static/fonts/geist/geist-cyrillic-700-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Geist'; font-style: normal; font-display: swap; font-weight: 700; src: url('/static/fonts/geist/geist-latin-700-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Geist Mono'; font-style: normal; font-display: swap; font-weight: 400; src: url('/static/fonts/geist/geist-mono-cyrillic-400-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Geist Mono'; font-style: normal; font-display: swap; font-weight: 400; src: url('/static/fonts/geist/geist-mono-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Geist Mono'; font-style: normal; font-display: swap; font-weight: 500; src: url('/static/fonts/geist/geist-mono-cyrillic-500-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Geist Mono'; font-style: normal; font-display: swap; font-weight: 500; src: url('/static/fonts/geist/geist-mono-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+/* ─────────── Токены ─────────── */
+:root {
+  --rd-spring: linear(0, 0.051, 0.1692, 0.3153, 0.4639, 0.6001, 0.7163, 0.8102, 0.8823, 0.935, 0.9717, 0.9955, 1.0098, 1.0171, 1.0198, 1.0195, 1.0175, 1.0147, 1.0117, 1.0089, 1.0064, 1.0044, 1.0028, 1.0016, 1.0008, 1.0002, 0.9999, 0.9997, 1);
+  --font: 'Geist', 'Golos Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --vl-font: var(--font);
+  --vl-display: var(--font);
+  --font-display: var(--font);
+
+  /* тёмная — чёрная OLED */
+  --ink-rgb: 242, 240, 236;
+  --bg: #000000;
+  --surface: #0c0c0c;
+  --surface-2: #141414;
+  --surface-3: #1c1c1c;
+  --text: #f2f0ec;
+  --text-dim: #b5afa6;
+  --text-faint: #8f8981;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --accent: #2a2a2a;
+  --accent-hover: #333333;
+  --accent-soft: #f2f0ec;
+  --accent-wash: rgba(255, 255, 255, 0.08);
+  --accent-glow: rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 1px 1px rgba(0, 0, 0, 0.1), 0 12px 32px -16px rgba(0, 0, 0, 0.38);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.3), 0 24px 60px -20px rgba(0, 0, 0, 0.8);
+
+  --vl-stage: #000000;
+  --vl-panel: #0c0c0c;
+  --vl-raised: #141414;
+  --vl-raised-2: #1c1c1c;
+  --vl-field: #1c1c1c;
+  --vl-hover: #1c1c1c;
+  --vl-online: #22c55e;
+  --vl-ava-0: #262626; --vl-ava-1: #262626; --vl-ava-2: #262626; --vl-ava-3: #262626; --vl-ava-4: #262626; --vl-ava-5: #262626;
+  --vl-ava-ink: #f2f0ec;
+
+  /* свои токены редизайна */
+  --rd-page: #000000;
+  --rd-panel: #0c0c0c;
+  --rd-field: #1c1c1c;
+  --rd-field-hover: #262626;
+  --rd-line: #2c2c2c;
+  --rd-sub: #8f8981;
+  --rd-faint: #6f6a63;
+  --rd-acc: #2a2a2a;
+  --rd-acc-hover: #333333;
+  --rd-on-acc: #f2f0ec;
+  --rd-bub-their: #222222;
+  --rd-bub-mine: #22303c;
+  --rd-tick: #6fd3f5;
+  --rd-typing: #4fd1a5;
+  --rd-input: #101010;
+  --rd-tile: #111111;
+  --rd-panel-shadow: 0 1px 1px rgba(0, 0, 0, 0.1), 0 12px 32px -16px rgba(0, 0, 0, 0.38);
+  --rd-pop-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 24px 60px -20px rgba(0, 0, 0, 0.8);
+  --rd-lift: 0 2px 4px rgba(0, 0, 0, 0.43), 0 16px 30px -12px rgba(0, 0, 0, 0.7);
+}
+
+html[data-theme="light"] {
+  --ink-rgb: 28, 25, 23;
+  --bg: #eceae6;
+  --surface: #fbfaf8;
+  --surface-2: #fbfaf8;
+  --surface-3: #f0eee9;
+  --text: #1c1917;
+  --text-dim: #57534e;
+  --text-faint: #8a847c;
+  --border: rgba(28, 25, 23, 0.08);
+  --border-strong: rgba(28, 25, 23, 0.16);
+  --accent: #1c1917;
+  --accent-hover: #34302c;
+  --accent-soft: #1c1917;
+  --accent-wash: rgba(28, 25, 23, 0.07);
+  --accent-glow: rgba(28, 25, 23, 0.18);
+  --shadow-sm: 0 1px 1px rgba(28, 25, 23, 0.04), 0 12px 32px -16px rgba(28, 25, 23, 0.16);
+  --shadow-md: 0 1px 2px rgba(28, 25, 23, 0.06), 0 24px 60px -20px rgba(28, 25, 23, 0.35);
+
+  --vl-stage: #eceae6;
+  --vl-panel: #fbfaf8;
+  --vl-raised: #fbfaf8;
+  --vl-raised-2: #f0eee9;
+  --vl-field: #f0eee9;
+  --vl-hover: #f0eee9;
+  --vl-online: #22c55e;
+  --vl-ava-0: #e7e4df; --vl-ava-1: #e7e4df; --vl-ava-2: #e7e4df; --vl-ava-3: #e7e4df; --vl-ava-4: #e7e4df; --vl-ava-5: #e7e4df;
+  --vl-ava-ink: #1c1917;
+
+  --rd-page: #eceae6;
+  --rd-panel: #fbfaf8;
+  --rd-field: #f0eee9;
+  --rd-field-hover: #e7e4df;
+  --rd-line: #e2dfda;
+  --rd-sub: #8a847c;
+  --rd-faint: #a8a29e;
+  --rd-acc: #1c1917;
+  --rd-acc-hover: #34302c;
+  --rd-on-acc: #ffffff;
+  --rd-bub-their: #f0eee9;
+  --rd-bub-mine: #e9ecef;
+  --rd-tick: #34b3e4;
+  --rd-typing: #1f9e78;
+  --rd-input: #ffffff;
+  --rd-tile: #1c1917;
+  --rd-panel-shadow: 0 1px 1px rgba(28, 25, 23, 0.04), 0 12px 32px -16px rgba(28, 25, 23, 0.16);
+  --rd-pop-shadow: 0 1px 2px rgba(28, 25, 23, 0.06), 0 24px 60px -20px rgba(28, 25, 23, 0.35);
+  --rd-lift: 0 2px 4px rgba(28, 25, 23, 0.18), 0 16px 30px -12px rgba(28, 25, 23, 0.55);
+}
+
+html, body { font-family: var(--font); -webkit-font-smoothing: antialiased; }
+body, body.vl-ready, body.vl-ready #vl-shell { background: var(--rd-page); }
+
+/* Рамки фокуса не рисуем ни у кнопок, ни у полей (как в макете) */
+:focus-visible { outline: none !important; }
+
+/* ─────────── Боковая панель ─────────── */
+body.vl-ready #vl-sidebar, #vl-view > .vl-view {
+  background: var(--rd-panel);
+  border-radius: 28px;
+  box-shadow: var(--rd-panel-shadow);
+  border: 0;
+}
+.vl-side__title { font: 700 30px/1.1 var(--font); letter-spacing: -0.03em; }
+.vl-side__search { background: var(--rd-field); border-radius: 23px; }
+.vl-side__search-input { font-family: var(--font); }
+
+.vl-dm {
+  --vl-ring: var(--rd-panel);
+  min-height: 70px; padding: 0 12px; border-radius: 20px;
+  transition: background-color 0.34s cubic-bezier(0.4, 0, 0.2, 1), color 0.34s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.5s var(--rd-spring), translate 0.5s var(--rd-spring), transform 0.45s var(--rd-spring);
+}
+.vl-dm:hover { background: var(--rd-field); --vl-ring: var(--rd-field); }
+.vl-dm:active { transform: scale(0.98); transition-duration: 0.1s; }
+/* Выбранный чат — «приподнятая» плашка цвета акцента */
+.vl-dm.is-active, .vl-dm.is-active:hover {
+  background: var(--rd-acc); color: var(--rd-on-acc); --vl-ring: var(--rd-acc);
+  translate: 0 -2px; box-shadow: var(--rd-lift);
+}
+.vl-dm.is-active .vl-dm__time, .vl-dm.is-active .vl-dm__sub { color: var(--rd-on-acc); opacity: 0.62; }
+.vl-dm.is-active .vl-avatar { background: rgba(255, 255, 255, 0.16); color: var(--rd-on-acc); }
+.vl-dm__name { font-weight: 600; font-size: 16px; }
+.vl-dm__sub { font-size: 14px; color: var(--rd-sub); }
+.vl-dm.is-unread .vl-dm__time { color: var(--text); }
+.vl-dm__sub.is-typing { color: var(--rd-typing); }
+.vl-badge { background: var(--rd-acc); color: var(--rd-on-acc); }
+.vl-dm.is-active .vl-badge { background: var(--rd-on-acc); color: var(--rd-acc); }
+
+.vl-avatar { font-family: var(--font); font-weight: 600; }
+.vl-avatar.is-self { background: var(--rd-acc); color: var(--rd-on-acc); }
+.vl-me__btn { border-radius: 20px; }
+.vl-me__btn:hover { background: var(--rd-field); }
+
+/* ─────────── Кнопки ─────────── */
+.vl-btn--primary { background: var(--rd-acc); color: var(--rd-on-acc); box-shadow: none; }
+.vl-btn--primary:hover:not(:disabled) { background: var(--rd-acc-hover); box-shadow: none; }
+.vl-btn--soft { background: var(--rd-field); color: var(--text); }
+.vl-btn--soft:hover:not(:disabled) { background: var(--rd-field-hover); }
+.vl-round { background: var(--rd-field); color: var(--text); transition: background-color 0.2s, transform 0.45s var(--rd-spring); }
+.vl-round:hover { background: var(--rd-field-hover); }
+.vl-round:active { transform: scale(0.94); transition-duration: 0.1s; }
+.vl-round.is-ghost { background: transparent; }
+.vl-round.is-ghost:hover { background: var(--rd-field); }
+
+/* ─────────── Шапка чата ─────────── */
+.vl-chat__head { border-bottom: 1px solid var(--rd-line); }
+.vl-chat__head-name { font: 600 22px/1.2 var(--font); letter-spacing: -0.02em; }
+@media (max-width: 600px) { .vl-chat__head-name { font-size: 18px; } }
+.vl-chat__head-sub { font-size: 14px; color: var(--rd-sub); }
+.vl-chat__head-sub.is-typing, .vl-chat__head .is-typing { color: var(--rd-typing); }
+.vl-chat__call { background: var(--rd-acc); color: var(--rd-on-acc); box-shadow: none; }
+.vl-chat__call:hover { background: var(--rd-acc-hover); }
+
+/* ─────────── Сообщения: у обоих слева, как в Telegram на ПК ─────────── */
+.vl-msg.is-mine { align-items: flex-start; }
+.vl-msg.is-mine .vl-msg__wrap { flex-direction: row; }
+.vl-msg.is-mine.is-new .vl-bubble { transform-origin: bottom left; }
+.vl-msg__wrap { max-width: min(78%, 520px); }
+.vl-bubble,
+.vl-msg.is-mine .vl-bubble {
+  padding: 7px 11px 7px 12px; font-family: var(--font);
+  background: var(--rd-bub-their); color: var(--text);
+  border-radius: 16px 16px 16px 6px;
+}
+.vl-msg.is-mine .vl-bubble { background: var(--rd-bub-mine); }
+/* серия: скругления как в Telegram, последнее — с хвостиком */
+.vl-msg.pos-first .vl-bubble { border-radius: 16px 16px 16px 6px; }
+.vl-msg.pos-middle .vl-bubble,
+.vl-msg.is-mine.pos-middle .vl-bubble { border-radius: 6px 16px 16px 6px; }
+.vl-msg.pos-last .vl-bubble,
+.vl-msg.is-mine.pos-last .vl-bubble { border-radius: 6px 16px 16px 0; }
+.vl-msg.pos-single .vl-bubble,
+.vl-msg.is-mine.pos-single .vl-bubble { border-radius: 16px 16px 16px 0; }
+.vl-msg.pos-last .vl-bubble::before,
+.vl-msg.pos-single .vl-bubble::before {
+  content: ''; position: absolute; left: -8px; bottom: 0; width: 10px; height: 17px; background: inherit; pointer-events: none;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 17'%3E%3Cpath d='M10 0C10 9 7 14.5 0 17H10Z'/%3E%3C/svg%3E") no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 17'%3E%3Cpath d='M10 0C10 9 7 14.5 0 17H10Z'/%3E%3C/svg%3E") no-repeat;
+}
+.vl-msg.has-media .vl-bubble::before, .vl-msg.is-media .vl-bubble::before { display: none; }
+/* .vl-msg рисуется с content-visibility:auto — он обрезает всё за краем строки.
+   Расширяем строку влево на 10px (и возвращаем отступом), чтобы хвостик влез. */
+.vl-msg { padding-left: 10px; margin-left: -10px; }
+.vl-bubble__meta,
+.vl-msg.is-mine .vl-bubble__meta { color: var(--rd-faint); font-size: 12px; }
+.vl-ticks { --tick: var(--rd-faint); --tick-read: var(--rd-tick); }
+.vl-bubble .vl-link,
+.vl-msg.is-mine .vl-bubble .vl-link { color: inherit; text-decoration: underline; text-decoration-color: rgba(var(--ink-rgb), 0.35); }
+.vl-msg.is-flash .vl-bubble { animation: rd-flash 1.3s var(--ease); }
+@keyframes rd-flash { 0%, 40% { box-shadow: 0 0 0 2px var(--rd-typing); } }
+
+.vl-day, .vl-unread-divider span {
+  font-family: var(--font); font-weight: 500; color: var(--rd-sub);
+}
+.vl-unread-divider span { background: var(--rd-field); color: var(--rd-sub); }
+
+/* ─────────── Поле ввода: микрофон внутри рамки ─────────── */
+.vl-composer__box { position: relative; }
+.vl-composer__field {
+  min-height: 54px; border-radius: 27px; padding: 0 60px 0 18px;
+  background: var(--rd-input); box-shadow: inset 0 0 0 1.5px var(--rd-line);
+}
+.vl-composer__field:focus-within { box-shadow: inset 0 0 0 1.5px var(--rd-line); }
+.vl-composer__input { font-family: var(--font); font-size: 16px; padding: 15px 0; }
+.vl-composer__send {
+  position: absolute; right: 7px; bottom: 7px; width: 40px; height: 40px;
+  background: var(--rd-acc); color: var(--rd-on-acc); box-shadow: none;
+  transition: background-color 0.25s, color 0.25s, transform 0.42s var(--rd-spring);
+}
+.vl-composer__send.is-mic { background: transparent; color: var(--text-dim); }
+.vl-composer__send.is-mic:hover:not(:disabled) { background: var(--rd-field); }
+.vl-composer__send:hover:not(:disabled) { background: var(--rd-acc-hover); transform: none; }
+.vl-composer__send.is-mic:hover:not(:disabled) { background: var(--rd-field); }
+.vl-composer__send:disabled { background: transparent; }
+.vl-reply-bar { border-radius: 22px; background: var(--rd-field); }
+
+/* ─────────── Меню, окна, тосты ─────────── */
+.vl-menu, .vl-modal, .vl-ucard {
+  background: var(--rd-panel); border-radius: 24px; box-shadow: var(--rd-pop-shadow), inset 0 0 0 1px var(--rd-line);
+}
+.vl-menu__item { border-radius: 16px; }
+.vl-menu__item:hover { background: var(--rd-field); }
+
+/* ─────────── Светлая тема на ПК: у сайта свои правила с html[data-theme] — перекрываем ─────────── */
+@media (min-width: 861px) {
+  html[data-theme="light"] body.vl-ready #vl-sidebar { background: var(--rd-panel); box-shadow: var(--rd-panel-shadow); }
+  html[data-theme="light"] .vl-side__search { background: var(--rd-field); }
+  html[data-theme="light"] .vl-dm:hover { background: var(--rd-field); --vl-ring: var(--rd-field); }
+  html[data-theme="light"] .vl-dm.is-active,
+  html[data-theme="light"] .vl-dm.is-active:hover { background: var(--rd-acc); --vl-ring: var(--rd-acc); box-shadow: var(--rd-lift); --ank-fill: var(--rd-acc); }
+  html[data-theme="light"] .vl-me__btn { background: transparent; }
+  html[data-theme="light"] .vl-me__btn:hover { background: var(--rd-field); }
+}
+
+/* Аватарка в выбранной строке — полупрозрачная светлая, буквы белые */
+html .vl-dm.is-active .vl-avatar:not(.has-img) { background: rgba(255, 255, 255, 0.16) !important; color: var(--rd-on-acc) !important; }
+
+/* ═══════════════ Вторая часть: вход, лобби, настройки, звонок ═══════════════ */
+:root {
+  --rd-on-bg: rgba(111, 211, 245, 0.16);   /* включённая демка/камера в тёмной — голубая */
+  --rd-on-fg: #6fd3f5;
+  --rd-on-bg-hover: rgba(111, 211, 245, 0.24);
+  --rd-tgl-on: #22c55e;
+  --rd-knob: #f2f0ec;
+  --rd-bad: #ef4444;
+  --rd-bad-wash: rgba(239, 68, 68, 0.14);
+  --rd-tile-me: #1c1c1c;
+  --rd-tile-av: #262626;
+  --danger: #ef4444;
+}
+html[data-theme="light"] {
+  --rd-on-bg: #1c1917;
+  --rd-on-fg: #ffffff;
+  --rd-on-bg-hover: #34302c;
+  --rd-tgl-on: #1c1917;
+  --rd-knob: #ffffff;
+  --rd-bad: #dc2626;
+  --rd-bad-wash: rgba(239, 68, 68, 0.12);
+  --rd-tile-me: #dcd8d2;
+  --rd-tile-av: #34302c;
+  --danger: #dc2626;
+}
+
+/* Фон экранов входа и лобби — ровный, без синих пятен */
+.auth-screen, .lobby-screen { background: var(--rd-page); }
+.auth-overlay { background: var(--rd-acc); }
+html[data-theme="light"] .auth-overlay { background: #1c1917; }
+.auth-container, .lobby-card { border-radius: 28px; background: var(--rd-panel); box-shadow: var(--rd-panel-shadow); border-color: transparent; }
+
+/* Логотип в цвет акцента: в тёмной — светлый пузырь с чёрными полосками */
+.ank-pulse .pl-bubble { fill: var(--text); }
+.ank-pulse .pl-bar { fill: var(--rd-page); }
+.ank-sigil { --lp-accent: var(--text); --lp-soft: var(--text-dim); }
+
+/* Кнопки-переключатели при входе в звонок */
+.join-toggle-btn { border-color: transparent; background: var(--rd-field); border-radius: 999px; }
+.join-toggle-btn:hover { background: var(--rd-field-hover); }
+.join-toggle-btn.on,
+html[data-theme="light"] .join-toggle-btn.on { background: var(--rd-on-bg); color: var(--rd-on-fg); border-color: transparent; --ank-fill: var(--rd-on-bg-hover); }
+.join-toggle-btn.on i { color: var(--rd-on-fg); }
+.join-toggle-btn.on:hover,
+html[data-theme="light"] .join-toggle-btn.on:hover { background: var(--rd-on-bg-hover); }
+
+/* Поля выбора и ввода */
+.dd-btn, .settings-sheet .dd-btn, html[data-theme="light"] .settings-sheet .dd-btn {
+  min-height: 50px; padding: 0 18px; border: 0; border-radius: 25px; background: var(--rd-field); font-size: 15px;
+}
+.dd-btn:hover, html[data-theme="light"] .dd-btn:hover, html[data-theme="light"] .settings-sheet .dd-btn:hover { background: var(--rd-field-hover); }
+.fld input, .settings-card input[type="text"], .settings-card input:not([type]) { border-radius: 25px; }
+
+/* Переключатели: пружинящая ручка */
+.switch__track { background: var(--rd-field-hover); }
+.switch__track::after { background: var(--rd-knob); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: transform 0.45s var(--rd-spring); }
+.switch input:checked + .switch__track { background: var(--rd-tgl-on); }
+html[data-theme="light"] .switch__track { background: #dcd8d2; }
+html[data-theme="light"] .switch input:checked + .switch__track { background: var(--rd-tgl-on); }
+
+/* Окно настроек и профиля */
+.settings-sheet, html[data-theme="light"] .settings-sheet { background: var(--rd-panel); border-radius: 28px; box-shadow: var(--rd-pop-shadow); }
+.settings-nav, html[data-theme="light"] .settings-nav { background: var(--rd-page); }
+.settings-sheet .settings-card, html[data-theme="light"] .settings-sheet .settings-card { background: var(--rd-page); box-shadow: none; border-radius: 22px; }
+html[data-theme="light"] .settings-overlay { background: rgba(28, 25, 23, 0.32); }
+.settings-nav__item.active, .settings-nav__item[aria-current="page"] { background: var(--rd-acc); color: var(--rd-on-acc); }
+html[data-theme="light"] .settings-nav__item.active, html[data-theme="light"] .settings-nav__item[aria-current="page"] { background: #1c1917; color: #fff; }
+
+/* Карточка профиля и чипы */
+.vl-pcard__banner, .vl-ucard__banner, .vl-ucard.is-saved .vl-ucard__banner { background: var(--rd-field); }
+.vl-chip.is-active { background: var(--rd-acc); color: var(--rd-on-acc); --ank-fill: var(--rd-acc-hover); }
+html[data-theme="light"] .vl-chip.is-active { background: #1c1917; color: #fff; --ank-fill: #34302c; }
+.vl-friend.is-incoming { background: var(--rd-field); }
+.vl-jump { box-shadow: var(--rd-pop-shadow); background: var(--rd-acc); color: var(--rd-on-acc); }
+.toast { --tone-bg: var(--rd-field); --tone-border: var(--rd-line); }
+
+/* ─────────── Звонок ─────────── */
+.tile, .tile .no-video-placeholder,
+.room-main.is-spotlight .sidebar-participants .tile, .room-main.is-spotlight .sidebar-participants .no-video-placeholder,
+html[data-theme="light"] .tile, html[data-theme="light"] .tile .no-video-placeholder,
+html[data-theme="light"] .room-main.is-spotlight .sidebar-participants .tile,
+html[data-theme="light"] .room-main.is-spotlight .sidebar-participants .no-video-placeholder { background: var(--rd-tile); }
+.tile.is-local, .tile.is-local .no-video-placeholder,
+html[data-theme="light"] .tile.is-local, html[data-theme="light"] .tile.is-local .no-video-placeholder { background: var(--rd-tile-me); }
+.tile .avatar-circle, html[data-theme="light"] .tile .avatar-circle {
+  background: var(--rd-tile-av); color: #f2f0ec; box-shadow: none; font-family: var(--font); font-weight: 600;
+}
+.tile.is-local .avatar-circle, html[data-theme="light"] .tile.is-local .avatar-circle { background: var(--rd-acc-hover); color: var(--rd-on-acc); }
+html[data-theme="light"] .tile.is-local .avatar-circle { background: #fbfaf8; color: #1c1917; }
+.avatar-circle { background: var(--rd-tile-av); box-shadow: none; }
+.tile.speaking, .room-main.is-spotlight .sidebar-participants .tile.speaking { box-shadow: 0 0 0 3px #22c55e; }
+.tile.speaking .avatar-circle { box-shadow: none; }
+.tile .tile-label { font-family: var(--font); font-weight: 600; color: #f2f0ec; }
+html[data-theme="light"] .tile .tile-label { color: #f2f0ec; }
+html[data-theme="light"] .tile.is-local .tile-label { color: #1c1917; }
+.tile .tile-label .host-crown { color: currentColor; }
+.solo-invite { background: var(--rd-panel); box-shadow: var(--rd-panel-shadow); }
+
+.room-topbar .room-info, .room-copy-btn { font-family: var(--font); }
+.room-copy-btn, .room-topbar .ctrl-btn, html[data-theme="light"] .room-topbar .ctrl-btn { background: var(--rd-field); color: var(--text); box-shadow: none; }
+.room-copy-btn:hover, .room-topbar .ctrl-btn:hover, html[data-theme="light"] .room-topbar .ctrl-btn:hover { background: var(--rd-field-hover); }
+.room-copy-btn i { color: var(--text); }
+html[data-theme="light"] .room-copy-btn { background: var(--rd-field); box-shadow: none; --ank-fill: var(--rd-field-hover); }
+html[data-theme="light"] .room-copy-btn:hover { background: var(--rd-field-hover); }
+
+/* Капсула управления: цвет панели, кнопки 56px в цвет поля */
+.controls-pill, html[data-theme="light"] .controls-pill {
+  padding: 8px; gap: 8px; border: 0; background: var(--rd-panel); box-shadow: var(--rd-pop-shadow), inset 0 0 0 1px var(--rd-line);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.controls-pill .ctrl-btn { width: 56px; height: 56px; transition: background-color 0.25s, color 0.25s, transform 0.45s var(--rd-spring); }
+.controls-pill .ctrl-btn:active { transform: scale(0.94); transition-duration: 0.1s; }
+.controls-pill .ctrl-btn:not(.active):not(.off):not(.danger) { background: var(--rd-field); color: var(--text); }
+.controls-pill .ctrl-btn:not(.active):not(.off):not(.danger):hover { background: var(--rd-field-hover); }
+.controls-pill .ctrl-btn.active { background: var(--rd-field); color: var(--text); --ank-fill: var(--rd-field-hover); }
+.controls-pill .ctrl-btn.active:hover { background: var(--rd-field-hover); }
+/* Включённая демонстрация: в тёмной — голубая, в светлой — чёрная */
+.controls-pill .ctrl-btn--screen.active { background: var(--rd-on-bg); color: var(--rd-on-fg); --ank-fill: var(--rd-on-bg-hover); }
+.controls-pill .ctrl-btn--screen.active:hover { background: var(--rd-on-bg-hover); }
+.controls-pill .ctrl-btn.off, .controls-pill .ctrl-btn.danger,
+html[data-theme="light"] .controls-pill .ctrl-btn.off, html[data-theme="light"] .controls-pill .ctrl-btn.danger { background: var(--rd-bad-wash); color: var(--rd-bad); --ank-fill: rgba(239, 68, 68, 0.22); }
+.controls-pill .ctrl-btn.off:hover, .controls-pill .ctrl-btn.danger:hover,
+html[data-theme="light"] .controls-pill .ctrl-btn.off:hover, html[data-theme="light"] .controls-pill .ctrl-btn.danger:hover { background: rgba(239, 68, 68, 0.22); color: var(--rd-bad); }
+.controls-pill .ctrl-btn.off .ctl-ico__cut { stroke: var(--rd-panel); }
+html[data-theme="light"] .controls-pill .ctrl-btn.off .ctl-ico__cut, html[data-theme="light"] .controls-pill .ctrl-btn.off:hover .ctl-ico__cut { stroke: var(--rd-panel); }
+.controls-sep { background: var(--rd-line); }
+.controls-pill .leave-btn { height: 56px; min-height: 56px; width: 84px; padding: 0; border-radius: 28px; background: #ef4444; --ank-fill: #dc2626; }
+.controls-pill .leave-btn:hover { background: #dc2626; }
+@media (max-width: 600px) {
+  .controls-pill .ctrl-btn { width: 48px; height: 48px; }
+  .controls-pill .leave-btn { height: 48px; min-height: 48px; width: 68px; }
+}
+@media (max-width: 380px) {
+  .controls-pill .ctrl-btn { width: 44px; height: 44px; }
+  .controls-pill .leave-btn { height: 44px; min-height: 44px; width: 60px; }
+}
+
+/* Панель участников */
+.panel-overlay .panel { background: var(--rd-panel); box-shadow: var(--rd-pop-shadow); font-family: var(--font); }
+.panel-overlay .panel h3 { font-family: var(--font); font-weight: 600; letter-spacing: -0.01em; }
+.panel-count, .panel-participant { font-family: var(--font); }
+.panel-participant { background: var(--rd-field); }
+.panel-overlay .panel-close { background: var(--rd-field); }
+.panel-overlay .panel-close:hover { background: var(--rd-field-hover); }
+
+/* Старые имена шрифтов (Unbounded, Golos Text) в правилах сайта — тоже Geist: последнее объявление побеждает */
+@font-face { font-family: 'Unbounded'; font-style: normal; font-display: swap; font-weight: 400; src: url('/static/fonts/geist/geist-cyrillic-400-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Unbounded'; font-style: normal; font-display: swap; font-weight: 400; src: url('/static/fonts/geist/geist-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Unbounded'; font-style: normal; font-display: swap; font-weight: 500; src: url('/static/fonts/geist/geist-cyrillic-500-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Unbounded'; font-style: normal; font-display: swap; font-weight: 500; src: url('/static/fonts/geist/geist-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Unbounded'; font-style: normal; font-display: swap; font-weight: 600; src: url('/static/fonts/geist/geist-cyrillic-600-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Unbounded'; font-style: normal; font-display: swap; font-weight: 600; src: url('/static/fonts/geist/geist-latin-600-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Unbounded'; font-style: normal; font-display: swap; font-weight: 700; src: url('/static/fonts/geist/geist-cyrillic-700-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Unbounded'; font-style: normal; font-display: swap; font-weight: 700; src: url('/static/fonts/geist/geist-latin-700-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Golos Text'; font-style: normal; font-display: swap; font-weight: 400; src: url('/static/fonts/geist/geist-cyrillic-400-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Golos Text'; font-style: normal; font-display: swap; font-weight: 400; src: url('/static/fonts/geist/geist-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Golos Text'; font-style: normal; font-display: swap; font-weight: 500; src: url('/static/fonts/geist/geist-cyrillic-500-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Golos Text'; font-style: normal; font-display: swap; font-weight: 500; src: url('/static/fonts/geist/geist-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Golos Text'; font-style: normal; font-display: swap; font-weight: 600; src: url('/static/fonts/geist/geist-cyrillic-600-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Golos Text'; font-style: normal; font-display: swap; font-weight: 600; src: url('/static/fonts/geist/geist-latin-600-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Golos Text'; font-style: normal; font-display: swap; font-weight: 700; src: url('/static/fonts/geist/geist-cyrillic-700-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'Golos Text'; font-style: normal; font-display: swap; font-weight: 700; src: url('/static/fonts/geist/geist-latin-700-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+/* ─────────── Поправки после скриншотов ─────────── */
+.ank-pulse .pl-bubble path { stroke: var(--text); }
+.device-preview, .device-preview video, .device-preview .no-cam { background: var(--rd-tile); border: 0; }
+.device-preview .no-cam { color: #8f8981; }
+/* Кнопки «Камера/Микрофон» при входе — как в звонке: включено — цвет поля, выключено — красная подложка */
+.join-toggle-btn, html[data-theme="light"] .join-toggle-btn { background: var(--rd-bad-wash); color: var(--rd-bad); --ank-fill: rgba(239, 68, 68, 0.22); }
+.join-toggle-btn:hover, html[data-theme="light"] .join-toggle-btn:hover { background: rgba(239, 68, 68, 0.22); color: var(--rd-bad); }
+.join-toggle-btn i { color: currentColor; }
+.join-toggle-btn.on, html[data-theme="light"] .join-toggle-btn.on { background: var(--rd-field); color: var(--text); --ank-fill: var(--rd-field-hover); }
+.join-toggle-btn.on i { color: currentColor; }
+.join-toggle-btn.on:hover, html[data-theme="light"] .join-toggle-btn.on:hover { background: var(--rd-field-hover); color: var(--text); }
