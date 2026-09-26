@@ -93,6 +93,62 @@ function el(tag, attrs = {}, children = []) {
   return node
 }
 
+// ---- Иконки из канваса «Голос» (тонкие линии). gIcon('mic', 22) ----
+const G_ICONS = {
+  logo: '<path stroke-width="2.4" d="M6 10v4M10 7v10M14 9v6M18 11v2"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+  cam: '<rect x="3" y="6" width="13" height="12" rx="3"/><path d="M16 10l5-3v10l-5-3"/>',
+  spk: '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/>',
+  chev: '<path stroke-width="2.4" d="M6 9l6 6 6-6"/>',
+  check: '<path stroke-width="2.8" d="M5 12.5l4.5 4.5L19 7.5"/>',
+  screen: '<rect x="3" y="4" width="18" height="13" rx="2.5"/><path d="M8 21h8M12 17v4"/>',
+  sliders: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle class="i-kr" cx="16" cy="7" r="2"/><circle class="i-kl" cx="10" cy="17" r="2"/>',
+  hang: '<path d="M3 15.2v-2a2.2 2.2 0 0 1 1.2-2C6.6 10 9.2 9.4 12 9.4s5.4.6 7.8 1.8a2.2 2.2 0 0 1 1.2 2v2a1.2 1.2 0 0 1-1.5 1.2l-2.9-.8a1.2 1.2 0 0 1-.9-1.1l-.1-1.7c-1.1-.4-2.3-.6-3.6-.6s-2.5.2-3.6.6l-.1 1.7a1.2 1.2 0 0 1-.9 1.1l-2.9.8A1.2 1.2 0 0 1 3 15.2z"/>',
+  link: '<path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/>',
+  people: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
+  x: '<path stroke-width="2.4" d="M6 6l12 12M18 6L6 18"/>',
+  crown: '<path d="M4.6 18 3 9.3l5 3.7L12 6.5l4 6.5 5-3.7L19.4 18z"/>',
+  micOff: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M4 4l16 16"/>',
+  kick: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 11-4.6M16 15l5 5M21 15l-5 5"/>',
+  expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+  compress: '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'
+}
+function gIcon(name, size = 20, extra = '') {
+  const t = document.createElement('template')
+  t.innerHTML = `<svg class="g-svg${extra ? ' ' + extra : ''}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${G_ICONS[name] || ''}</svg>`
+  return t.content.firstElementChild
+}
+// Микрофон/камера с чертой: черта прочерчивается сверху вниз, под ней значок вырезан маской
+let gMaskSeq = 0
+function svgToggleIcon(kind, size = 22) {
+  const id = 'gcut' + (++gMaskSeq)
+  const d = kind === 'cam' ? 'M3 3.5 20.5 21' : 'M4 3.5 20.5 20'
+  const t = document.createElement('template')
+  t.innerHTML = `<svg class="g-svg g-tsvg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"/><path class="g-cut" d="${d}" pathLength="1"/></mask></defs><g mask="url(#${id})">${G_ICONS[kind]}</g><path class="g-slash" stroke-width="2.2" d="${d}" pathLength="1"/></svg>`
+  return t.content.firstElementChild
+}
+// Шапка экранов звонка: лого «Голос» и серый подзаголовок
+function gCallHeader(subtitle, extra = []) {
+  return el('header', { class: 'g-callhead' }, [gHomeLink(subtitle), el('span', { class: 'g-callhead__spacer' }), ...extra])
+}
+// «Голос · …» слева в шапке экранов звонка: по нажатию — к чатам (звонок, если идёт, продолжится)
+function gHomeLink(subtitle) {
+  const a = el('a', { href: '/friends', class: 'g-callhead__home', title: 'К чатам' }, [
+    el('span', { class: 'g-callhead__logo' }, [gIcon('logo', 20)]),
+    el('span', { class: 'g-callhead__name' }, 'Голос'),
+    el('span', { class: 'g-callhead__sub' }, '· ' + subtitle)
+  ])
+  a.addEventListener('click', (e) => {
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return
+    e.preventDefault()
+    if (a.closest('.in-pip')) return
+    if (typeof VL.goChats === 'function') VL.goChats()
+    else location.assign('/')
+  })
+  return a
+}
+
 // Типы уведомлений: info (синий), success (зелёный), warning (жёлтый), error (красный)
 const TOAST_ICONS = {
   info: 'fas fa-circle-info',
@@ -132,7 +188,8 @@ function showToast(message, type = 'info') {
 }
 
 function initials(name) {
-  return (name || '?').trim().slice(0, 2).toUpperCase()
+  // Одна буква, как в канвасе «Голос»
+  return (Array.from(String(name || '?').trim())[0] || '?').toUpperCase()
 }
 
 // ---- Копирование в буфер обмена: сайт + .exe ----
@@ -257,6 +314,39 @@ function makeSwitchRow(labelText, checked, onChange) {
     el('span', { class: 'settings-row__text' }, labelText),
     el('span', { class: 'switch' }, [input, el('span', { class: 'switch__track', 'aria-hidden': 'true' })])
   ])
+}
+
+// Строка-переключатель как .urow в канвасе: заголовок, подпись и пружинящий тумблер
+function gToggleRow(title, sub, checked, onChange) {
+  const tgl = el('span', { class: 'g-tgl', 'data-on': checked ? '1' : '0' })
+  const row = el('button', { type: 'button', class: 'g-urow', role: 'switch', 'aria-checked': checked ? 'true' : 'false' }, [
+    el('span', { class: 'g-urow__t' }, [el('b', {}, title), sub ? el('span', {}, sub) : null]),
+    tgl
+  ])
+  row.addEventListener('click', () => {
+    const on = tgl.dataset.on !== '1'
+    tgl.dataset.on = on ? '1' : '0'
+    row.setAttribute('aria-checked', on ? 'true' : 'false')
+    onChange(on)
+  })
+  return row
+}
+// Сегменты с едущей плашкой (.useg в канвасе)
+function gSeg(options, value, onPick) {
+  const knob = el('span', { class: 'g-seg__k' })
+  const box = el('div', { class: 'g-seg', role: 'radiogroup' }, [knob])
+  const btns = options.map(([id, label], i) => {
+    const b = el('button', { type: 'button', role: 'radio' }, label)
+    b.addEventListener('click', () => { set(i); onPick(id) })
+    box.appendChild(b)
+    return b
+  })
+  function set(i) {
+    knob.style.setProperty('--i', String(i))
+    btns.forEach((b, j) => { b.dataset.on = j === i ? '1' : '0'; b.setAttribute('aria-checked', j === i ? 'true' : 'false') })
+  }
+  set(Math.max(0, options.findIndex(([id]) => id === value)))
+  return box
 }
 
 // ---- Выбор устройств: один компонент для лобби и для окна «Настройки» в звонке ----
@@ -407,7 +497,7 @@ function closeDropdown(returnFocus = false) {
   if (returnFocus) { try { btn.focus() } catch {} }
 }
 
-function makeDropdown(select) {
+function makeDropdown(select, iconName = '') {
   // На iPhone и Mac системный список выбора аккуратный и привычный — оставляем его
   if (IS_APPLE) {
     select.classList.add('native-select')
@@ -416,8 +506,9 @@ function makeDropdown(select) {
   select.hidden = true
   const label = el('span', { class: 'dd-label' })
   const btn = el('button', { type: 'button', class: 'dd-btn', 'aria-haspopup': 'listbox', 'aria-expanded': 'false' }, [
+    iconName ? gIcon(iconName, 18, 'dd-ico') : null,
     label,
-    el('i', { class: 'fas fa-chevron-down dd-chevron', 'aria-hidden': 'true' })
+    gIcon('chev', 16, 'dd-chevron')
   ])
   if (select.getAttribute('aria-label')) btn.setAttribute('aria-label', select.getAttribute('aria-label'))
   const wrap = el('div', { class: 'dd' }, [select, btn])
@@ -450,7 +541,7 @@ function makeDropdown(select) {
         tabindex: '-1',
         'aria-selected': String(o.value === select.value),
         title: o.textContent
-      }, [el('span', { class: 'dd-item-text' }, o.textContent), el('i', { class: 'fas fa-check dd-check', 'aria-hidden': 'true' })])
+      }, [el('span', { class: 'dd-item-text' }, o.textContent), gIcon('check', 16, 'dd-check')])
       item.addEventListener('click', (e) => { e.stopPropagation(); choose(o.value) })
       return item
     })
@@ -806,59 +897,43 @@ async function renderLobby(prefillRoomCode = '') {
   const params = new URLSearchParams(location.search)
   const urlRoom = prefillRoomCode || (location.pathname.startsWith('/room/') ? location.pathname.split('/room/')[1] : '') || params.get('room') || ''
 
-  const screen = el('div', { class: 'lobby-screen' })
-  const card = el('div', { class: 'lobby-card' })
+  // ---- Разметка как в канвасе «Вход в звонок»: слева превью, справа карточка ----
+  const me = state.currentUser
+  const myName = me.displayName || me.username
+  const screen = el('div', { class: 'lobby-screen g-join' })
+  const errorSlot = el('div', { class: 'g-join__err', style: 'display:none' })
 
-  card.appendChild(el('h1', {}, 'Voice Lobby'))
-
-  const userBar = el('div', { class: 'lobby-userbar' })
-  userBar.appendChild(el('span', {}, [el('i', { class: 'fas fa-user' }), ` ${state.currentUser.displayName || state.currentUser.username}`]))
-  const logoutBtn = el('button', { type: 'button', class: 'lobby-logout-btn' }, 'Выйти')
-  logoutBtn.addEventListener('click', async () => {
-    try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }) } catch {}
-    state.currentUser = null
-    if (typeof VL.onLogout === 'function') VL.onLogout()
-    else renderAuthScreen()
-  })
-  userBar.appendChild(logoutBtn)
-  card.appendChild(userBar)
-
-  const errorSlot = el('div', { style: 'display:none' })
-  card.appendChild(errorSlot)
-
-  // Device preview
-  const preview = el('div', { class: 'device-preview' })
+  // Превью: камера или крупная буква; сверху — индикатор микрофона, снизу — имя и кнопки
+  const preview = el('div', { class: 'device-preview g-join__prev' })
   const previewVideo = el('video', { autoplay: true, muted: true, playsinline: true, 'webkit-playsinline': 'true' })
   watchLocalMirror(previewVideo) // задняя камера — без зеркала
-  const noCam = el('div', { class: 'no-cam' }, 'Камера отключена')
+  const noCam = el('div', { class: 'no-cam g-join__noc' }, [el('span', { class: 'g-join__ava' }, (Array.from(String(myName).trim())[0] || '?').toUpperCase())])
+  const micDots = el('span', { class: 'lvl-dots g-meter', 'aria-hidden': 'true' })
+  for (let i = 0; i < 12; i++) micDots.appendChild(el('i', {}))
+  const micState = el('span', {}, state.micEnabled ? 'Микрофон работает' : 'Микрофон выключен')
+  const meterPill = el('div', { class: 'g-join__meter' }, [micDots, micState])
+  const namePill = el('div', { class: 'g-join__name' }, myName)
+  const micToggleBtn = el('button', { type: 'button', class: 'g-cb join-toggle-btn', 'aria-label': 'Микрофон', title: 'Микрофон' }, [svgToggleIcon('mic')])
+  const camToggleBtn = el('button', { type: 'button', class: 'g-cb join-toggle-btn', 'aria-label': 'Камера', title: 'Камера' }, [svgToggleIcon('cam')])
   preview.appendChild(previewVideo)
   preview.appendChild(noCam)
-  card.appendChild(preview)
+  preview.appendChild(meterPill)
+  preview.appendChild(namePill)
+  preview.appendChild(el('div', { class: 'g-join__cbar' }, [micToggleBtn, camToggleBtn]))
 
-  // ---- Переключатели: с чем входить в звонок (камера/микрофон вкл/выкл) ----
-  const joinToggles = el('div', { class: 'join-toggles' })
-  function makeJoinToggle(iconOnClass, iconOffClass, labelText, initialOn) {
-    const btn = el('button', { type: 'button', class: `join-toggle-btn ${initialOn ? 'on' : 'off'}` }, [
-      el('i', { class: initialOn ? iconOnClass : iconOffClass }),
-      el('span', {}, labelText)
-    ])
-    return btn
-  }
-  const camToggleBtn = makeJoinToggle('fas fa-video', 'fas fa-video-slash', 'Камера', state.cameraEnabled)
-  const micToggleBtn = makeJoinToggle('fas fa-microphone', 'fas fa-microphone-slash', 'Микрофон', state.micEnabled)
-  joinToggles.appendChild(camToggleBtn)
-  joinToggles.appendChild(micToggleBtn)
-  card.appendChild(joinToggles)
-
-  function setJoinToggle(btn, on, iconOnClass, iconOffClass) {
+  function setJoinToggle(btn, on) {
+    btn.dataset.off = on ? '0' : '1'
     btn.classList.toggle('on', on)
     btn.classList.toggle('off', !on)
-    btn.querySelector('i').className = on ? iconOnClass : iconOffClass
   }
+  setJoinToggle(micToggleBtn, state.micEnabled)
+  setJoinToggle(camToggleBtn, state.cameraEnabled)
+  preview.dataset.cam = state.cameraEnabled ? '1' : '0'
 
   camToggleBtn.addEventListener('click', async () => {
     state.cameraEnabled = !state.cameraEnabled
-    setJoinToggle(camToggleBtn, state.cameraEnabled, 'fas fa-video', 'fas fa-video-slash')
+    setJoinToggle(camToggleBtn, state.cameraEnabled)
+    preview.dataset.cam = state.cameraEnabled ? '1' : '0'
     if (state.cameraEnabled) {
       await switchCamera(state.selectedCamId)
     } else {
@@ -873,30 +948,39 @@ async function renderLobby(prefillRoomCode = '') {
 
   micToggleBtn.addEventListener('click', async () => {
     state.micEnabled = !state.micEnabled
-    setJoinToggle(micToggleBtn, state.micEnabled, 'fas fa-microphone', 'fas fa-microphone-slash')
+    setJoinToggle(micToggleBtn, state.micEnabled)
+    micState.textContent = state.micEnabled ? 'Микрофон работает' : 'Микрофон выключен'
+    meterPill.classList.toggle('is-off', !state.micEnabled)
     if (state.micEnabled) {
       await startMicMonitor(state.selectedMicId)
     } else {
       stopMicMonitor()
     }
   })
+  meterPill.classList.toggle('is-off', !state.micEnabled)
 
-  // ---- Выбор устройств ввода/вывода (те же карточки, что в окне настроек звонка) ----
-  const devices = buildDeviceCards()
-  const { micSelect, spkSelect, camSelect } = devices
-  card.appendChild(el('div', { class: 'device-settings' }, [devices.micCard, devices.spkCard, devices.camCard]))
+  // Карточка: код комнаты, устройства, «Войти в звонок»
+  const micSelect = el('select', { 'aria-label': 'Микрофон' })
+  const spkSelect = el('select', { 'aria-label': 'Динамики' })
+  const camSelect = el('select', { 'aria-label': 'Камера' })
+  const devices = { micSelect, spkSelect, camSelect, micDots }
+  const field = (label, control) => el('div', { class: 'g-join__f' }, [el('span', { class: 'g-join__label' }, label), control])
+  const roomInput = el('input', { type: 'text', class: 'g-join__inp', placeholder: 'Код комнаты', value: urlRoom, autocomplete: 'off', spellcheck: 'false' })
+  const spkField = field('Динамики', makeDropdown(spkSelect, 'spk'))
+  if (!speakerSelectionSupported()) spkField.style.display = 'none'
+  const joinBtn = el('button', { type: 'button', class: 'g-join__btn' }, 'Войти в звонок')
+  const card = el('div', { class: 'g-join__card' }, [
+    el('span', { class: 'g-join__title' }, 'Войти в звонок'),
+    field('Код комнаты', roomInput),
+    field('Микрофон', makeDropdown(micSelect, 'mic')),
+    spkField,
+    field('Камера', makeDropdown(camSelect, 'cam')),
+    errorSlot,
+    joinBtn
+  ])
 
-  const roomInput = el('input', {
-    type: 'text',
-    placeholder: 'Код комнаты (оставьте пустым — создать новую)',
-    value: urlRoom
-  })
-  card.appendChild(roomInput)
-
-  const joinBtn = el('button', {}, urlRoom ? 'Войти в комнату' : 'Создать / войти')
-  card.appendChild(joinBtn)
-
-  screen.appendChild(card)
+  screen.appendChild(gCallHeader('Вход в звонок'))
+  screen.appendChild(el('div', { class: 'g-join__body' }, [preview, card]))
   root.appendChild(screen)
 
   // ---- Управление превью камеры ----
@@ -1014,7 +1098,7 @@ async function renderLobby(prefillRoomCode = '') {
     const savedHostSecret = roomCode ? localStorage.getItem(`hostSecret:${roomCode}`) : null
 
     joinBtn.disabled = true
-    joinBtn.textContent = 'Подключение...'
+    joinBtn.replaceChildren(el('span', { class: 'g-spin' }), 'Подключаемся…')
     errorSlot.style.display = 'none'
 
     try {
@@ -1046,10 +1130,10 @@ async function renderLobby(prefillRoomCode = '') {
       await enterRoom(data)
     } catch (e) {
       errorSlot.style.display = 'block'
-      errorSlot.className = 'error-box'
+      errorSlot.className = 'error-box g-join__err'
       errorSlot.textContent = e.message || 'Ошибка подключения. Проверьте интернет-соединение.'
       joinBtn.disabled = false
-      joinBtn.textContent = urlRoom ? 'Войти в комнату' : 'Создать / войти'
+      joinBtn.textContent = 'Войти в звонок'
     }
   }
 
@@ -1096,7 +1180,10 @@ async function enterRoom(joinData) {
   const callTimer = el('span', { class: 'room-timer', 'aria-label': 'Длительность звонка' }, '0:00')
   // Качество связи (после подключения — вместо точки): три полоски как у сигнала телефона,
   // по наведению/нажатию — карточка с пингом и параметрами вашего видео.
-  const connBars = el('span', { class: 'conn-bars', 'aria-hidden': 'true' }, [el('i'), el('i'), el('i')])
+  const connBars = el('span', { class: 'conn-bars', 'aria-hidden': 'true' }, [el('i'), el('i'), el('i'), el('i')])
+  // В капсуле шапки, как в канвасе: полоски связи · «24 мс» | секундомер
+  const pingPill = el('span', { class: 'g-ping' }, '— мс')
+  const pillSep = el('span', { class: 'g-pill-sep', 'aria-hidden': 'true' })
   const connTitle = el('span', { class: 'conn-card__title' }, 'Связь определяется…')
   const connPing = el('span', { class: 'conn-card__val' }, '—')
   const connVideo = el('span', { class: 'conn-card__val' }, '—')
@@ -1114,14 +1201,14 @@ async function enterRoom(joinData) {
     connScreenRow,
     connLimitRow
   ])
-  const roomStatus = el('span', { class: 'room-status', role: 'status', tabindex: '0' }, [statusDot, connBars, statusText, callTimer, connCard])
+  const roomStatus = el('span', { class: 'room-status', role: 'status', tabindex: '0' }, [statusDot, connBars, statusText, pingPill, pillSep, callTimer, connCard])
   roomInfo.appendChild(roomStatus)
   roomInfo.dataset.q = 'unknown'
   // Шапка как в макете «Голос — звонок»: слева логотип, по центру ничего; справа секундомер
   // и связь, «Скопировать ссылку» и «Участники». Код комнаты и корона в шапке больше не нужны.
   const topRight = el('div', { class: 'room-topbar__right' })
   topRight.appendChild(roomInfo)
-  const copyLinkIcon = el('i', { class: 'fas fa-link', 'aria-hidden': 'true' })
+  const copyLinkIcon = el('span', { class: 'g-copy-ico', 'aria-hidden': 'true' }, [gIcon('link', 18, 'g-copy-ico__link'), gIcon('check', 18, 'g-copy-ico__ok')])
   const copyLinkLabel = el('span', { class: 'room-copy-btn__label' }, 'Скопировать ссылку')
   const copyLinkBtn = el('button', { type: 'button', class: 'room-copy-btn', title: 'Скопировать ссылку на звонок', 'aria-label': 'Скопировать ссылку на звонок' }, [copyLinkIcon, copyLinkLabel])
   // Как у кнопки в карточке приглашения: зелёная «Ссылка скопирована» держится, пока курсор
@@ -1132,7 +1219,6 @@ async function enterRoom(joinData) {
     clearTimeout(copyLinkTimer)
     copyLinkTimer = setTimeout(() => {
       copyLinkBtn.classList.remove('is-copied')
-      copyLinkIcon.className = 'fas fa-link'
       copyLinkLabel.textContent = 'Скопировать ссылку'
     }, 2200)
   }
@@ -1145,7 +1231,6 @@ async function enterRoom(joinData) {
     const ok = await copyToClipboard(location.href)
     if (!ok) { showToast('Не удалось скопировать ссылку', 'error'); return }
     copyLinkBtn.classList.add('is-copied')
-    copyLinkIcon.className = 'fas fa-check'
     copyLinkLabel.textContent = 'Ссылка скопирована'
     clearTimeout(copyLinkTimer)
     if (!copyLinkHovered) resetCopyLinkSoon()
@@ -1166,15 +1251,13 @@ async function enterRoom(joinData) {
   // В шапке кнопки «в отдельном окне» больше нет (по просьбе); сама функция осталась в коде
   // Значок «Участники» — два человека (как в макете «Голос — звонок»): при наведении
   // передний коротко подпрыгивает, задний чуть позже сдвигается к нему
-  const participantsBtn = el('button', {
-    class: 'ctrl-btn room-people-btn',
-    title: 'Участники',
-    'aria-label': 'Участники',
-    html: '<svg class="room-people-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<g class="room-people-ico__back"><path d="M16 3.5a4 4 0 0 1 0 8"/><path d="M22 21a7 7 0 0 0-4-6.3"/></g>' +
-      '<g class="room-people-ico__front"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/></g></svg>'
-  })
+  const pplCount = el('span', { class: 'g-ppl-count' }, '1')
+  const participantsBtn = el('button', { type: 'button', class: 'room-people-btn g-ppl-btn', title: 'Участники', 'aria-label': 'Участники', 'aria-pressed': 'false' }, [gIcon('people', 20, 'g-ico-pop'), pplCount])
   topRight.appendChild(participantsBtn)
+  // Слева — «Голос · Звонок»; по нажатию возвращаемся к чатам, звонок продолжается
+  const homeLink = gHomeLink('Звонок')
+  topbar.appendChild(homeLink)
+  topbar.appendChild(el('span', { class: 'g-callhead__spacer' }))
   topbar.appendChild(topRight)
 
   screen.appendChild(topbar)
@@ -1193,32 +1276,14 @@ async function enterRoom(joinData) {
   // Микрофон и камера — свои SVG-иконки с чертой: при выключении (класс .off у кнопки)
   // черта «прочерчивается» поверх значка, при включении втягивается обратно (CSS).
   // Под чертой значок вырезан маской — черта не сливается с ним.
-  const micBtn = el('button', { class: 'ctrl-btn active', title: 'Микрофон' }, [svgIcon(`
-    <svg class="ctl-ico" viewBox="0 0 24 24" aria-hidden="true">
-      <defs><mask id="vl-mask-mic" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
-        <rect width="24" height="24" fill="#fff"/><path class="ctl-ico__cut" d="M4 3.5 20.5 20" pathLength="1"/></mask></defs>
-      <g mask="url(#vl-mask-mic)">
-        <rect x="8.5" y="2.5" width="7" height="12" rx="3.5" fill="currentColor"/>
-        <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      </g>
-      <path class="ctl-ico__slash" d="M4 3.5 20.5 20" pathLength="1"/>
-    </svg>`)])
-  const camBtn = el('button', { class: 'ctrl-btn active', title: 'Камера' }, [svgIcon(`
-    <svg class="ctl-ico" viewBox="0 0 24 24" aria-hidden="true">
-      <defs><mask id="vl-mask-cam" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
-        <rect width="24" height="24" fill="#fff"/><path class="ctl-ico__cut" d="M3 3.5 20.5 21" pathLength="1"/></mask></defs>
-      <g mask="url(#vl-mask-cam)">
-        <rect x="2.5" y="6" width="13.5" height="12" rx="3" fill="currentColor"/>
-        <path d="M17 10.2 21.5 7.4v9.2L17 13.8z" fill="currentColor"/>
-      </g>
-      <path class="ctl-ico__slash" d="M3 3.5 20.5 21" pathLength="1"/>
-    </svg>`)])
-  const screenBtn = el('button', { class: 'ctrl-btn ctrl-btn--screen', title: 'Демонстрация экрана' }, [el('i', { class: 'fas fa-desktop' })])
+  const micBtn = el('button', { class: 'ctrl-btn active', title: 'Микрофон', 'aria-label': 'Микрофон' }, [svgToggleIcon('mic', 22)])
+  const camBtn = el('button', { class: 'ctrl-btn active', title: 'Камера', 'aria-label': 'Камера' }, [svgToggleIcon('cam', 22)])
+  const screenBtn = el('button', { class: 'ctrl-btn ctrl-btn--screen', title: 'Демонстрация экрана', 'aria-label': 'Демонстрация экрана' }, [gIcon('screen', 22, 'g-ico-hop')])
   const screenCountBadge = el('span', { class: 'badge-count', style: 'display:none' }, '0')
   screenBtn.appendChild(screenCountBadge)
   // Кнопка настроек устройств — сразу справа от демонстрации: микрофон, камера
   // и динамики переключаются прямо во время звонка через всплывающую панель ниже.
-  const settingsBtn = el('button', { class: 'ctrl-btn ctrl-btn--settings', title: 'Настройки устройств' }, [el('i', { class: 'fas fa-gear' })])
+  const settingsBtn = el('button', { class: 'ctrl-btn ctrl-btn--settings', title: 'Настройки', 'aria-label': 'Настройки' }, [gIcon('sliders', 22)])
   // Видна только в отдельном окне: возвращает звонок в основное окно
   const popInBtn = el('button', {
     class: 'ctrl-btn ctrl-btn--pop-in',
@@ -1236,8 +1301,7 @@ async function enterRoom(joinData) {
   const controlsPill = el('div', { class: 'controls-pill' })
   // «Выйти» — красная кнопка с трубкой внутри той же капсулы, после разделителя.
   // Трубка — Material Icons «call_end» (Apache 2.0); при наведении один раз качается.
-  const leaveBtn = el('button', { type: 'button', class: 'leave-btn', title: 'Выйти из звонка', 'aria-label': 'Выйти из звонка' }, [svgIcon(`
-    <svg class="leave-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08a.96.96 0 0 1 0-1.36C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.72c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.69-1.36-2.67-1.85a1 1 0 0 1-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/></svg>`)])
+  const leaveBtn = el('button', { type: 'button', class: 'leave-btn', title: 'Выйти из звонка', 'aria-label': 'Выйти из звонка' }, [gIcon('hang', 26, 'g-ico-rock')])
 
   controlsPill.appendChild(micBtn)
   controlsPill.appendChild(camBtn)
@@ -1501,6 +1565,7 @@ async function enterRoom(joinData) {
       }
     }
     connPing.textContent = rtt === null ? '—' : `${Math.round(rtt * 1000)} мс`
+    pingPill.textContent = rtt === null ? '— мс' : `${Math.round(rtt * 1000)} мс`
     connVideoRow.hidden = !lp.isCameraEnabled
     if (lp.isCameraEnabled) connVideo.textContent = fmtVideo(video)
     connScreenRow.hidden = !lp.isScreenShareEnabled
@@ -1544,7 +1609,7 @@ async function enterRoom(joinData) {
   function getSoloInviteCard() {
     if (soloInviteCard) return soloInviteCard
 
-    const btnIcon = el('i', { class: 'fas fa-link' })
+    const btnIcon = el('span', { class: 'g-copy-ico', 'aria-hidden': 'true' }, [gIcon('link', 18, 'g-copy-ico__link'), gIcon('check', 18, 'g-copy-ico__ok')])
     const btnLabel = el('span', {}, 'Скопировать ссылку')
     const copyBtn = el('button', { type: 'button', class: 'solo-copy-btn' }, [btnIcon, btnLabel])
 
@@ -1559,7 +1624,6 @@ async function enterRoom(joinData) {
       }
       // Короткое подтверждение прямо на кнопке + тост
       copyBtn.classList.add('is-copied')
-      btnIcon.className = 'fas fa-check'
       btnLabel.textContent = 'Ссылка скопирована'
       showToast('Ссылка на звонок скопирована', 'success')
       // Под курсором кнопка остаётся зелёной сколько угодно; назад в «Скопировать ссылку»
@@ -1574,7 +1638,6 @@ async function enterRoom(joinData) {
       clearTimeout(soloCopyTimer)
       soloCopyTimer = setTimeout(() => {
         copyBtn.classList.remove('is-copied')
-        btnIcon.className = 'fas fa-link'
         btnLabel.textContent = 'Скопировать ссылку'
       }, 2200)
     }
@@ -1633,12 +1696,16 @@ async function enterRoom(joinData) {
     // экран" после выхода из fullscreen). Теперь источник правды - Map'ы тайлов, а DOM приводится
     // к нужному виду инкрементально (placeTiles): при обычном ресайзе узлы не переставляются
     // вовсе, трек не переподключается, демонстрация не мигает и не может пропасть.
+    pplCount.textContent = String(Math.max(1, cameraTilesMap.size))
+    // Панель участников объявлена ниже (после подключения) — до этого просто пропускаем
+    try { refreshPeoplePanel() } catch {}
     const screenTiles = Array.from(screenTilesMap.values(), (t) => t.tile)
     const cameraTiles = Array.from(cameraTilesMap.values(), (t) => t.tile)
     const hasScreenShares = screenTiles.length > 0
     // "Я один в комнате" - особая раскладка с приглашением (см. getSoloInviteCard)
     const isSolo = !hasScreenShares && cameraTiles.length === 1
-    const isSpotlight = !hasScreenShares && cameraTiles.length >= 2
+    // Как в канвасе: камеры — равной сеткой плиток 16:9 (без «главного» участника)
+    const isSpotlight = false
     // Две демонстрации рядом имеют смысл только на очень широкой сцене: паре кадров 16:9
     // нужна пропорция около 32:9, иначе друг под другом они получаются заметно крупнее
     // (на телефоне и в узком окне — тем более). Считаем по фактической сцене, а не по ширине окна.
@@ -1646,6 +1713,7 @@ async function enterRoom(joinData) {
     const stageRatio = stageH > 0 ? stage.clientWidth / stageH : 1.6
     const sideBySideScreens = screenTiles.length > 1 && stageRatio >= 3.1
 
+    stage.classList.toggle('g-grid', !hasScreenShares)
     stage.classList.toggle('stage-solo', isSolo)
     stage.classList.toggle('stage-centered', !isSolo && !isSpotlight)
     stage.classList.toggle('stage-spotlight', isSpotlight)
@@ -1674,6 +1742,11 @@ async function enterRoom(joinData) {
     } else {
       cameraTilesMap.forEach((t) => t.tile.classList.remove('is-main'))
       placeTiles(stage, isSolo ? cameraTiles.concat([getSoloInviteCard()]) : cameraTiles)
+      const n = isSolo ? 2 : cameraTiles.length
+      const wide = stageRatio >= 1.2
+      const cols = n <= 1 ? 1 : n <= 2 ? (wide ? 2 : 1) : n <= 4 ? 2 : n <= 6 ? (wide ? 3 : 2) : 3
+      stage.style.setProperty('--cols', String(cols))
+      stage.style.setProperty('--rows', String(Math.ceil(n / cols)))
       placeTiles(sidebar, [])
       sidebar.style.display = 'none'
     }
@@ -1744,32 +1817,70 @@ async function enterRoom(joinData) {
   }
 
   // ---- Регулятор громкости (слайдер + иконка), общий для камеры и демонстрации ----
+  // ---- Громкость участника — «резиновая капсула» из канваса: чёрная капсула, белая полоса
+  // без ручки; тянешь за край — вся капсула упруго тянется. Значок динамика — выключить звук.
+  // Шкала 0…150% (как раньше), полоса заполняется пропорционально.
+  const VOL_MAX = 1.5
   function makeVolumeControl(onChange, initial = 1) {
-    const wrap = el('div', { class: 'volume-control' })
-    const icon = el('i', { class: 'fas fa-volume-high' })
-    const slider = el('input', { type: 'range', min: '0', max: '150', value: String(Math.round(initial * 100)) })
-    wrap.appendChild(icon)
-    wrap.appendChild(slider)
-    slider.addEventListener('input', (e) => {
+    const t = document.createElement('template')
+    t.innerHTML = '<svg class="g-vol__spk" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 9.5h3.5L11 5.5v13l-4.5-4H3z"/><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path class="w1" d="M14 10a3 3 0 0 1 0 4"/><path class="w2" d="M16.5 8a6 6 0 0 1 0 8"/><path class="w3" d="M19 6a9 9 0 0 1 0 12"/><path class="vx" d="M15 9.5l5 5M20 9.5l-5 5"/></g></svg>'
+    const spk = t.content.firstElementChild
+    const fill = el('div', { class: 'g-vol__fl' })
+    const track = el('div', { class: 'g-vol__tr' }, [fill])
+    const spkBtn = el('button', { type: 'button', class: 'g-vol__btn', 'aria-label': 'Выключить звук участника' }, [spk])
+    const wrap = el('div', { class: 'volume-control g-vol', role: 'slider', 'aria-label': 'Громкость', 'aria-valuemin': '0', 'aria-valuemax': '150', tabindex: '0' }, [spkBtn, track])
+    let value = initial
+    let beforeMute = initial > 0 ? initial : 1
+    function paint(v) {
+      value = Math.max(0, Math.min(VOL_MAX, v))
+      fill.style.width = (value / VOL_MAX * 100) + '%'
+      fill.dataset.zero = value === 0 ? '1' : '0'
+      spk.dataset.lvl = value === 0 ? '0' : value < 0.4 ? '1' : value < 0.9 ? '2' : '3'
+      wrap.setAttribute('aria-valuenow', String(Math.round(value * 100)))
+    }
+    wrap._set = paint
+    paint(initial)
+    function setFromX(x) {
+      const r = track.getBoundingClientRect()
+      const k = (x - r.left) / r.width
+      // За краем — капсула тянется (резина), значение упирается в край
+      const over = k < 0 ? k * r.width : k > 1 ? (k - 1) * r.width : 0
+      wrap.style.transform = over ? `translateX(${Math.sign(over) * Math.min(14, Math.sqrt(Math.abs(over)) * 2)}px) scaleX(${1 + Math.min(0.06, Math.abs(over) / 900)})` : ''
+      paint(Math.max(0, Math.min(1, k)) * VOL_MAX)
+      if (value > 0) beforeMute = value
+      onChange(value)
+    }
+    let dragging = false
+    wrap.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.g-vol__btn')) return
       e.stopPropagation()
-      const v = Number(slider.value) / 100
-      icon.className = v === 0 ? 'fas fa-volume-xmark' : v < 0.5 ? 'fas fa-volume-low' : 'fas fa-volume-high'
-      onChange(v)
+      dragging = true
+      wrap.dataset.drag = '1'
+      try { wrap.setPointerCapture(e.pointerId) } catch {}
+      setFromX(e.clientX)
+    })
+    wrap.addEventListener('pointermove', (e) => { if (dragging) setFromX(e.clientX) })
+    const end = () => { if (!dragging) return; dragging = false; wrap.dataset.drag = '0'; wrap.style.transform = '' }
+    wrap.addEventListener('pointerup', end)
+    wrap.addEventListener('pointercancel', end)
+    wrap.addEventListener('wheel', (e) => { e.preventDefault(); paint(value - Math.sign(e.deltaY) * 0.1); if (value > 0) beforeMute = value; onChange(value) }, { passive: false })
+    wrap.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); paint(value + 0.1); onChange(value) }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); paint(value - 0.1); onChange(value) }
+    })
+    spkBtn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      if (value > 0) { beforeMute = value; paint(0) } else paint(beforeMute || 1)
+      onChange(value)
     })
     wrap.addEventListener('click', (e) => e.stopPropagation())
     wrap.addEventListener('dblclick', (e) => e.stopPropagation())
     return wrap
   }
 
-  // Обновить визуальное состояние (значение слайдера + иконка) уже существующего .volume-control
-  // на тайле (камера/демонстрация) - используется, чтобы слайдер в контекстном меню и штатный
-  // регулятор громкости на самом тайле оставались синхронизированы между собой.
+  // Синхронизировать капсулу громкости на тайле с меню демонстрации (оба управляют одним значением)
   function syncVolumeControlUI(wrap, v) {
-    if (!wrap) return
-    const slider = wrap.querySelector('input[type="range"]')
-    const icon = wrap.querySelector('i')
-    if (slider) slider.value = String(Math.round(v * 100))
-    if (icon) icon.className = v === 0 ? 'fas fa-volume-xmark' : v < 0.5 ? 'fas fa-volume-low' : 'fas fa-volume-high'
+    if (wrap && wrap._set) wrap._set(v)
   }
 
   // Аватарка участника: своя — из аккаунта, чужая — из metadata токена LiveKit (её кладёт сервер)
@@ -1799,24 +1910,27 @@ async function enterRoom(joinData) {
     const video = el('video', { autoplay: true, playsinline: true, 'webkit-playsinline': 'true', ...(isLocal ? { muted: true } : {}) })
     if (isLocal) watchLocalMirror(video) // передняя — зеркально, задняя — как есть
     const placeholder = el('div', { class: 'no-video-placeholder' }, [avatarCircle(name, isLocal ? myAvatarUrl() : participantAvatarUrl(identity))])
-    const micIcon = el('i', { class: 'fas fa-microphone-slash', style: 'display:none' })
+    const micIcon = el('span', { class: 'g-tile-muted', style: 'display:none' }, [gIcon('micOff', 16)])
     // По умолчанию считаем камеру выключенной (большинство участников входят с выключенной камерой),
     // индикатор скрывается явно как только подтверждается активная камера-трек
-    const camIcon = el('i', { class: 'fas fa-video-slash', style: isLocal ? 'display:none' : 'display:inline' })
-    const labelChildren = [camIcon, micIcon, el('span', {}, name + (isLocal ? ' (Вы)' : ''))]
-    if (hostBadge) labelChildren.push(el('i', { class: 'fas fa-crown host-crown', title: 'Создатель комнаты' }))
+    const camIcon = el('span', { class: 'g-tile-camoff', style: isLocal ? 'display:none' : 'display:inline' })
+    // Имя на плитке как в канвасе: у своей — «Имя (Вы)», «(Вы)» приглушённое; пока говорит — полоски
+    const eq = el('span', { class: 'g-eq', 'aria-hidden': 'true' }, [el('i'), el('i'), el('i')])
+    const labelChildren = [camIcon, micIcon, eq, el('span', { class: 'g-tile-name' }, name), isLocal ? el('span', { class: 'g-you' }, '(Вы)') : null]
+    if (hostBadge) labelChildren.push(el('span', { class: 'host-crown g-tile-crown', title: 'Создатель комнаты' }, [gIcon('crown', 15)]))
     const label = el('div', { class: 'tile-label' }, labelChildren)
     tile.appendChild(video)
     tile.appendChild(placeholder)
     tile.appendChild(label)
 
     // Полноэкранный режим для тайла камеры (выбрать конкретного участника "на весь экран")
-    const fsBtn = el('button', { class: 'tile-fullscreen-btn', title: 'На весь экран' }, [el('i', { class: 'fas fa-expand' })])
+    const fsBtn = el('button', { class: 'tile-fullscreen-btn g-tt', title: 'На весь экран', 'aria-label': 'На весь экран' }, [gIcon('expand', 17, 'g-fs-in'), gIcon('compress', 17, 'g-fs-out')])
     fsBtn.addEventListener('click', (e) => {
       e.stopPropagation()
       toggleTileFullscreen(tile)
     })
-    tile.appendChild(fsBtn)
+    const tools = el('div', { class: 'g-ttools' }, [fsBtn])
+    tile.appendChild(tools)
     tile.addEventListener('dblclick', () => toggleTileFullscreen(tile))
 
     let volumeCtl = null
@@ -1827,16 +1941,16 @@ async function enterRoom(joinData) {
         const p = room.getParticipantByIdentity(identity)
         if (p) p.setVolume(v, LK.Track.Source.Microphone)
       })
-      // Громкость — в рамке самого участника, рядом с его именем (раскрывается при наведении)
-      label.appendChild(volumeCtl)
+      // Громкость — капсулой в правом нижнем углу плитки (как в канвасе)
+      tile.appendChild(volumeCtl)
       // Кнопка "выгнать участника" - видна только создателю комнаты (слева, чтобы не конфликтовать с fullscreen справа)
       if (state.isHost) {
-        kickBtn = el('button', { class: 'tile-kick-btn', title: 'Выгнать из звонка' }, [el('i', { class: 'fas fa-user-slash' })])
+        kickBtn = el('button', { class: 'tile-kick-btn g-tt g-tt--kick', title: 'Выгнать из звонка', 'aria-label': 'Выгнать из звонка' }, [gIcon('kick', 17)])
         kickBtn.addEventListener('click', (e) => {
           e.stopPropagation()
           kickParticipant(identity, name)
         })
-        tile.appendChild(kickBtn)
+        tools.insertBefore(kickBtn, fsBtn)
       }
     }
     playEnter(tile)
@@ -1999,12 +2113,10 @@ async function enterRoom(joinData) {
   function makeScreenTile(identity, name, sid, isLocal) {
     const tile = el('div', { class: 'tile screen-tile', id: `tile-screen-${sid}` })
     const video = el('video', { autoplay: true, playsinline: true, 'webkit-playsinline': 'true', muted: true })
-    const label = el('div', { class: 'tile-label' }, [el('i', { class: 'fas fa-desktop' }), el('span', {}, `Демонстрация — ${name}`)])
-    // Бейдж LIVE в левом верхнем углу тайла демонстрации (технический FPS-бейдж убран)
-    const liveBadge = el('div', { class: 'live-badge-group' }, [
-      el('span', { class: 'live-badge' }, [el('span', { class: 'live-dot' }), 'LIVE'])
-    ])
-    const fsBtn = el('button', { class: 'tile-fullscreen-btn', title: 'На весь экран' }, [el('i', { class: 'fas fa-expand' })])
+    const label = el('div', { class: 'tile-label' }, [el('span', { class: 'g-tile-name' }, name), isLocal ? el('span', { class: 'g-you' }, '(Вы)') : null])
+    // Плашка «Демонстрация» в левом верхнем углу (как в канвасе)
+    const liveBadge = el('div', { class: 'live-badge-group g-share-badge' }, [gIcon('screen', 15), 'Демонстрация'])
+    const fsBtn = el('button', { class: 'tile-fullscreen-btn g-tt', title: 'На весь экран', 'aria-label': 'На весь экран' }, [gIcon('expand', 17, 'g-fs-in'), gIcon('compress', 17, 'g-fs-out')])
     fsBtn.addEventListener('click', (e) => {
       e.stopPropagation()
       toggleTileFullscreen(tile)
@@ -2012,7 +2124,7 @@ async function enterRoom(joinData) {
     tile.appendChild(video)
     tile.appendChild(liveBadge)
     tile.appendChild(label)
-    tile.appendChild(fsBtn)
+    tile.appendChild(el('div', { class: 'g-ttools' }, [fsBtn]))
     let volumeCtl = null
     if (!isLocal) {
       // Громкость звука демонстрации (звук с устройства демонстрирующего)
@@ -3076,53 +3188,80 @@ async function enterRoom(joinData) {
     }
     closeScreenContextMenu()
 
-    const sheet = el('div', { class: 'settings-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Настройки' })
-    const closeBtn = el('button', { class: 'panel-close', type: 'button', 'aria-label': 'Закрыть настройки' }, [el('i', { class: 'fas fa-xmark' })])
+    const sheet = el('div', { class: 'settings-sheet g-scard', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Настройки' })
+    const closeBtn = el('button', { class: 'g-close', type: 'button', 'aria-label': 'Закрыть настройки' }, [gIcon('x', 16)])
     closeBtn.addEventListener('click', closeDevicePopup)
-    sheet.appendChild(el('div', { class: 'settings-head' }, [el('h3', {}, 'Настройки'), closeBtn]))
 
-    // Те же карточки, что и в лобби (buildDeviceCards)
-    inCallDevices = buildDeviceCards()
+    // Устройства — те же списки, что при входе в звонок
+    const micDots = el('span', { class: 'lvl-dots g-meter g-meter--card', 'aria-hidden': 'true' })
+    for (let i = 0; i < 12; i++) micDots.appendChild(el('i', {}))
+    inCallDevices = { micSelect: el('select', { 'aria-label': 'Микрофон' }), camSelect: el('select', { 'aria-label': 'Камера' }), spkSelect: el('select', { 'aria-label': 'Динамики' }), micDots }
     inCallMicSelect = inCallDevices.micSelect
     inCallCamSelect = inCallDevices.camSelect
     inCallSpkSelect = inCallDevices.spkSelect
     inCallMicSelect.addEventListener('change', () => { applyMicDevice(inCallMicSelect.value || null); startInCallMeter() })
     inCallCamSelect.addEventListener('change', () => applyCamDevice(inCallCamSelect.value || null))
     inCallSpkSelect.addEventListener('change', () => applySpeakerDevice(inCallSpkSelect.value || null))
-    inCallDevices.micCard.appendChild(makeSwitchRow('Подключаться с выключенным микрофоном', getPref('joinMicMuted'), (on) => setPref('joinMicMuted', on)))
-    inCallDevices.micCard.appendChild(makeSwitchRow('Шумоподавление', getPref('noiseSuppression'), (on) => applyNoiseSuppression(on)))
-    const spkTestBtn = el('button', { type: 'button', class: 'settings-test-btn' }, 'Проверить')
+    const micDD = makeDropdown(inCallMicSelect, 'mic')
+    const camDD = makeDropdown(inCallCamSelect, 'cam')
+    const spkDD = makeDropdown(inCallSpkSelect, 'spk')
+    const spkTestBtn = el('button', { type: 'button', class: 'g-ubtn2 g-test-btn' }, 'Проверить')
     spkTestBtn.addEventListener('click', () => playSpeakerTest(spkTestBtn))
-    inCallDevices.spkCard.querySelector('.settings-card-head').appendChild(spkTestBtn)
+    const group = (label, ...nodes) => el('div', { class: 'g-sgroup' }, [el('span', { class: 'g-label2' }, label), ...nodes])
 
-    // Разделы: слева меню, справа содержимое. Пока раздел один — «Звук»;
-    // новые добавляются в SECTIONS и сразу появляются в меню.
     const SECTIONS = [
-      { group: 'Звонок', id: 'sound', icon: 'fas fa-volume-high', title: 'Звук', build: () => [inCallDevices.micCard, inCallDevices.spkCard, inCallDevices.camCard] },
-      { group: 'Звонок', id: 'look', icon: 'fas fa-palette', title: 'Оформление', build: () => [buildThemeCard(), buildTilesCard()] }
+      {
+        id: 'sound', icon: 'spk', title: 'Звук и видео',
+        build: () => [
+          group('Микрофон', micDD,
+            el('div', { class: 'g-mic-hint' }, [el('span', {}, state.micEnabled ? 'Говорите — полоски загорятся' : 'Микрофон выключен'), micDots]),
+            gToggleRow('Подключаться с выключенным микрофоном', '', getPref('joinMicMuted'), (on) => setPref('joinMicMuted', on))),
+          speakerSelectionSupported() ? group('Динамики', el('div', { class: 'g-spk-row' }, [el('div', { class: 'g-spk-row__sel' }, [spkDD]), spkTestBtn])) : null,
+          group('Камера', camDD),
+          gToggleRow('Шумоподавление', 'Убирает стук клавиатуры и шум фона', getPref('noiseSuppression'), (on) => applyNoiseSuppression(on))
+        ].filter(Boolean)
+      },
+      {
+        id: 'look', icon: 'sun', title: 'Оформление',
+        build: () => {
+          const getChoice = () => (VL.getThemeChoice ? VL.getThemeChoice() : (localStorage.getItem('vl:theme') || 'dark'))
+          const setChoice = (id) => {
+            if (VL.setThemeChoice) VL.setThemeChoice(id)
+            else {
+              try { localStorage.setItem('vl:theme', id) } catch {}
+              const t = id === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : id
+              document.documentElement.dataset.theme = t
+              document.documentElement.style.colorScheme = t
+            }
+          }
+          return [
+            group('Тема', gSeg([['light', 'Светлая'], ['dark', 'Тёмная'], ['system', 'Как в системе']], getChoice(), setChoice), el('span', { class: 'g-hint' }, 'Только на этом устройстве.')),
+            gToggleRow('Имена на плитках', 'Подписи участников внизу слева', getPref('tileNames'), (on) => { setPref('tileNames', on); applyTileNamesPref() })
+          ]
+        }
+      }
     ]
-    const nav = el('nav', { class: 'settings-nav', 'aria-label': 'Разделы настроек' })
-    const content = el('div', { class: 'settings-body' })
+    const title = el('span', { class: 'g-scard__title' })
+    const content = el('div', { class: 'g-scard__pane' })
     const navButtons = new Map()
     const show = (id) => {
       const sec = SECTIONS.find((x) => x.id === id) || SECTIONS[0]
-      navButtons.forEach((b, key) => { b.classList.toggle('active', key === sec.id); b.setAttribute('aria-current', key === sec.id ? 'page' : 'false') })
-      content.innerHTML = ''
-      content.appendChild(el('h4', { class: 'settings-section-title' }, sec.title))
-      sec.build().forEach((n) => content.appendChild(n))
+      navButtons.forEach((b, key) => b.classList.toggle('is-on', key === sec.id))
+      title.textContent = sec.title
+      content.replaceChildren(el('div', { class: 'g-scard__sec' }, sec.build()))
     }
-    let lastGroup = null
+    const nav = el('div', { class: 'g-scard__side' }, [el('div', { class: 'g-scard__h' }, 'Настройки')])
     SECTIONS.forEach((sec) => {
-      if (sec.group !== lastGroup) { nav.appendChild(el('div', { class: 'settings-nav__group' }, sec.group)); lastGroup = sec.group }
-      const b = el('button', { type: 'button', class: 'settings-nav__item' }, [el('i', { class: sec.icon, 'aria-hidden': 'true' }), sec.title])
+      const b = el('button', { type: 'button', class: 'g-pf__nav' }, [gIcon(sec.icon, 19), sec.title])
       b.addEventListener('click', () => show(sec.id))
       navButtons.set(sec.id, b)
       nav.appendChild(b)
     })
+    sheet.appendChild(nav)
+    sheet.appendChild(el('div', { class: 'g-scard__main' }, [el('div', { class: 'g-scard__head' }, [title, closeBtn]), content]))
     show('sound')
-    sheet.appendChild(el('div', { class: 'settings-layout' }, [nav, content]))
 
-    const overlay = el('div', { class: 'settings-overlay' }, [sheet])
+    const overlay = el('div', { class: 'settings-overlay g-sov' }, [sheet])
     overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDevicePopup() })
     document.body.appendChild(overlay)
     devicePopup = overlay
@@ -3194,61 +3333,62 @@ async function enterRoom(joinData) {
   // Страховочный таймер нужен на случай, если animationend не придёт вообще (например,
   // когда панель скрыта вкладкой в фоне и анимации не играются) - иначе оверлей
   // остался бы висеть над звонком.
+  // Панель участников — справа внутри звонка, как в канвасе: выезжает и сжимает плитки,
+  // при закрытии плитки возвращаются. Список обновляется вместе с раскладкой (relayout).
+  const peopleList = el('div', { class: 'g-people__list' })
+  const peopleTitle = el('span', { class: 'g-people__title' }, 'Участники')
+  const peopleClose = el('button', { type: 'button', class: 'g-people__x', 'aria-label': 'Скрыть участников' }, [gIcon('x', 16, 'g-ico-pop')])
+  const peopleAside = el('aside', { class: 'g-people', 'aria-label': 'Участники' }, [el('div', { class: 'g-people__head' }, [peopleTitle, peopleClose]), peopleList])
+  const peopleSide = el('div', { class: 'g-people-side' }, [peopleAside])
+  roomMain.appendChild(peopleSide)
+  let peopleOpen = false
+  function participantRow(name, isLocal, isHost, micMuted, avatarUrl, identity) {
+    const kick = !isLocal && state.isHost ? el('button', { type: 'button', class: 'g-prow__kick', title: 'Выгнать из звонка', 'aria-label': 'Выгнать из звонка' }, [gIcon('kick', 17)]) : null
+    if (kick) kick.addEventListener('click', () => kickParticipant(identity, name))
+    return el('div', { class: `g-prow${isHost ? ' is-host' : ''}` }, [
+      avatarCircle(name, avatarUrl, 'g-prow__ava'),
+      el('span', { class: 'g-prow__name' }, [
+        el('span', { class: 'g-prow__text' }, name),
+        isLocal ? el('span', { class: 'g-you' }, '(Вы)') : null,
+        isHost ? el('span', { class: 'g-prow__crown', title: 'Создатель комнаты', 'aria-label': 'Создатель комнаты' }, [gIcon('crown', 17)]) : null
+      ]),
+      micMuted ? el('span', { class: 'g-prow__muted', title: 'Микрофон выключен' }, [gIcon('micOff', 18)]) : null,
+      kick
+    ])
+  }
+  function refreshPeoplePanel() {
+    if (!peopleOpen) return
+    const rows = [participantRow(state.displayName, true, state.isHost, !state.micEnabled, myAvatarUrl(), '')]
+    try {
+      room.remoteParticipants.forEach((p) => {
+        const micPub = p.getTrackPublication(LK.Track.Source.Microphone)
+        rows.push(participantRow(p.name || p.identity, false, isParticipantHost(p), !micPub || micPub.isMuted, participantAvatarUrl(p.identity), p.identity))
+      })
+    } catch {}
+    peopleTitle.textContent = `Участники · ${rows.length}`
+    peopleList.replaceChildren(...rows)
+  }
+  // Пока панель едет, плитки пересчитываются каждый кадр — они плавно сжимаются вслед за ней
+  function followPanel() {
+    const until = performance.now() + 700
+    const tick = () => { relayout(); if (performance.now() < until) roomFrame(tick) }
+    roomFrame(tick)
+  }
+  function setPeopleOpen(open) {
+    peopleOpen = !!open
+    screen.classList.toggle('people-open', peopleOpen)
+    participantsBtn.setAttribute('aria-pressed', peopleOpen ? 'true' : 'false')
+    participantsBtn.classList.toggle('is-on', peopleOpen)
+    if (peopleOpen) refreshPeoplePanel()
+    followPanel()
+  }
   function closeParticipantsPanel() {
-    const existing = document.querySelector('.panel-overlay')
-    if (!existing) return false
-    if (existing.classList.contains('is-closing')) return true // уже уезжает
-    existing.classList.add('is-closing')
-    const panel = existing.querySelector('.panel')
-    let fallback = 0
-    const drop = () => { clearTimeout(fallback); existing.remove() }
-    if (panel) {
-      panel.addEventListener('animationend', drop, { once: true })
-      fallback = setTimeout(drop, 600)
-    } else {
-      drop()
-    }
+    if (!peopleOpen) return false
+    setPeopleOpen(false)
     return true
   }
-
-  function participantRow(name, isLocal, isHost, micMuted, avatarUrl) {
-    const children = [
-      avatarCircle(name, avatarUrl, isLocal ? 'is-local' : ''),
-      el('span', { class: 'panel-participant__name' }, [
-        el('span', { class: 'panel-participant__text' }, name),
-        isLocal ? el('span', { class: 'panel-participant__you' }, '(Вы)') : null,
-        // Корона — рядом с именем того, кто создал комнату (в том числе у вас самих)
-        isHost ? el('i', { class: 'fas fa-crown host-crown', title: 'Создатель комнаты', 'aria-label': 'Создатель комнаты' }) : null
-      ].filter(Boolean))
-    ]
-    if (micMuted) children.push(el('i', { class: 'fas fa-microphone-slash panel-participant__muted', title: 'Микрофон выключен', 'aria-label': 'Микрофон выключен' }))
-    return el('div', { class: `panel-participant${isHost ? ' is-host' : ''}` }, children)
-  }
-
-  function openParticipantsPanel() {
-    const existing = document.querySelector('.panel-overlay')
-    if (existing) {
-      // Повторный клик по кнопке закрывает панель. Если она уже уезжает, не ждём конца
-      // анимации, а сразу открываем заново - иначе быстрые клики ощущались как залипание.
-      if (!existing.classList.contains('is-closing')) { closeParticipantsPanel(); return }
-      existing.remove()
-    }
-
-    const panel = el('div', { class: 'panel' })
-    const closeBtn = el('button', { class: 'panel-close', type: 'button', 'aria-label': 'Закрыть' }, [el('i', { class: 'fas fa-xmark' })])
-    panel.appendChild(el('div', { class: 'panel-head' }, [el('h3', {}, ['Участники', el('span', { class: 'panel-count' }, String(room.remoteParticipants.size + 1))]), closeBtn]))
-    panel.appendChild(participantRow(state.displayName, true, state.isHost, !state.micEnabled, myAvatarUrl()))
-    room.remoteParticipants.forEach((p) => {
-      const micPub = p.getTrackPublication(LK.Track.Source.Microphone)
-      const micMuted = !micPub || micPub.isMuted
-      panel.appendChild(participantRow(p.name || p.identity, false, isParticipantHost(p), micMuted, participantAvatarUrl(p.identity)))
-    })
-
-    const overlay = el('div', { class: 'panel-overlay' }, [panel])
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeParticipantsPanel() })
-    closeBtn.addEventListener('click', closeParticipantsPanel)
-    document.body.appendChild(overlay)
-  }
+  function openParticipantsPanel() { setPeopleOpen(!peopleOpen) }
+  peopleClose.addEventListener('click', () => setPeopleOpen(false))
 
   participantsBtn.addEventListener('click', openParticipantsPanel)
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeParticipantsPanel() })

@@ -44,6 +44,10 @@ export function registerChatRoutes(app, { db, hub, friends, media, push, createC
     pageBefore: db.prepare(`SELECT * FROM messages m WHERE ${VISIBLE} AND m.id < ? ORDER BY m.id DESC LIMIT ?`),
     pageAfter: db.prepare(`SELECT * FROM messages m WHERE ${VISIBLE} AND m.id > ? ORDER BY m.id ASC LIMIT ?`),
     pageAround: db.prepare(`SELECT * FROM messages m WHERE ${VISIBLE} AND m.id >= ? ORDER BY m.id ASC LIMIT ?`),
+    recentCalls: db.prepare(`SELECT m.* FROM messages m JOIN conversation_members cm ON cm.conversation_id = m.conversation_id AND cm.user_id = ?
+      WHERE cm.hidden = 0 AND m.kind = 'call' AND m.deleted_at IS NULL AND m.id > cm.cleared_before
+      AND NOT EXISTS (SELECT 1 FROM message_hidden h WHERE h.user_id = cm.user_id AND h.message_id = m.id)
+      ORDER BY m.id DESC LIMIT 30`),
     searchScan: db.prepare(`SELECT m.id, m.body FROM messages m WHERE ${VISIBLE} AND m.body != '' ORDER BY m.id DESC LIMIT ${SEARCH_SCAN}`),
     insertMessage: db.prepare('INSERT INTO messages (conversation_id, author_id, kind, body, meta, reply_to, client_id, created_at, forward) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'),
     touchConv: db.prepare('UPDATE conversations SET last_message_id = ?, last_message_at = ? WHERE id = ?'),
@@ -588,6 +592,12 @@ export function registerChatRoutes(app, { db, hub, friends, media, push, createC
     }
     hits.sort((a, b) => b - a)
     return c.json({ messages: hits.slice(0, 40).map((id) => messageView(q.message.get(id))) })
+  })
+
+  // Недавние звонки для вкладки «Звонки»: карточки звонков из всех своих чатов, новые сверху
+  app.get('/api/calls/recent', (c) => {
+    const me = Number(c.get('user').id)
+    return c.json({ calls: q.recentCalls.all(me).map(messageView) })
   })
 
   // ---------- Медиа, файлы, голосовые, ссылки (как вкладки профиля в Телеграме) ----------

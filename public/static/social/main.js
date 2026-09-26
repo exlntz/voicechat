@@ -14,13 +14,12 @@ import {
 import { startEvents, stopEvents } from './events.js'
 import { createSidebar } from './sidebar.js'
 import { openProfile, closeProfile } from './profile.js'
-import { createFriendsView } from './friends.js'
 import { createChatView } from './chat.js'
 import { initNotifications, setBaseTitle } from './notify.js'
 import { initPush, disablePush } from './push.js'
 import { initCalls, onCallEnded, isSwitching, inCall, callState } from './call-invite.js'
 import { preloadWallpaper } from './wallpapers.js'
-import { h, icon, toast, displayName, setSelfId, waveBars, isMobile, onMobileChange, homePath, initHoverFill } from './ui.js'
+import { h, icon, toast, displayName, setSelfId, waveBars, isMobile, onMobileChange, homePath } from './ui.js'
 
 const VL = window.VL
 VL.store = store // app.js берёт отсюда свежую аватарку для звонка
@@ -75,6 +74,12 @@ function applyRoute(next, { fromApp = false } = {}) {
     }
   }
   // Список чатов отдельным экраном — только на телефоне; на компьютере он всегда слева
+  // Телефон: друзья — вкладка на экране «Чаты»
+  if (next.name === 'friends' && isMobile()) {
+    if (sidebar && next.tab) sidebar.setTab('friends')
+    next = { name: 'chats' }
+    history.replaceState({}, '', '/chats')
+  }
   if (next.name === 'chats' && !isMobile()) {
     next = { name: 'friends', tab: '' }
     history.replaceState({}, '', '/friends')
@@ -105,7 +110,7 @@ function applyRoute(next, { fromApp = false } = {}) {
   } else {
     const key = next.name === 'dm' ? 'dm:' + next.id : 'friends'
     if (key !== viewKey) mountView(next, key)
-    else if (next.name === 'friends' && view && view.setTab) view.setTab(next.tab || 'online')
+    else if (next.name === 'friends' && sidebar && next.tab) sidebar.setTab(next.tab === 'pending' || next.tab === 'blocked' || next.tab === 'all' ? 'friends' : next.tab)
   }
   if (sidebar) sidebar.setRoute(next)
   updateLayout()
@@ -128,7 +133,9 @@ async function mountView(r, key) {
   unmountView()
   viewKey = key
   if (r.name === 'friends') {
-    view = createFriendsView({ navigate, openDmWith, menuButton, initialTab: r.tab || 'online' })
+    // Друзья теперь во вкладке слева (как в канвасе); справа — пустая панель до выбора чата
+    if (sidebar && r.tab) sidebar.setTab(r.tab === 'pending' || r.tab === 'blocked' || r.tab === 'all' ? 'friends' : r.tab)
+    view = createEmptyView()
   } else {
     // Карточка лички нужна до отрисовки (собеседник в шапке); из кэша/списка — мгновенно
     let conv = store.conversations.get(r.id)
@@ -151,6 +158,17 @@ async function mountView(r, key) {
   if (view.onShown) requestAnimationFrame(() => view && view.onShown && view.onShown())
   if (view.focus) view.focus()
   updateTitle()
+}
+
+function createEmptyView() {
+  const node = h('section', { class: 'vl-view g-empty-view' }, [
+    h('div', { class: 'g-empty-view__box' }, [
+      h('span', { class: 'g-logo g-logo--lg' }, [icon('logo')]),
+      h('span', { class: 'g-empty-view__title' }, 'Выберите чат'),
+      h('span', { class: 'g-empty-view__sub' }, 'или начните звонок во вкладке «Звонки»')
+    ])
+  ])
+  return { node, destroy() {} }
 }
 
 function unmountView() {
@@ -178,8 +196,9 @@ function updateLayout() {
   body.classList.toggle('vl-dock-open', docked && dockOpen)
   const screen = appRoot.querySelector('.room-screen')
   if (screen) screen.classList.toggle('is-docked', docked)
-  renderDockTools(docked && dockOpen)
-  renderIsland(docked && !dockOpen)
+  // Звонок из чата — плашкой «В звонке» внизу слева (sidebar.js); видео открывается целиком
+  renderDockTools(false)
+  renderIsland(false)
   if (sidebar) sidebar.refreshCall()
 }
 
@@ -189,7 +208,6 @@ function updateLayout() {
 // Скрытая панель остаётся в документе с прежним размером (невидимой): звонок и раскладка
 // плиток не пересоздаются, звук идёт как обычно.
 let dockOpen = false
-try { dockOpen = localStorage.getItem('vl:dockOpen') === '1' } catch {}
 function setDockOpen(open) {
   dockOpen = !!open
   try { localStorage.setItem('vl:dockOpen', dockOpen ? '1' : '0') } catch {}
@@ -455,6 +473,13 @@ VL.onCallEnded = () => {
   }
   announce()
 }
+// «Голос» в шапке лобби и звонка — к чатам. Во время звонка он продолжается (плашка слева).
+VL.goChats = () => {
+  if (solo) { exitSolo(isMobile() ? '/chats' : '/friends', { openLatestChat: !isMobile() }); return }
+  if (!sessionActive) return
+  const back = callState.conversationId && inCall() ? '/dm/' + callState.conversationId : (isMobile() ? '/chats' : '/friends')
+  navigate(back)
+}
 // Навигация, которую сделал сам app.js (вход в комнату из лобби)
 window.addEventListener('vl:navigate', (e) => {
   if (!sessionActive) return
@@ -502,7 +527,6 @@ setUnauthorizedHandler(() => { if (sessionActive) { toast('Сессия исте
 // ---------- Запуск ----------
 async function boot() {
   VL.shellReady = true
-  initHoverFill() // заливка кнопок от курсора, как в звонке
   body.classList.add('vl-shell')
   initNotifications({ navigate: openDeepLink })
   initCalls({ navigate, onCallStart: () => updateLayout() })
