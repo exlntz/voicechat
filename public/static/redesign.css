@@ -1188,3 +1188,26 @@ html[data-theme="light"] { --g-on-bg: #8a847c; --g-on-fg: #ffffff; --g-on-bg-h: 
 .g-sov.is-closing .settings-sheet.g-scard, .g-pf-overlay.is-closing .g-pf { animation: g-soft-out .25s cubic-bezier(.4, 0, 1, 1) both; }
 @keyframes g-soft-out { to { opacity: 0; transform: translateY(10px) scale(.98); } }
 @media (prefers-reduced-motion: reduce) { .settings-sheet.g-scard, .g-pf, .g-scard__sec, .g-pf__sec { animation-duration: .01s; } }
+
+/* ─────────── Поправки: выбор чата, кнопки звонка, профиль ─────────── */
+/* Выбор чата: переход медленнее и мягче; в тёмной теме плашка заметно «над» остальными */
+.g-row { transition: background-color .45s var(--g-ease), color .45s var(--g-ease), box-shadow .6s var(--g-spring), translate .6s var(--g-spring), transform .45s var(--g-spring); }
+.g-row .g-ava.vl-avatar { transition: background-color .45s var(--g-ease), color .45s var(--g-ease); }
+html:not([data-theme="light"]) .g-row.is-on { background-color: #2a2a2a; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 0 0 1px rgba(255, 255, 255, 0.04), 0 10px 24px -8px rgba(0, 0, 0, 0.9), 0 3px 6px rgba(0, 0, 0, 0.6); translate: 0 -3px; }
+html[data-theme="light"] .g-row.is-on { translate: 0 -3px; }
+/* Смена чата справа — содержимое мягко проявляется */
+.vl-view-enter { animation: g-view-in .38s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes g-view-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+/* «Участники» в шапке звонка — без обводки, в цвет поля */
+.g-ppl-btn { box-shadow: none !important; background: var(--g-field); }
+.g-ppl-btn:hover { background: var(--g-field-h); }
+.g-ppl-btn.is-on { background: var(--g-acc); }
+/* Значок ссылки на кнопке приглашения тоже качается при наведении */
+.solo-copy-btn:hover .g-copy-ico__link { animation: g-tug .55s cubic-bezier(.36, .07, .19, .97); }
+.solo-copy-btn .g-copy-ico { width: 18px; height: 18px; }
+/* Профиль: имя и юзернейм под обложкой, с ровными отступами */
+.g-pf__id { margin: -48px 0 0 22px; gap: 16px; }
+.g-pf__id-text { padding-bottom: 8px; gap: 3px; }
+.g-pf__name { line-height: 1.2; }
+.g-pf__user { line-height: 1.3; }
+.g-pf__top { margin-bottom: 6px; }

@@ -141,6 +141,7 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
     return a
   }
 
+  const rowCache = new Map() // convId -> <a class="g-row">
   function renderDms() {
     const convs = sortedConversations()
     const activeId = route.name === 'dm' ? route.id : route.name === 'room' ? callState.conversationId : null
@@ -161,11 +162,8 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
       const callHere = inCall() && callState.conversationId === conv.id
       const subText = isTyping ? 'печатает…' : callHere ? 'в звонке с вами' : conv.lastMessage ? (conv.lastMessage.authorId === store.me.id && !saved ? 'Вы: ' : '') + messagePreview(conv.lastMessage) : saved ? 'Сохранённые сообщения' : presenceText(p)
       const active = conv.id === activeId
-      const item = h('a', {
-        href: '/dm/' + conv.id,
-        role: 'listitem',
-        class: `g-row${active ? ' is-on' : ''}${conv.unread ? ' is-unread' : ''}${conv.muted ? ' is-muted' : ''}${saved ? ' is-saved' : ''}`
-      }, [
+      const cls = `g-row${active ? ' is-on' : ''}${conv.unread ? ' is-unread' : ''}${conv.muted ? ' is-muted' : ''}${saved ? ' is-saved' : ''}`
+      const kids = [
         rowAvatar(saved ? store.me : peer, { saved, presence: saved ? null : p }),
         h('span', { class: 'g-row__text' }, [
           h('span', { class: 'g-row__top' }, [
@@ -179,7 +177,19 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
             conv.unread ? h('span', { class: 'g-badge' }, conv.unread > 99 ? '99+' : String(conv.unread)) : conv.pinned ? h('span', { class: 'g-row__pin', title: 'Закреплён' }, [icon('thumbtack')]) : null
           ])
         ])
-      ])
+      ]
+      // Строка живёт между перерисовками: меняются только класс и содержимое — так выбор чата
+      // плавно перетекает (фон, подъём, тень), а не появляется новым узлом
+      let item = rowCache.get(conv.id)
+      if (item) {
+        if (item.className !== cls) item.className = cls
+        item.replaceChildren(...kids)
+        nodes.push(item)
+        continue
+      }
+      item = h('a', { href: '/dm/' + conv.id, role: 'listitem', class: cls }, kids)
+      rowCache.set(conv.id, item)
+      const convId = conv.id
       item.addEventListener('click', (e) => {
         if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return
         e.preventDefault()
@@ -188,6 +198,9 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
       // ПКМ по чату: закрепить, контакт, обои, уведомления, позвонить, удалить
       const chatMenu = (e) => {
         e.preventDefault()
+        const conv = store.conversations.get(convId)
+        if (!conv) return
+        const saved = isSavedConv(conv)
         const patch = (body) => api.updateConversation(conv.id, body).catch((er) => toast(er.message, 'error'))
         showMenu([
           { label: conv.pinned ? 'Открепить' : 'Закрепить', icon: conv.pinned ? 'thumbtack-slash' : 'thumbtack', onClick: () => patch({ pinned: !conv.pinned }) },
@@ -247,7 +260,15 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
         nodes.push(h('div', { class: 'g-empty' }, 'Здесь появятся ваши переписки'))
       }
     }
-    dmList.replaceChildren(...nodes)
+    // Без replaceChildren: узлы, которые уже стоят на месте, не вынимаются из документа
+    // (иначе их CSS-переходы обрывались бы)
+    let at = dmList.firstChild
+    for (const n of nodes) {
+      if (n === at) { at = at.nextSibling; continue }
+      dmList.insertBefore(n, at)
+    }
+    while (at) { const next = at.nextSibling; at.remove(); at = next }
+    if (!needle) for (const id of [...rowCache.keys()]) if (!store.conversations.has(id)) rowCache.delete(id)
   }
 
   function lastTicks(conv) {
@@ -512,8 +533,10 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
   }
   island.addEventListener('click', (e) => { if (!e.target.closest('.g-island__btn')) openCall() })
   island.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target === island) openCall() })
-  islandMic.addEventListener('click', () => { if (window.VL.toggleMic) window.VL.toggleMic() })
-  islandHang.addEventListener('click', () => { if (window.VL.leaveCall) window.VL.leaveCall() })
+  // stopPropagation: иначе клик доходит до самой плашки и открывает звонок (значок внутри
+  // кнопки к этому моменту уже перерисован, и проверка closest() его не находит)
+  islandMic.addEventListener('click', (e) => { e.stopPropagation(); if (window.VL.toggleMic) window.VL.toggleMic() })
+  islandHang.addEventListener('click', (e) => { e.stopPropagation(); if (window.VL.leaveCall) window.VL.leaveCall() })
   let islandTimer = 0
   let callStartedAt = 0
   function fmt(ms) {
@@ -547,7 +570,7 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
       islandTime.textContent = live && callStartedAt ? fmt(Date.now() - callStartedAt) : '00:00'
       const micOn = !!window.VL.state.micEnabled
       islandMic.classList.toggle('is-off', !micOn)
-      islandMic.replaceChildren(icon(micOn ? 'microphone' : 'microphone-slash'))
+      if (islandMic.dataset.on !== String(micOn)) { islandMic.dataset.on = String(micOn); islandMic.replaceChildren(icon(micOn ? 'microphone' : 'microphone-slash')) }
       islandMic.title = micOn ? 'Выключить микрофон' : 'Включить микрофон'
       const people = islandPeople().slice(0, 2)
       const sig = people.join('|')
