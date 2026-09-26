@@ -1172,3 +1172,19 @@ html:not([data-theme="light"]) .room-screen .controls-pill .ctrl-btn.off { color
 /* Включённая демонстрация экрана — серая кнопка (в обеих темах) */
 :root { --g-on-bg: #4a4a4a; --g-on-fg: #f2f0ec; --g-on-bg-h: #555555; }
 html[data-theme="light"] { --g-on-bg: #8a847c; --g-on-fg: #ffffff; --g-on-bg-h: #78716c; }
+
+/* «Скопировать ссылку» — без обводки, в цвет поля */
+.room-screen .room-copy-btn, .room-screen .room-copy-btn.is-copied { background: var(--g-field) !important; box-shadow: none !important; }
+.room-screen .room-copy-btn:hover { background: var(--g-field-h) !important; }
+
+/* Настройки и профиль открываются мягко: окно плавно выезжает без перелёта,
+   содержимое проявляется чуть позже, затемнение — медленнее */
+.settings-overlay.g-sov, .g-pf-overlay { animation: g-fade .35s ease both; }
+.settings-sheet.g-scard, .g-pf { transition: none; animation: g-soft-in .5s cubic-bezier(.22, 1, .36, 1) both; will-change: transform, opacity; }
+@keyframes g-soft-in { from { opacity: 0; transform: translateY(18px) scale(.97); } to { opacity: 1; transform: none; } }
+.settings-sheet.g-scard .g-scard__main, .settings-sheet.g-scard .g-scard__side, .g-pf .g-pf__main, .g-pf .g-pf__side { animation: g-fade-up .45s cubic-bezier(.22, 1, .36, 1) .08s both; }
+@keyframes g-fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.g-scard__sec, .g-pf__sec { animation: g-fade-up .35s cubic-bezier(.22, 1, .36, 1) both; }
+.g-sov.is-closing .settings-sheet.g-scard, .g-pf-overlay.is-closing .g-pf { animation: g-soft-out .25s cubic-bezier(.4, 0, 1, 1) both; }
+@keyframes g-soft-out { to { opacity: 0; transform: translateY(10px) scale(.98); } }
+@media (prefers-reduced-motion: reduce) { .settings-sheet.g-scard, .g-pf, .g-scard__sec, .g-pf__sec { animation-duration: .01s; } }
