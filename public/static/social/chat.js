@@ -53,22 +53,23 @@ export function createChatView({ convId, navigate, menuButton }) {
   const conv = () => store.conversations.get(convId)
 
   // ---------- Шапка ----------
-  const headAvatar = avatar(saved ? me : peer, { size: 44, presence: saved ? null : presenceOf(peer.id), saved })
-  const headName = h('span', { class: 'vl-chat__head-name' })
-  const headSub = h('span', { class: 'vl-chat__head-sub' })
-  const headWho = h('button', { type: 'button', class: 'vl-chat__head-who', title: 'Профиль, медиа и файлы' }, [headAvatar, h('span', { class: 'vl-chat__head-text' }, [headName, headSub])])
+  // Шапка как в канвасе: аватар 48, имя 22, статус; справа — поиск и чёрная «Позвонить»
+  const headAvatar = h('span', { class: 'g-chat__ava' })
+  const headName = h('span', { class: 'g-chat__name' })
+  const headSub = h('span', { class: 'g-chat__sub' })
+  const headWho = h('button', { type: 'button', class: 'g-chat__who', title: 'Профиль, медиа и файлы' }, [headAvatar, h('span', { class: 'g-chat__titles' }, [headName, headSub])])
   headWho.addEventListener('click', () => openCard())
-  const searchBtn = h('button', { type: 'button', class: 'vl-round is-lg', title: 'Поиск по чату', 'aria-label': 'Поиск по чату' }, [icon('magnifying-glass')])
-  // «Позвонить» — синяя таблетка с подписью (на телефоне остаётся только значок)
-  const callLabel = h('span', { class: 'vl-chat__call-label' }, 'Позвонить')
-  const callBtn = h('button', { type: 'button', class: 'vl-btn vl-btn--primary vl-btn--pill vl-chat__call', title: 'Позвонить', 'aria-label': 'Позвонить', hidden: saved }, [icon('phone'), callLabel])
-  const moreBtn = h('button', { type: 'button', class: 'vl-round is-lg', title: 'Ещё', 'aria-label': 'Ещё' }, [icon('ellipsis-vertical')])
-  searchBtn.addEventListener('click', () => openSearch())
+  const searchBtn = h('button', { type: 'button', class: 'g-hbtn', title: 'Поиск по чату', 'aria-label': 'Поиск по чату' }, [icon('magnifying-glass')])
+  const callLabel = h('span', { class: 'g-chat__call-label' }, 'Позвонить')
+  const callBtn = h('button', { type: 'button', class: 'g-btn g-btn--acc g-chat__call', title: 'Позвонить', 'aria-label': 'Позвонить', hidden: saved }, [icon('phone'), callLabel])
+  // «Ещё» (обои, уведомления, удалить) — правой кнопкой по шапке и в меню чата слева
+  const moreBtn = h('button', { type: 'button', class: 'g-hbtn g-chat__more', title: 'Ещё', 'aria-label': 'Ещё' }, [icon('ellipsis-vertical')])
+  searchBtn.addEventListener('click', () => (searchBar.hidden ? openSearch() : closeSearch()))
   callBtn.addEventListener('click', () => {
     if (inCall() && callState.conversationId === convId) { navigate('/room/' + window.VL.state.roomCode); return }
     startCall(convId)
   })
-  moreBtn.addEventListener('click', () => {
+  const openMore = (anchor) => {
     const c = conv()
     if (!c) return
     showMenu([
@@ -79,8 +80,9 @@ export function createChatView({ convId, navigate, menuButton }) {
       { label: c.pinned ? 'Открепить чат' : 'Закрепить чат', icon: c.pinned ? 'thumbtack-slash' : 'thumbtack', onClick: () => api.updateConversation(convId, { pinned: !c.pinned }).catch((e) => toast(e.message, 'error')) },
       'sep',
       { label: 'Удалить чат', icon: 'trash', danger: true, onClick: () => askDeleteChat(c, { navigate }) }
-    ], moreBtn)
-  })
+    ], anchor)
+  }
+  moreBtn.addEventListener('click', () => openMore(moreBtn))
   async function toggleMute() {
     const c = conv()
     if (!c) return
@@ -99,14 +101,26 @@ export function createChatView({ convId, navigate, menuButton }) {
       onJump: (_, id) => jumpTo(id)
     })
   }
-  const header = h('header', { class: 'vl-view__head vl-chat__head' }, [
-    menuButton(),
-    headWho,
-    h('div', { class: 'vl-chat__head-actions' }, [searchBtn, callBtn, moreBtn])
-  ])
+  // Аватар собеседника в шапке: картинка или буква; точка «в сети»
+  let headSig = ''
+  function paintHeadAvatar(user, p) {
+    const sig = saved ? 'saved' : `${user.avatarUrl || ''}|${displayName(user)}`
+    if (sig !== headSig) {
+      headSig = sig
+      const a = avatar(saved ? me : user, { size: 48, saved })
+      a.classList.add('g-ava', 'is-peer')
+      headAvatar.replaceChildren(a)
+    }
+    const a = headAvatar.firstChild
+    let dot = a && a.querySelector('.g-dot')
+    const online = !!p && p.status !== 'offline'
+    if (online && !dot && a) a.appendChild(h('span', { class: 'g-dot' }))
+    if (!online && dot) dot.remove()
+  }
   function renderHeader() {
     const c = conv()
     if (saved) {
+      paintHeadAvatar(me, null)
       headName.textContent = 'Избранное'
       headSub.textContent = 'Только для вас'
       input.placeholder = 'Заметка для себя'
@@ -114,17 +128,12 @@ export function createChatView({ convId, navigate, menuButton }) {
       // Собеседник мог сменить юзернейм или аватарку, пока чат открыт, — берём свежие данные
       const cur = userById(peer.id) || peer
       const p = presenceOf(peer.id)
-      const img = headAvatar.querySelector('.vl-avatar__img')
-      // Аватарка или имя (инициалы) поменялись — пересобрать кружок
-      if ((img ? img.getAttribute('src') : null) !== (cur.avatarUrl || null) || headAvatar.dataset.name !== displayName(cur)) {
-        headAvatar.dataset.name = displayName(cur)
-        const fresh = avatar(cur, { size: 44, presence: p })
-        headAvatar.replaceChildren(...fresh.childNodes)
-        headAvatar.className = fresh.className
-      }
-      setPresenceDot(headAvatar, p)
+      paintHeadAvatar(cur, p)
       headName.textContent = displayName(cur)
-      headSub.textContent = presenceText(p)
+      const typers = typingNames()
+      headSub.classList.toggle('is-typing', typers.length > 0)
+      if (typers.length) headSub.replaceChildren('печатает', h('span', {}, '.'), h('span', {}, '.'), h('span', {}, '.'))
+      else headSub.textContent = presenceText(p)
       headSub.classList.toggle('is-online', !!p && p.status !== 'offline' && (p.status === 'online' || !!p.inCall))
       headWho.title = `@${cur.username} — профиль, медиа и файлы`
       input.placeholder = 'Сообщение...'
@@ -176,16 +185,14 @@ export function createChatView({ convId, navigate, menuButton }) {
   }
 
   // ---------- Поиск по чату ----------
-  const searchInput = h('input', { type: 'search', class: 'vl-search__input', placeholder: 'Поиск по сообщениям', 'aria-label': 'Поиск по сообщениям', autocomplete: 'off', spellcheck: 'false' })
+  const searchInput = h('input', { type: 'search', class: 'vl-search__input', placeholder: 'Поиск по чату', 'aria-label': 'Поиск по чату', autocomplete: 'off', spellcheck: 'false' })
   const searchCount = h('span', { class: 'vl-search__count' })
   const searchUp = h('button', { type: 'button', class: 'vl-round is-sm is-ghost', title: 'Раньше', 'aria-label': 'Предыдущее совпадение' }, [icon('chevron-up')])
   const searchDown = h('button', { type: 'button', class: 'vl-round is-sm is-ghost', title: 'Позже', 'aria-label': 'Следующее совпадение' }, [icon('chevron-down')])
   const searchClose = h('button', { type: 'button', class: 'vl-round is-sm is-ghost', title: 'Закрыть поиск', 'aria-label': 'Закрыть поиск' }, [icon('xmark')])
   const searchResults = h('div', { class: 'vl-search__results', role: 'listbox', hidden: true })
-  const searchBar = h('div', { class: 'vl-search', hidden: true }, [
-    h('div', { class: 'vl-search__field' }, [icon('magnifying-glass'), searchInput, searchCount, searchUp, searchDown, searchClose]),
-    searchResults
-  ])
+  const searchBar = h('div', { class: 'g-sfield', hidden: true }, [icon('magnifying-glass'), searchInput, searchCount, searchUp, searchDown, searchResults])
+  searchClose.hidden = true
   const search = { hits: [], index: -1, timer: 0, q: '' }
   function openSearch() {
     searchBar.hidden = false
@@ -258,6 +265,16 @@ export function createChatView({ convId, navigate, menuButton }) {
     return [from ? '…' : '', str.slice(from, i), h('mark', {}, str.slice(i, i + q.length)), str.slice(i + q.length, i + q.length + 80)]
   }
 
+  const header = h('header', { class: 'g-chat__head' }, [
+    menuButton(),
+    headWho,
+    searchBar,
+    searchBtn,
+    callBtn,
+    moreBtn
+  ])
+  header.addEventListener('contextmenu', (e) => { if (e.target.closest('input')) return; e.preventDefault(); openMore(e) })
+
   // ---------- Лента ----------
   const list = h('div', { class: 'vl-chat__list', role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions' })
   const scroller = h('div', { class: 'vl-chat__scroll' }, [list])
@@ -291,7 +308,12 @@ export function createChatView({ convId, navigate, menuButton }) {
   const replyBar = h('div', { class: 'vl-reply-bar', hidden: true })
   const tray = h('div', { class: 'vl-tray', hidden: true })
   const input = h('textarea', { class: 'vl-composer__input', rows: '1', maxlength: String(MAX_LEN + 500), placeholder: 'Сообщение...', 'aria-label': 'Сообщение' })
-  const sendBtn = h('button', { type: 'button', class: 'vl-composer__send', title: 'Отправить', 'aria-label': 'Отправить' }, [icon('paper-plane')])
+  // Микрофон и «отправить» лежат друг на друге: пока пусто — микрофон, с первой буквой он
+  // поворачивается и исчезает, а стрелка выпрыгивает на его место (как в канвасе)
+  const sendBtn = h('button', { type: 'button', class: 'g-act', title: 'Отправить', 'aria-label': 'Отправить', 'data-on': '1' }, [
+    h('span', { class: 'g-act__mic' }, [icon('microphone')]),
+    h('span', { class: 'g-act__snd' }, [icon('paper-plane')])
+  ])
   const counter = h('span', { class: 'vl-composer__counter', hidden: true })
   const attachBtn = h('button', { type: 'button', class: 'vl-composer__attach', title: 'Прикрепить файл', 'aria-label': 'Прикрепить файл' }, [icon('paperclip')])
   const fileInput = h('input', { type: 'file', multiple: true, hidden: true })
@@ -335,13 +357,9 @@ export function createChatView({ convId, navigate, menuButton }) {
     const mode = recorder ? 'stop' : (!hasContent && canRecord ? 'mic' : 'send')
     if (mode !== sendMode) {
       sendMode = mode
-      sendBtn.replaceChildren(icon(mode === 'mic' ? 'microphone' : 'paper-plane'))
-      sendBtn.title = mode === 'mic' ? 'Записать голосовое' : 'Отправить'
+      sendBtn.dataset.on = mode === 'mic' ? '0' : '1'
+      sendBtn.title = mode === 'mic' ? 'Записать голосовое' : mode === 'stop' ? 'Отправить голосовое' : 'Отправить'
       sendBtn.setAttribute('aria-label', sendBtn.title)
-      sendBtn.classList.toggle('is-mic', mode === 'mic')
-      sendBtn.classList.remove('is-swap')
-      void sendBtn.offsetWidth
-      sendBtn.classList.add('is-swap')
     }
     sendBtn.disabled = mode === 'send' && (!hasContent || over)
     autosize()
@@ -565,6 +583,7 @@ export function createChatView({ convId, navigate, menuButton }) {
   }
   function renderTyping() {
     const names = typingNames()
+    renderHeader()
     typingLine.textContent = names.length ? `${names.join(', ')} ${names.length > 1 ? 'печатают' : 'печатает'}` : ''
     const stick = atBottom
     renderList()
@@ -738,6 +757,15 @@ export function createChatView({ convId, navigate, menuButton }) {
   }
 
   // pos: single | first | middle | last — место в серии подряд идущих сообщений одного автора
+  // Аватар слева от сообщения, как в канвасе: виден у последнего в серии, у остальных — прозрачный
+  function msgAvatar(authorId, shown) {
+    const mine = authorId === me.id
+    const a = avatar(mine ? me : (userById(authorId) || (authorId === peer.id ? peer : { id: authorId, username: '' })), { size: 36, saved: saved && !mine })
+    a.classList.add('g-mava', mine ? 'is-me' : 'is-peer')
+    if (shown) a.classList.add('is-shown')
+    return a
+  }
+
   function buildMessage(m, pos) {
     const mine = m.authorId === me.id
     const key = m.id ? 'm' + m.id : 'c' + m.clientId
@@ -787,7 +815,7 @@ export function createChatView({ convId, navigate, menuButton }) {
       if (m.kind === 'text') tools.push(toolButton('share', 'Переслать', () => openForwardPicker(m)))
       tools.push(toolButton('ellipsis', 'Ещё', (e) => messageMenu(m, e)))
     }
-    const children = [h('div', { class: 'vl-msg__wrap' }, [h('span', { class: 'vl-msg__swipe', 'aria-hidden': 'true' }, [icon('reply')]), bubble, tools.length ? h('div', { class: 'vl-msg__tools' }, tools) : null])]
+    const children = [msgAvatar(m.authorId, pos === 'last' || pos === 'single'), h('div', { class: 'vl-msg__wrap' }, [h('span', { class: 'vl-msg__swipe', 'aria-hidden': 'true' }, [icon('reply')]), bubble, tools.length ? h('div', { class: 'vl-msg__tools' }, tools) : null])]
     if (m.failed) {
       const retry = h('button', { type: 'button', class: 'vl-linkbtn' }, 'Повторить')
       const drop = h('button', { type: 'button', class: 'vl-linkbtn' }, 'Удалить')
@@ -816,29 +844,30 @@ export function createChatView({ convId, navigate, menuButton }) {
     return msg
   }
 
-  // Звонок в ленте — пилюля по центру: зелёная, пока звонок жив, красноватая — пропущенный/отклонён
+  // Звонок в ленте — карточка как в канвасе: круглая трубка, «Исходящий звонок», время под ним
   function buildCallMessage(m) {
     const author = authorOf(m)
     const mine = m.authorId === me.id
     const status = (m.meta && m.meta.status) || 'ringing'
-    let text
-    if (status === 'missed') text = mine ? `${displayName(peer)} не ответил(а)` : `Пропущенный звонок от ${displayName(author)}`
-    else if (status === 'declined') text = mine ? `${displayName(peer)} отклонил(а) звонок` : 'Вы отклонили звонок'
-    else if (status === 'ringing') text = mine ? 'Вы звоните…' : `${displayName(author)} звонит вам…`
-    else text = mine ? 'Вы начали звонок' : `${displayName(author)} начал(а) звонок`
+    let title
+    let sub
+    if (status === 'missed') { title = mine ? 'Без ответа' : 'Пропущенный звонок'; sub = mine ? `${displayName(peer)} не ответил(а)` : `от ${displayName(author)}` }
+    else if (status === 'declined') { title = mine ? 'Звонок отклонён' : 'Вы отклонили звонок'; sub = '' }
+    else if (status === 'ringing') { title = mine ? 'Исходящий звонок' : 'Входящий звонок'; sub = 'вызов…' }
+    else { title = mine ? 'Исходящий звонок' : 'Входящий звонок'; sub = '' }
     const bad = status === 'missed' || status === 'declined'
-    const pill = h('div', { class: `vl-callpill${bad ? ' is-bad' : ''}` }, [
-      icon(bad ? 'phone-slash' : 'phone'),
-      h('span', { class: 'vl-callpill__text' }, text),
-      h('time', { class: 'vl-callpill__time' }, timeHM(m.createdAt))
+    const time = timeHM(m.createdAt) + (sub ? ' · ' + sub : '')
+    const card = h('div', { class: `g-callbub${bad ? ' is-bad' : ''}` }, [
+      h('span', { class: 'g-callbub__ico' }, [icon(bad ? 'phone-slash' : 'phone')]),
+      h('span', { class: 'g-callbub__text' }, [h('span', { class: 'g-callbub__title' }, title), h('span', { class: 'g-callbub__sub' }, time)])
     ])
     const here = inCall() && m.meta && window.VL.state.roomCode === m.meta.roomCode
     if (canJoin(m) && !here) {
-      const join = h('button', { type: 'button', class: 'vl-btn vl-btn--primary vl-btn--sm vl-btn--pill' }, 'Присоединиться')
+      const join = h('button', { type: 'button', class: 'g-btn g-btn--acc g-btn--sm g-callbub__join' }, 'Присоединиться')
       join.addEventListener('click', () => joinCallFromMessage(m))
-      pill.appendChild(join)
+      card.appendChild(join)
     }
-    const node = h('div', { class: `vl-msg vl-msg--call${animateKeys.delete('m' + m.id) ? ' is-new' : ''}`, 'data-key': 'm' + m.id }, [pill])
+    const node = h('div', { class: `vl-msg vl-msg--call ${mine ? 'is-mine' : 'is-theirs'} pos-single${animateKeys.delete('m' + m.id) ? ' is-new' : ''}`, 'data-key': 'm' + m.id }, [msgAvatar(m.authorId, true), card])
     const callMenu = (e) => {
       e.preventDefault()
       showMenu([{ label: 'Удалить у меня', icon: 'trash', danger: true, onClick: () => api.del(`/api/conversations/${convId}/messages/${m.id}?for=me`).then(() => removeMessage(convId, m.id)).catch((er) => toast(er.message, 'error')) }], e)
@@ -850,6 +879,7 @@ export function createChatView({ convId, navigate, menuButton }) {
 
   function buildTyping(names) {
     return h('div', { class: 'vl-msg is-theirs pos-single is-typing-row', 'aria-hidden': 'true' }, [
+      msgAvatar(peer.id, true),
       h('div', { class: 'vl-msg__wrap' }, [h('div', { class: 'vl-bubble is-typing', title: `${names.join(', ')} печатает` }, [h('i'), h('i'), h('i')])])
     ])
   }

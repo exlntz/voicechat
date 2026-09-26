@@ -57,9 +57,8 @@
 
   function enhanceButton(btn) {
     if (btn.matches(BTN_SKIP)) return
+    // Заливки от курсора и «магнита» в новом дизайне нет — кнопки меняют цвет плавно, как в канвасе
     btn.classList.add('ank-btn')
-    attachMagnet(btn)
-    attachFill(btn)
   }
 
   // Заливка от курсора: при входе мыши из точки входа вырастает круг и заполняет кнопку
@@ -382,7 +381,8 @@
     var topbar = $('.room-topbar', screen)
     // Шапка звонка: знак продукта слева и название "Voice Lobby" рядом с ним.
     // Раньше здесь была только иконка звонка, без подписи.
-    if (topbar && !$('.ank-brandline', topbar)) {
+    // Лого «Голос · Звонок» теперь рисует сам app.js (как в канвасе) — своё не добавляем
+    if (false && topbar && !$('.ank-brandline', topbar)) {
       var line = make('div', 'ank-brandline')
       // Пока идёт подключение — анимация всё время; в звонке — статично, при наведении
       // (класс переключает setStatus в app.js)
