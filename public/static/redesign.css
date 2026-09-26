@@ -1168,3 +1168,7 @@ html:not([data-theme="light"]) .room-screen .controls-pill .ctrl-btn.off { color
 .ank-pulse .pl-bar, html[data-theme] .ank-pulse .pl-bar { fill: var(--g-on-acc); }
 .g-brand .ank-pulse, .g-callhead__home .ank-pulse, .g-empty-view__box .ank-pulse { flex-shrink: 0; }
 .g-empty-view__box .ank-pulse { margin-bottom: 6px; }
+
+/* Включённая демонстрация экрана — серая кнопка (в обеих темах) */
+:root { --g-on-bg: #4a4a4a; --g-on-fg: #f2f0ec; --g-on-bg-h: #555555; }
+html[data-theme="light"] { --g-on-bg: #8a847c; --g-on-fg: #ffffff; --g-on-bg-h: #78716c; }
