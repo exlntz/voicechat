@@ -223,7 +223,11 @@ function resetPageScroll(blurInput = false) {
 // ---- Пользовательские настройки (localStorage, у каждого браузера свои) ----
 const PREFS = {
   // Подключаться к звонку с выключенным микрофоном. По умолчанию — нет.
-  joinMicMuted: { key: 'pref:joinMicMuted', def: false }
+  joinMicMuted: { key: 'pref:joinMicMuted', def: false },
+  // Шумоподавление микрофона (WebRTC noiseSuppression). По умолчанию — включено.
+  noiseSuppression: { key: 'pref:noiseSuppression', def: true },
+  // Имена на плитках звонка. Ключ общий с social/ui.js (applyPrefs).
+  tileNames: { key: 'vl:tileNames', def: true }
 }
 
 function getPref(name) {
@@ -237,6 +241,12 @@ function getPref(name) {
 function setPref(name, on) {
   try { localStorage.setItem(PREFS[name].key, on ? '1' : '0') } catch {}
 }
+
+// «Имена на плитках» выключены — подписи участников прячутся (класс на <html>, см. style.css)
+function applyTileNamesPref() {
+  document.documentElement.classList.toggle('vl-hide-tile-names', !getPref('tileNames'))
+}
+applyTileNamesPref()
 
 // Переключатель-«тумблер»: строка с подписью слева и switch справа
 function makeSwitchRow(labelText, checked, onChange) {
@@ -1389,6 +1399,9 @@ async function enterRoom(joinData) {
       ...(state.selectedCamId ? { deviceId: state.selectedCamId } : {})
     },
     audioCaptureDefaults: {
+      echoCancellation: true,
+      autoGainControl: true,
+      noiseSuppression: getPref('noiseSuppression'),
       ...(state.selectedMicId ? { deviceId: state.selectedMicId } : {})
     },
     ...(state.selectedSpeakerId ? { audioOutput: { deviceId: state.selectedSpeakerId } } : {}),
@@ -2906,6 +2919,54 @@ async function enterRoom(joinData) {
     }
   }
 
+  // Шумоподавление: запоминаем и перезапускаем текущий трек микрофона с новым ограничением
+  async function applyNoiseSuppression(on) {
+    setPref('noiseSuppression', on)
+    try { room.options.audioCaptureDefaults = { ...(room.options.audioCaptureDefaults || {}), noiseSuppression: on } } catch {}
+    const pub = room.localParticipant.getTrackPublication(LK.Track.Source.Microphone)
+    if (pub && pub.track && typeof pub.track.restartTrack === 'function') {
+      try { await pub.track.restartTrack({ ...room.options.audioCaptureDefaults }) } catch (e) { console.warn('noiseSuppression', e) }
+    }
+    showToast(on ? 'Шумоподавление включено' : 'Шумоподавление выключено', 'success')
+  }
+
+  // «Проверить» динамики: короткий двойной сигнал в выбранное устройство вывода
+  async function playSpeakerTest(btn) {
+    if (btn.disabled) return
+    btn.disabled = true
+    let ctx = null
+    let audio = null
+    const done = () => {
+      try { if (audio) audio.pause() } catch {}
+      if (ctx) ctx.close().catch(() => {})
+      btn.disabled = false
+    }
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)()
+      const dest = ctx.createMediaStreamDestination()
+      audio = new Audio()
+      audio.srcObject = dest.stream
+      if (state.selectedSpeakerId && typeof audio.setSinkId === 'function') {
+        try { await audio.setSinkId(state.selectedSpeakerId) } catch {}
+      }
+      await audio.play()
+      const t = ctx.currentTime + 0.05
+      ;[[660, 0], [880, 0.24]].forEach(([freq, at]) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.frequency.value = freq
+        osc.connect(gain)
+        gain.connect(dest)
+        gain.gain.setValueAtTime(0.0001, t + at)
+        gain.gain.exponentialRampToValueAtTime(0.3, t + at + 0.02)
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.22)
+        osc.start(t + at)
+        osc.stop(t + at + 0.24)
+      })
+      setTimeout(done, 800)
+    } catch (e) { done() }
+  }
+
   // silent: переключение не по клику пользователя (устройство выдернули, список обновился) —
   // без тоста, иначе «Микрофон переключён» всплывал при каждом открытии настроек.
   async function applyMicDevice(deviceId, silent = false) {
@@ -3029,12 +3090,16 @@ async function enterRoom(joinData) {
     inCallCamSelect.addEventListener('change', () => applyCamDevice(inCallCamSelect.value || null))
     inCallSpkSelect.addEventListener('change', () => applySpeakerDevice(inCallSpkSelect.value || null))
     inCallDevices.micCard.appendChild(makeSwitchRow('Подключаться с выключенным микрофоном', getPref('joinMicMuted'), (on) => setPref('joinMicMuted', on)))
+    inCallDevices.micCard.appendChild(makeSwitchRow('Шумоподавление', getPref('noiseSuppression'), (on) => applyNoiseSuppression(on)))
+    const spkTestBtn = el('button', { type: 'button', class: 'settings-test-btn' }, 'Проверить')
+    spkTestBtn.addEventListener('click', () => playSpeakerTest(spkTestBtn))
+    inCallDevices.spkCard.querySelector('.settings-card-head').appendChild(spkTestBtn)
 
     // Разделы: слева меню, справа содержимое. Пока раздел один — «Звук»;
     // новые добавляются в SECTIONS и сразу появляются в меню.
     const SECTIONS = [
       { group: 'Звонок', id: 'sound', icon: 'fas fa-volume-high', title: 'Звук', build: () => [inCallDevices.micCard, inCallDevices.spkCard, inCallDevices.camCard] },
-      { group: 'Звонок', id: 'look', icon: 'fas fa-palette', title: 'Оформление', build: () => [buildThemeCard()] }
+      { group: 'Звонок', id: 'look', icon: 'fas fa-palette', title: 'Оформление', build: () => [buildThemeCard(), buildTilesCard()] }
     ]
     const nav = el('nav', { class: 'settings-nav', 'aria-label': 'Разделы настроек' })
     const content = el('div', { class: 'settings-body' })
@@ -3063,6 +3128,14 @@ async function enterRoom(joinData) {
     devicePopup = overlay
     refreshInCallDeviceLists()
     startInCallMeter()
+  }
+
+  // «Оформление» → «Плитки»: показывать ли имена участников на плитках
+  function buildTilesCard() {
+    return el('div', { class: 'settings-card' }, [
+      el('div', { class: 'settings-card-head' }, [el('span', { class: 'settings-card-title' }, [el('i', { class: 'fas fa-table-cells-large' }), 'Плитки'])]),
+      makeSwitchRow('Имена на плитках', getPref('tileNames'), (on) => { setPref('tileNames', on); applyTileNamesPref() })
+    ])
   }
 
   // «Оформление» в настройках звонка: та же тема, что в профиле (хранится на устройстве)

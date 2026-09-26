@@ -543,6 +543,23 @@ export function setThemeChoice(choice) {
 }
 // Для app.js (настройки звонка): тот же выбор темы
 if (window.VL) Object.assign(window.VL, { getThemeChoice, setThemeChoice })
+
+// ---- Настройки этого устройства (localStorage 'vl:*'): размер текста в чатах, имена на плитках, звук входящего ----
+export function getPref(key, def) {
+  try { const v = localStorage.getItem('vl:' + key); return v == null ? def : v } catch { return def }
+}
+export function setPref(key, value) {
+  try { localStorage.setItem('vl:' + key, String(value)) } catch {}
+  applyPrefs()
+}
+export const CHAT_FONT_SIZES = { s: 13, m: 15, l: 17 }
+export function applyPrefs() {
+  const root = document.documentElement
+  root.style.setProperty('--vl-msg-size', (CHAT_FONT_SIZES[getPref('chatFont', 'm')] || 15) + 'px')
+  root.classList.toggle('vl-hide-tile-names', getPref('tileNames', '1') === '0')
+}
+applyPrefs()
+if (window.VL) Object.assign(window.VL, { getPref, setPref })
 // «Как в системе»: переключаемся вместе с системой
 if (window.matchMedia) {
   const mq = matchMedia('(prefers-color-scheme: dark)')

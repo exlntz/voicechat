@@ -1360,6 +1360,18 @@ button {
   z-index: 4;
   overflow: hidden;
 }
+.tile .tile-label { transition: opacity 0.25s var(--ease), transform 0.35s var(--ease); }
+/* «Имена на плитках» выключены в настройках звонка (подпись демонстрации оставляем) */
+.vl-hide-tile-names .tile:not(.screen-tile) .tile-label { opacity: 0; transform: translateY(6px); pointer-events: none; }
+/* «Проверить» у динамиков в настройках звонка */
+.settings-test-btn {
+  margin-left: auto; height: 32px; padding: 0 14px; border: 0; border-radius: 999px;
+  background: rgba(var(--ink-rgb), 0.08); color: var(--text); font: 600 13px/1 var(--font); cursor: pointer;
+  transition: background 0.2s var(--ease), transform 0.18s var(--ease);
+}
+.settings-test-btn:hover { background: rgba(var(--ink-rgb), 0.14); }
+.settings-test-btn:active { transform: scale(0.96); }
+.settings-test-btn:disabled { opacity: 0.55; cursor: default; }
 .tile .tile-label span {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3304,6 +3316,8 @@ body.pip-body > .room-screen { height: 100%; }
 .settings-sheet .settings-row { border-top-color: rgba(var(--ink-rgb), 0.07); }
 .settings-sheet .settings-row--first { margin-top: 4px; padding-top: 0; border-top: 0; }
 .settings-card-note { margin: -4px 0 14px; font-size: 13px; line-height: 1.5; color: var(--text-faint); }
+/* Значение справа в строке настроек (профиль → «Аккаунт») */
+.settings-row__value { margin-left: auto; font-size: 14px; color: var(--text-faint); text-align: right; }
 .settings-row + .settings-card-note { margin: 10px 0 0; }
 .settings-card-actions { display: flex; justify-content: flex-end; }
 .settings-sheet .dd-btn { background: #0f1216; }
