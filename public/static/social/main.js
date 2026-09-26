@@ -163,7 +163,7 @@ async function mountView(r, key) {
 function createEmptyView() {
   const node = h('section', { class: 'vl-view g-empty-view' }, [
     h('div', { class: 'g-empty-view__box' }, [
-      h('span', { class: 'g-logo g-logo--lg' }, [icon('logo')]),
+      window.VLLogo ? window.VLLogo(64) : h('span', { class: 'g-logo g-logo--lg' }, [icon('logo')]),
       h('span', { class: 'g-empty-view__title' }, 'Выберите чат'),
       h('span', { class: 'g-empty-view__sub' }, 'или начните звонок во вкладке «Звонки»')
     ])

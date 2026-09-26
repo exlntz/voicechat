@@ -1161,3 +1161,10 @@ html:not([data-theme="light"]) .room-screen .controls-pill .ctrl-btn.off { color
 .vl-incoming__sub { color: var(--g-sub); font-size: 15px; }
 .vl-incoming__act { color: var(--g-sub); font: 600 13px var(--font); }
 .vl-solo-chats { display: none !important; }
+
+/* Лого Voice Lobby — облачко с полосками, чёрное (в тёмной теме — цвета акцента) */
+.ank-pulse .pl-bubble, html[data-theme] .ank-pulse .pl-bubble { fill: var(--g-acc); }
+.ank-pulse .pl-bubble path, html[data-theme] .ank-pulse .pl-bubble path { stroke: var(--g-acc); }
+.ank-pulse .pl-bar, html[data-theme] .ank-pulse .pl-bar { fill: var(--g-on-acc); }
+.g-brand .ank-pulse, .g-callhead__home .ank-pulse, .g-empty-view__box .ank-pulse { flex-shrink: 0; }
+.g-empty-view__box .ank-pulse { margin-bottom: 6px; }

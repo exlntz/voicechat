@@ -132,11 +132,11 @@ function svgToggleIcon(kind, size = 22) {
 function gCallHeader(subtitle, extra = []) {
   return el('header', { class: 'g-callhead' }, [gHomeLink(subtitle), el('span', { class: 'g-callhead__spacer' }), ...extra])
 }
-// «Голос · …» слева в шапке экранов звонка: по нажатию — к чатам (звонок, если идёт, продолжится)
+// «Voice Lobby · …» слева в шапке экранов звонка: по нажатию — к чатам (звонок, если идёт, продолжится)
 function gHomeLink(subtitle) {
   const a = el('a', { href: '/friends', class: 'g-callhead__home', title: 'К чатам' }, [
-    el('span', { class: 'g-callhead__logo' }, [gIcon('logo', 20)]),
-    el('span', { class: 'g-callhead__name' }, 'Голос'),
+    window.VLLogo ? window.VLLogo(40) : el('span', { class: 'g-callhead__logo' }, [gIcon('logo', 20)]),
+    el('span', { class: 'g-callhead__name' }, 'Voice Lobby'),
     el('span', { class: 'g-callhead__sub' }, '· ' + subtitle)
   ])
   a.addEventListener('click', (e) => {
@@ -1254,7 +1254,7 @@ async function enterRoom(joinData) {
   const pplCount = el('span', { class: 'g-ppl-count' }, '1')
   const participantsBtn = el('button', { type: 'button', class: 'room-people-btn g-ppl-btn', title: 'Участники', 'aria-label': 'Участники', 'aria-pressed': 'false' }, [gIcon('people', 20, 'g-ico-pop'), pplCount])
   topRight.appendChild(participantsBtn)
-  // Слева — «Голос · Звонок»; по нажатию возвращаемся к чатам, звонок продолжается
+  // Слева — «Voice Lobby · Звонок»; по нажатию возвращаемся к чатам, звонок продолжается
   const homeLink = gHomeLink('Звонок')
   topbar.appendChild(homeLink)
   topbar.appendChild(el('span', { class: 'g-callhead__spacer' }))

@@ -283,6 +283,9 @@
       '<g class="pl-bar pl-b4"><circle class="pl-top" cx="83.5" cy="52" r="4.5"/><rect class="pl-mid" x="79" y="36.5" width="9" height="31"/><circle class="pl-bot" cx="83.5" cy="52" r="4.5"/></g>' +
     '</svg>'
 
+  // Лого «Voice Lobby» нужно и оболочке (левая панель, шапки звонка) — отдаём наружу
+  window.VLLogo = function (size, live) { return makePulse(size, live) }
+
   function makePulse(size, live) {
     var d = make('span', 'ank-pulse' + (live ? ' is-live' : ''))
     d.setAttribute('role', 'img')

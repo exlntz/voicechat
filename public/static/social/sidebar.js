@@ -27,7 +27,9 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
   // ---------- Шапка: лого «Голос» и кнопка профиля ----------
   const meBtn = h('button', { type: 'button', class: 'g-meb', title: 'Профиль', 'aria-label': 'Открыть профиль' })
   meBtn.addEventListener('click', () => openProfile())
-  const brand = h('div', { class: 'g-brand' }, [h('span', { class: 'g-logo' }, [icon('logo')]), h('span', { class: 'g-brand__name' }, 'Голос')])
+  // Лого Voice Lobby (облачко с полосками голоса, anker.js), чёрное под новый дизайн
+  const logo = window.VLLogo ? window.VLLogo(36) : h('span', { class: 'g-logo' }, [icon('logo')])
+  const brand = h('div', { class: 'g-brand' }, [logo, h('span', { class: 'g-brand__name' }, 'Voice Lobby')])
   const mobileTitle = h('span', { class: 'g-side__title' }, 'Чаты')
   const head = h('div', { class: 'g-side__head' }, [brand, mobileTitle, meBtn])
 
