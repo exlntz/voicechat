@@ -280,39 +280,16 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
   // ---------- Панель «Звонки» ----------
   const newCallBtn = h('button', { type: 'button', class: 'g-btn g-btn--acc g-btn--wide' }, [icon('phone'), 'Новый звонок'])
   newCallBtn.addEventListener('click', () => openPicker('call'))
-  const codeInput = h('input', { type: 'text', class: 'g-field__input', placeholder: 'Код комнаты', maxlength: '32', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Код комнаты' })
-  const codeGo = h('button', { type: 'button', class: 'g-field__btn' }, 'Войти')
-  const codeField = h('label', { class: 'g-field' }, [codeInput, codeGo])
-  function goCode() {
-    const code = codeInput.value.replace(/[^a-z0-9]/gi, '').toLowerCase()
-    if (!code) { codeInput.focus(); return }
-    codeInput.value = ''
-    navigate('/room/' + code)
-  }
-  codeGo.addEventListener('click', (e) => { e.preventDefault(); goCode() })
-  codeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); goCode() } })
   // Телефон: «Позвонить другу» — друзья в сети кружками в ряд
   const callStrip = h('div', { class: 'g-strip' })
   const callsList = h('div', { class: 'g-list g-list--calls' })
-  const mobileCode = h('div', { class: 'g-codecard' }, [h('span', { class: 'g-codecard__title' }, 'Комната по коду')])
   const callsPane = h('div', { class: 'g-pane g-pane--calls' }, [
     newCallBtn,
     h('div', { class: 'g-label g-only-phone' }, 'Позвонить другу'),
     callStrip,
-    mobileCode,
-    codeField,
     h('div', { class: 'g-label' }, 'НЕДАВНИЕ'),
     callsList
   ])
-  // Поле кода на телефоне живёт в карточке, на ПК — сразу под кнопкой
-  const codeHomeDesktop = () => { if (codeField.parentNode !== callsPane) callsPane.insertBefore(codeField, mobileCode.nextSibling) }
-  const phoneMQ = matchMedia('(max-width: 860px)')
-  function placeCode() {
-    if (phoneMQ.matches) { mobileCode.appendChild(codeField); codeGo.classList.add('g-btn', 'g-btn--acc'); codeGo.classList.remove('g-field__btn') }
-    else { codeHomeDesktop(); codeGo.classList.remove('g-btn', 'g-btn--acc'); codeGo.classList.add('g-field__btn') }
-  }
-  phoneMQ.addEventListener && phoneMQ.addEventListener('change', placeCode)
-  placeCode()
 
   let recentCalls = null
   let callsLoading = false
@@ -506,10 +483,17 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
   })
   const iosHint = needsHomeScreen()
   const hideKey = iosHint ? 'vl:iosHomeHintHidden' : 'vl:notifBannerHidden'
-  hideBtn.addEventListener('click', () => { try { localStorage.setItem(hideKey, '1') } catch {} renderNotifBanner() })
+  // Флаг в памяти: без него баннер не закрывался там, где localStorage недоступен (частный режим Safari)
+  let notifDismissed = false
+  hideBtn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation()
+    notifDismissed = true
+    try { localStorage.setItem(hideKey, '1') } catch {}
+    renderNotifBanner()
+  })
   function renderNotifBanner() {
-    let hidden = false
-    try { hidden = localStorage.getItem(hideKey) === '1' } catch {}
+    let hidden = notifDismissed
+    try { hidden = hidden || localStorage.getItem(hideKey) === '1' } catch {}
     if (iosHint) {
       notifText.textContent = 'Уведомления на iPhone: «Поделиться» → «На экран „Домой“», затем откройте сайт с иконки'
       enableBtn.hidden = true
