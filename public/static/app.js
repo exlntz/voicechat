@@ -1924,12 +1924,14 @@ async function enterRoom(joinData) {
     tile.appendChild(label)
 
     // Полноэкранный режим для тайла камеры (выбрать конкретного участника "на весь экран")
-    const fsBtn = el('button', { class: 'tile-fullscreen-btn g-tt', title: 'На весь экран', 'aria-label': 'На весь экран' }, [gIcon('expand', 17, 'g-fs-in'), gIcon('compress', 17, 'g-fs-out')])
+    const fsBtn = el('button', { class: 'tile-fullscreen-btn g-tt g-tt--fs', title: 'На весь экран', 'aria-label': 'На весь экран' }, [gIcon('expand', 17, 'g-fs-in'), gIcon('compress', 17, 'g-fs-out')])
     fsBtn.addEventListener('click', (e) => {
       e.stopPropagation()
       toggleTileFullscreen(tile)
     })
-    const tools = el('div', { class: 'g-ttools' }, [fsBtn])
+    // «На весь экран» — в правом нижнем углу плитки, остальные кнопки — справа сверху
+    tile.appendChild(fsBtn)
+    const tools = el('div', { class: 'g-ttools' })
     tile.appendChild(tools)
     tile.addEventListener('dblclick', () => toggleTileFullscreen(tile))
 
@@ -1950,7 +1952,7 @@ async function enterRoom(joinData) {
           e.stopPropagation()
           kickParticipant(identity, name)
         })
-        tools.insertBefore(kickBtn, fsBtn)
+        tools.appendChild(kickBtn)
       }
     }
     playEnter(tile)
@@ -2116,7 +2118,7 @@ async function enterRoom(joinData) {
     const label = el('div', { class: 'tile-label' }, [el('span', { class: 'g-tile-name' }, name), isLocal ? el('span', { class: 'g-you' }, '(Вы)') : null])
     // Плашка «Демонстрация» в левом верхнем углу (как в канвасе)
     const liveBadge = el('div', { class: 'live-badge-group g-share-badge' }, [gIcon('screen', 15), 'Демонстрация'])
-    const fsBtn = el('button', { class: 'tile-fullscreen-btn g-tt', title: 'На весь экран', 'aria-label': 'На весь экран' }, [gIcon('expand', 17, 'g-fs-in'), gIcon('compress', 17, 'g-fs-out')])
+    const fsBtn = el('button', { class: 'tile-fullscreen-btn g-tt g-tt--fs', title: 'На весь экран', 'aria-label': 'На весь экран' }, [gIcon('expand', 17, 'g-fs-in'), gIcon('compress', 17, 'g-fs-out')])
     fsBtn.addEventListener('click', (e) => {
       e.stopPropagation()
       toggleTileFullscreen(tile)
@@ -2124,7 +2126,7 @@ async function enterRoom(joinData) {
     tile.appendChild(video)
     tile.appendChild(liveBadge)
     tile.appendChild(label)
-    tile.appendChild(el('div', { class: 'g-ttools' }, [fsBtn]))
+    tile.appendChild(fsBtn)
     let volumeCtl = null
     if (!isLocal) {
       // Громкость звука демонстрации (звук с устройства демонстрирующего)

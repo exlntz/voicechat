@@ -1230,3 +1230,31 @@ html[data-theme="light"] .room-screen .room-copy-btn, html[data-theme="light"] .
 html[data-theme="light"] .room-screen .room-copy-btn:hover { background: #f7f6f3 !important; }
 html[data-theme="light"] .g-ppl-btn:not(.is-on) { background: #fff; color: var(--g-ink); }
 html[data-theme="light"] .g-ppl-btn:not(.is-on):hover { background: #f7f6f3; }
+
+/* «На весь экран» — круглая кнопка в правом нижнем углу плитки; громкость сдвинута левее */
+.room-screen .tile .g-tt.g-tt--fs { position: absolute; right: 14px; bottom: 14px; top: auto; left: auto; z-index: 4; width: 40px; height: 40px; border-radius: 20px; opacity: 0; transform: translateY(4px) scale(.9); transition: opacity .2s, background-color .2s, transform .45s var(--g-spring); }
+.room-screen .tile:hover .g-tt.g-tt--fs, .room-screen .tile.is-fullscreen .g-tt.g-tt--fs, .room-screen .tile .g-tt.g-tt--fs:focus-visible { opacity: 1; transform: none; }
+.room-screen .tile .g-tt.g-tt--fs:active { transform: scale(.92); }
+.room-screen .tile .g-vol { right: 62px; max-width: calc(100% - 76px); }
+@media (hover: none) { .room-screen .tile .g-tt.g-tt--fs { opacity: 1; transform: none; } }
+
+/* Поле ввода: без полосы прокрутки (на Windows она торчала серой палкой у микрофона) */
+.vl-composer__input { scrollbar-width: none; }
+.vl-composer__input::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* «Изменить контакт»: «Отмена» и «Сохранить» в ряд, «Удалить из контактов» — строкой ниже, внутри окна */
+.vl-contact .vl-modal__actions { flex-wrap: wrap; }
+.vl-contact .vl-contact__spacer { display: none; }
+.vl-contact .vl-modal__actions .vl-btn { flex: 1 1 0; }
+.vl-contact .vl-modal__actions .vl-contact__remove { order: 3; flex: 1 1 100%; background: rgba(239, 68, 68, .1); color: #dc2626; }
+.vl-contact .vl-modal__actions .vl-contact__remove:hover { background: rgba(239, 68, 68, .16); }
+
+/* Большая кнопка «Скопировать ссылку» в приглашении — полностью круглые края, как у кнопки в шапке */
+.room-screen .solo-copy-btn { border-radius: 999px !important; }
+
+/* Шапка звонка на телефоне: только облачко слева, чтобы «Voice Lobby» не переносилось и таймер не обрезался */
+@media (max-width: 560px) {
+  .room-topbar .g-callhead__name { display: none; }
+  body.vl-show-app .room-screen .room-topbar { padding-left: 0; }
+  .room-topbar .room-status, .room-screen .room-copy-btn, .room-topbar .g-ppl-btn { flex-shrink: 0; }
+}
