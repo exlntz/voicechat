@@ -916,7 +916,7 @@ async function renderLobby(prefillRoomCode = '') {
   for (let i = 0; i < 12; i++) micDots.appendChild(el('i', {}))
   const micState = el('span', {}, state.micEnabled ? 'Микрофон работает' : 'Микрофон выключен')
   const meterPill = el('div', { class: 'g-join__meter' }, [micDots, micState])
-  const namePill = el('div', { class: 'g-join__name' }, myName)
+  const namePill = el('div', { class: 'g-join__name' }, [el('span', { class: 'g-join__nm' }, myName), el('span', { class: 'g-you' }, '(Вы)')])
   const micToggleBtn = el('button', { type: 'button', class: 'g-cb join-toggle-btn', 'aria-label': 'Микрофон', title: 'Микрофон' }, [svgToggleIcon('mic')])
   const camToggleBtn = el('button', { type: 'button', class: 'g-cb join-toggle-btn', 'aria-label': 'Камера', title: 'Камера' }, [svgToggleIcon('cam')])
   preview.appendChild(previewVideo)

@@ -195,7 +195,18 @@ function updateLayout() {
   body.classList.toggle('vl-call-docked', docked)
   body.classList.toggle('vl-dock-open', docked && dockOpen)
   const screen = appRoot.querySelector('.room-screen')
-  if (screen) screen.classList.toggle('is-docked', docked)
+  if (screen) {
+    const returning = !docked && screen.classList.contains('is-docked')
+    screen.classList.toggle('is-docked', docked)
+    // Вернулись в звонок (плашка «В звонке», «развернуть»): шапка, плитки и кнопки въезжают
+    if (returning) {
+      screen.classList.remove('is-return')
+      void screen.offsetWidth
+      screen.classList.add('is-return')
+      clearTimeout(screen._retT)
+      screen._retT = setTimeout(() => screen.classList.remove('is-return'), 1000)
+    }
+  }
   // Звонок из чата — плашкой «В звонке» внизу слева (sidebar.js); видео открывается целиком
   renderDockTools(false)
   renderIsland(false)
