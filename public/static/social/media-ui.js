@@ -98,7 +98,126 @@ function boxSize(meta, maxW = 360, maxH = 360) {
   return { w: Math.max(140, Math.round(w * k)), h: Math.max(90, Math.round(hh * k)) }
 }
 
+// ---------- Фото в ленте как в Телеграме: размытое превью → резкое фото ----------
+// Фото качается целиком (fetch с прогрессом), декодируется и только потом плавно
+// проявляется поверх размытого превью (meta.thumb, ~24 px). Пока грузится — круг с
+// прогрессом и крестиком: крестик останавливает загрузку, стрелка — продолжает.
+// Состояние загрузок живёт вне DOM: лента перерисовывается, а загрузка идёт дальше.
+const imgReady = new Map() // url -> objectURL уже загруженного фото
+const imgLoads = new Map() // url -> { frac, subs, ac }
+const imgPaused = new Set() // остановленные крестиком — сами не возобновляются
+function loadChatImage(url) {
+  let L = imgLoads.get(url)
+  if (L) return L
+  L = { frac: 0, subs: new Set(), ac: new AbortController() }
+  imgLoads.set(url, L)
+  const notify = () => L.subs.forEach((fn) => fn(L))
+  ;(async () => {
+    try {
+      const res = await fetch(url, { credentials: 'same-origin', signal: L.ac.signal })
+      if (!res.ok) throw new Error('HTTP ' + res.status)
+      const total = Number(res.headers.get('content-length')) || 0
+      let blob
+      if (res.body && total) {
+        const reader = res.body.getReader()
+        const parts = []
+        let got = 0
+        for (;;) {
+          const { done, value } = await reader.read()
+          if (done) break
+          parts.push(value)
+          got += value.length
+          L.frac = Math.min(0.99, got / total)
+          notify()
+        }
+        blob = new Blob(parts, { type: res.headers.get('content-type') || 'image/jpeg' })
+      } else blob = await res.blob()
+      const obj = URL.createObjectURL(blob)
+      const probe = new Image()
+      probe.src = obj
+      try { await probe.decode() } catch {}
+      imgReady.set(url, obj)
+      // Держим в памяти не больше 300 фото: старые освобождаем (в кэше браузера они остаются)
+      if (imgReady.size > 300) { const [k, v] = imgReady.entries().next().value; imgReady.delete(k); URL.revokeObjectURL(v) }
+      L.done = true
+      L.frac = 1
+    } catch (e) {
+      L.error = e
+    }
+    imgLoads.delete(url)
+    notify()
+  })()
+  return L
+}
+// Круг загрузки (48 px): дуга прогресса вращается, в центре крестик или стрелка
+const RING_C = 2 * Math.PI * 19
+function progressRing(label) {
+  const arc = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+  arc.setAttribute('cx', '24'); arc.setAttribute('cy', '24'); arc.setAttribute('r', '19')
+  arc.setAttribute('class', 'vl-ring__arc')
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  svg.setAttribute('viewBox', '0 0 48 48'); svg.setAttribute('class', 'vl-ring__svg')
+  svg.appendChild(arc)
+  // Вращение продолжается с той же фазы после перерисовки ленты
+  svg.style.animationDelay = -(Date.now() % 1200) + 'ms'
+  const btn = h('span', { class: 'vl-ring', role: 'button', tabindex: '0', 'aria-label': label }, [svg, h('span', { class: 'vl-ring__x' }, [icon('xmark')]), h('span', { class: 'vl-ring__go' }, [icon('arrow-down')])])
+  return {
+    el: btn,
+    set(frac) { arc.style.strokeDasharray = `${Math.max(0.04, frac) * RING_C} ${RING_C}` },
+    paused(on) { btn.classList.toggle('is-paused', on); btn.setAttribute('aria-label', on ? 'Загрузить' : label) }
+  }
+}
+let imgObserver = null
+function whenVisible(el, fn) {
+  if (!('IntersectionObserver' in window)) { fn(); return }
+  if (!imgObserver) {
+    imgObserver = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) { imgObserver.unobserve(e.target); const cb = e.target._onVisible; e.target._onVisible = null; if (cb) cb() }
+    }, { rootMargin: '300px 0px' })
+  }
+  el._onVisible = fn
+  imgObserver.observe(el)
+}
+function receivedImage(cell, f) {
+  const url = f.url
+  const ready = imgReady.get(url)
+  if (ready) { cell.appendChild(h('img', { src: ready, alt: '', draggable: 'false' })); return }
+  cell.classList.add('vl-pimg')
+  const thumb = f.meta && f.meta.thumb
+  cell.appendChild(thumb ? h('img', { class: 'vl-pimg__thumb', src: thumb, alt: '', draggable: 'false' }) : h('span', { class: 'vl-pimg__ph' }))
+  const ring = progressRing('Отменить загрузку')
+  cell.appendChild(ring.el)
+  let L = null
+  const onUpdate = (l) => {
+    if (l.done) { reveal(); return }
+    if (l.error) { L = null; ring.paused(true); return }
+    ring.set(l.frac)
+  }
+  function start() {
+    imgPaused.delete(url)
+    ring.paused(false)
+    L = loadChatImage(url)
+    L.subs.add(onUpdate)
+    ring.set(L.frac)
+  }
+  function reveal() {
+    const img = h('img', { class: 'vl-pimg__full', src: imgReady.get(url), alt: '', draggable: 'false' })
+    cell.appendChild(img)
+    requestAnimationFrame(() => requestAnimationFrame(() => cell.classList.add('is-loaded')))
+  }
+  const toggle = (e) => {
+    e.stopPropagation()
+    if (L) { imgPaused.add(url); L.ac.abort(); L = null; ring.paused(true) } else start()
+  }
+  ring.el.addEventListener('click', toggle)
+  ring.el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(e) } })
+  const live = imgLoads.get(url)
+  if (live) { L = live; L.subs.add(onUpdate); ring.set(L.frac) } else if (imgPaused.has(url)) ring.paused(true)
+  else { ring.set(0); whenVisible(cell, () => { if (!L && !imgPaused.has(url) && !imgReady.has(url)) start() }) }
+}
+
 // Все вложения сообщения. onOpen(index) — открыть фото/видео в просмотрщике.
+// uploading: { progress, onCancel } — сообщение ещё отправляется (круг с крестиком на фото).
 export function renderAttachments(files, { mine = false, onOpen, uploading = null } = {}) {
   const visual = files.filter((f) => f.kind === 'image' || f.kind === 'video')
   const others = files.filter((f) => f.kind !== 'image' && f.kind !== 'video')
@@ -113,13 +232,23 @@ export function renderAttachments(files, { mine = false, onOpen, uploading = nul
         cell.style.aspectRatio = `${w} / ${hh}`
       }
       const src = f.previewUrl || f.url
-      if (f.kind === 'image') {
-        cell.appendChild(h('img', { src, alt: '', loading: 'lazy', decoding: 'async', draggable: 'false' }))
+      if (f.kind === 'image' && !f.previewUrl && f.url) {
+        receivedImage(cell, f)
+      } else if (f.kind === 'image') {
+        cell.appendChild(h('img', { src, alt: '', decoding: 'async', draggable: 'false' }))
       } else {
         // Первый кадр вместо обложки; значок и длительность поверх
         cell.appendChild(h('video', { src: src + (f.previewUrl ? '' : '#t=0.1'), muted: true, playsinline: true, preload: 'metadata' }))
         cell.appendChild(h('span', { class: 'vl-media-cell__play' }, [icon('play')]))
         if (f.meta && f.meta.duration) cell.appendChild(h('span', { class: 'vl-media-cell__dur' }, fmtClock(f.meta.duration)))
+      }
+      // Своё фото ещё отправляется: круг с прогрессом, крестик отменяет отправку
+      if (uploading && i < 4 && !(visual.length > 4 && i === 3)) {
+        cell.classList.add('is-uploading')
+        const ring = progressRing('Отменить отправку')
+        ring.set(uploading.progress || 0)
+        ring.el.addEventListener('click', (e) => { e.stopPropagation(); if (uploading.onCancel) uploading.onCancel() })
+        cell.appendChild(ring.el)
       }
       if (visual.length > 4 && i === 3) cell.appendChild(h('span', { class: 'vl-media-cell__more' }, '+' + (visual.length - 4)))
       if (i > 3) cell.hidden = true
@@ -133,7 +262,8 @@ export function renderAttachments(files, { mine = false, onOpen, uploading = nul
     else if (f.kind === 'audio' && !f.previewUrl && f.url) out.push(audioCard(f, mine))
     else out.push(f.url ? fileCard(f) : pendingCard(f))
   }
-  if (uploading) {
+  // Полоска — только для файлов без картинки (у фото и видео — круг прямо на них)
+  if (uploading && others.length) {
     out.push(h('div', { class: 'vl-upload-progress' }, [h('i', { style: { width: Math.round(uploading.progress * 100) + '%' } })]))
   }
   return out
