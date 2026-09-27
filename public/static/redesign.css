@@ -1460,15 +1460,47 @@ html[data-theme="light"] { --g-tile: #4a4541; --g-tile-ava: #625c56; --rd-tile: 
 /* Время поверх фото — маленькая плашка в углу (top от обычной метки растягивал её во всю высоту) */
 .vl-view--chat .vl-bubble__meta.is-over-media { top: auto; bottom: 8px; right: 8px; height: auto; padding: 3px 8px; border-radius: 10px; margin: 0; }
 
-/* Плитки звонка: у всех одинаковые, своя больше не отличается цветом
-   (светлая — графит, тёмная — графит v2) */
-html[data-theme] .room-screen .tile.is-local, html[data-theme] .room-screen .tile.is-local .no-video-placeholder { background: var(--g-tile); }
-html[data-theme] .room-screen .tile.is-local .avatar-circle { background: var(--g-tile-ava) !important; color: #fff; }
-html[data-theme] .room-screen .tile.is-local .tile-label { background: rgba(255, 255, 255, .14) !important; color: #fff !important; }
-html[data-theme] .room-screen .tile.is-local .g-you { color: #fff; }
 
-/* Громкость, как и «На весь экран», видна только когда курсор на плитке; плавно гаснет.
-   Пока тянут ползунок — не прячется; на телефоне (без наведения) видна всегда */
+
+/* ─────────── Плитки звонка: у всех одинаковые ───────────
+   Светлая тема — светло-серые с белой аватаркой и светлой подписью (как своя плитка раньше),
+   тёмная — графит v2. Превью камеры на экране входа — такое же */
+html[data-theme="light"] { --g-tile: #dcd8d2; --g-tile-ava: #fbfaf8; --rd-tile: #dcd8d2; --g-tile-fg: #1c1917; --g-tile-pill: rgba(255, 255, 255, .72); }
+html:not([data-theme="light"]) { --g-tile-fg: #f2f0ec; --g-tile-pill: rgba(255, 255, 255, .14); }
+html[data-theme] .room-screen .tile, html[data-theme] .room-screen .tile .no-video-placeholder,
+html[data-theme] .room-screen .tile.is-local, html[data-theme] .room-screen .tile.is-local .no-video-placeholder { background: var(--g-tile); }
+html[data-theme] .room-screen .tile .avatar-circle, html[data-theme] .room-screen .tile.is-local .avatar-circle { background: var(--g-tile-ava) !important; color: var(--g-tile-fg) !important; }
+html[data-theme] .room-screen .tile .tile-label, html[data-theme] .room-screen .tile.is-local .tile-label { background: var(--g-tile-pill) !important; color: var(--g-tile-fg) !important; }
+html[data-theme] .room-screen .tile .g-you { color: inherit; }
+.g-join__ava, html:not([data-theme="light"]) .g-join__ava { color: var(--g-tile-fg); }
+/* Подпись имени на превью: ровно 20px от левого и нижнего края (как плашка микрофона сверху) */
+.g-join__name { left: 20px; bottom: 20px; gap: 8px; padding: 0 14px 0 14px; background: var(--g-tile-pill); color: var(--g-tile-fg); }
+.g-join__name .g-you { font-weight: 500; opacity: .55; }
+html[data-theme="light"] .g-join__meter { background: rgba(28, 25, 23, .72); }
+
+/* Кнопки на плитке — одного цвета: громкость, «На весь экран», «Выгнать» */
+html[data-theme] .room-screen .tile .g-tt, html[data-theme] .room-screen .tile .g-vol { background: rgba(16, 14, 12, .86) !important; color: #fff; box-shadow: none; -webkit-backdrop-filter: blur(10px) !important; backdrop-filter: blur(10px) !important; }
+html[data-theme] .room-screen .tile .g-tt:hover { background: #000 !important; }
+html[data-theme] .room-screen .tile .g-tt--kick:hover { background: #ef4444 !important; }
+.room-screen .tile .g-vol { --g-vol-fill: #ffffff; --g-vol-knob: #ffffff; --g-vol-track: rgba(255, 255, 255, .28); }
+/* Громкость видна только при наведении на плитку и плавно гаснет; пока тянут — не прячется.
+   (Раньше её держал :focus-within — после клика по шкале она оставалась в фокусе навсегда) */
 .room-screen .tile .g-vol { opacity: 0; pointer-events: none; transition: transform .7s var(--g-spring), opacity .25s ease; }
-.room-screen .tile:hover .g-vol, .room-screen .tile .g-vol[data-drag="1"], .room-screen .tile .g-vol:focus-within, .room-screen .tile.is-fullscreen:hover .g-vol { opacity: 1; pointer-events: auto; }
+.room-screen .tile:hover .g-vol, .room-screen .tile .g-vol[data-drag="1"], .room-screen .tile .g-vol:focus-visible { opacity: 1; pointer-events: auto; }
 @media (hover: none) { .room-screen .tile .g-vol { opacity: 1; pointer-events: auto; } }
+
+/* Возврат в звонок из чатов: шапка проявляется, плитки по очереди вырастают, панель кнопок въезжает снизу */
+.room-screen.is-return .room-topbar { animation: g-ret-fade .45s ease both; }
+.room-screen.is-return .stage > .tile, .room-screen.is-return .stage > .solo-invite { animation: g-ret-tile .6s var(--g-spring) both; }
+.room-screen.is-return .stage > :nth-child(2) { animation-delay: .05s; }
+.room-screen.is-return .stage > :nth-child(3) { animation-delay: .1s; }
+.room-screen.is-return .stage > :nth-child(4) { animation-delay: .15s; }
+.room-screen.is-return .stage > :nth-child(n+5) { animation-delay: .2s; }
+.room-screen.is-return .controls-pill { animation: g-ret-bar .6s var(--g-spring) .12s both; }
+@keyframes g-ret-fade { from { opacity: 0; } }
+@keyframes g-ret-tile { from { opacity: 0; scale: .92; translate: 0 14px; } }
+@keyframes g-ret-bar { from { opacity: 0; translate: 0 28px; } }
+/* Превью входа в светлой теме: кнопки микрофона/камеры на светлом фоне — тёмные */
+html[data-theme="light"] .g-cb:not([data-off="1"]) { background: rgba(28, 25, 23, .78) !important; color: #fff !important; }
+html[data-theme="light"] .g-cb:not([data-off="1"]):hover { background: #1c1917 !important; }
+html[data-theme="light"] .g-cb[data-off="1"] { background: rgba(239, 68, 68, .16) !important; }

@@ -1191,6 +1191,18 @@ export function createChatView({ convId, navigate, menuButton }) {
     maybeLoadOlder()
   }).catch((e) => { if (!destroyed) toast(e.message || 'Не удалось загрузить сообщения', 'error') })
 
+  // Esc в открытом чате — закрыть его (начальный экран «Выберите чат»), как в Телеграме.
+  // Не срабатывает, пока открыто окно/меню/просмотр или Esc уже занят (поиск, ответ, правка)
+  const onEsc = (e) => {
+    if (e.key !== 'Escape' || e.defaultPrevented || destroyed || !node.isConnected) return
+    if (document.querySelector('.vl-modal-overlay, .g-overlay, .g-pf-overlay, .vl-lightbox, .vl-menu, .settings-overlay, .vl-incoming-wrap')) return
+    if (node.offsetParent === null) return // чат скрыт (например, открыт звонок)
+    e.preventDefault()
+    navigate(homePath())
+  }
+  document.addEventListener('keydown', onEsc)
+  unsub.push(() => document.removeEventListener('keydown', onEsc))
+
   return {
     node,
     convId,
