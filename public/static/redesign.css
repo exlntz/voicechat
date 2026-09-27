@@ -1393,3 +1393,16 @@ html:not([data-theme="light"]) .g-tgl[data-on="1"] { background: #22c55e; }
 .room-screen.is-preloading { position: fixed !important; inset: 0 !important; visibility: hidden !important; pointer-events: none !important; }
 .room-screen.is-reveal { animation: g-room-in .55s cubic-bezier(.22, 1, .36, 1) both; }
 @keyframes g-room-in { from { opacity: 0; transform: scale(.985); } }
+
+/* Полоски связи — SVG одинаковой толщины */
+.room-topbar .conn-bars.g-bars { display: block; width: 18px; height: 16px; flex-shrink: 0; overflow: visible; }
+.room-topbar .room-info:not(.is-live) .conn-bars.g-bars { display: none; }
+.room-topbar .g-bars rect { fill: var(--g-line); transition: fill .3s; }
+.room-topbar .room-info[data-q="excellent"] .g-bars rect,
+.room-topbar .room-info[data-q="good"] .g-bars rect:nth-child(-n+3),
+.room-topbar .room-info[data-q="poor"] .g-bars rect:nth-child(1) { fill: var(--q); }
+
+/* Вход по ссылке (/room/<код>): отступ под старую плавающую кнопку «Чаты» больше не нужен —
+   лого стояло на 46px ниже, чем на обычном экране входа */
+body.vl-solo .lobby-screen.g-join { padding-top: 18px; }
+@media (max-width: 860px) { body.vl-solo .lobby-screen.g-join { padding-top: calc(env(safe-area-inset-top) + 10px); } }

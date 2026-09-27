@@ -1212,7 +1212,9 @@ async function enterRoom(joinData, opts = {}) {
   const callTimer = el('span', { class: 'room-timer', 'aria-label': 'Длительность звонка' }, '0:00')
   // Качество связи (после подключения — вместо точки): три полоски как у сигнала телефона,
   // по наведению/нажатию — карточка с пингом и параметрами вашего видео.
-  const connBars = el('span', { class: 'conn-bars', 'aria-hidden': 'true' }, [el('i'), el('i'), el('i'), el('i')])
+  // Полоски — SVG: у <i> по 3px на экранах с масштабом 125% браузер округлял ширину то до 3,
+  // то до 4 пикселей, и одна полоска выглядела худой
+  const connBars = svgIcon('<svg class="conn-bars g-bars" viewBox="0 0 18 16" width="18" height="16" aria-hidden="true"><rect x="0" y="11" width="3.2" height="5" rx="1.6"/><rect x="4.9" y="7.5" width="3.2" height="8.5" rx="1.6"/><rect x="9.8" y="4" width="3.2" height="12" rx="1.6"/><rect x="14.7" y="0" width="3.2" height="16" rx="1.6"/></svg>')
   // В капсуле шапки, как в канвасе: полоски связи · «24 мс» | секундомер
   const pingPill = el('span', { class: 'g-ping' }, '— мс')
   const pillSep = el('span', { class: 'g-pill-sep', 'aria-hidden': 'true' })
@@ -1518,7 +1520,14 @@ async function enterRoom(joinData, opts = {}) {
     const ss = String(s).padStart(2, '0')
     return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`
   }
-  function tickCallTimer() { callTimer.textContent = formatCallTime(Date.now() - callStartedAt) }
+  // Тик выровнен по границе секунды от начала звонка (+25 мс запаса): у setInterval тики
+  // уплывали, и если один приходился на 1,999 с, а следующий на 3,001 — счёт прыгал на 2 секунды
+  function tickCallTimer() {
+    const ms = Date.now() - callStartedAt
+    callTimer.textContent = formatCallTime(ms)
+    clearTimeout(callTimerId)
+    callTimerId = setTimeout(tickCallTimer, 1000 - (ms % 1000) + 25)
+  }
 
   function setStatus(text, cls) {
     statusDot.className = `status-dot ${cls}`
@@ -1528,7 +1537,6 @@ async function enterRoom(joinData, opts = {}) {
     if (cls === '' && !callStartedAt) {
       callStartedAt = Date.now()
       tickCallTimer()
-      callTimerId = setInterval(tickCallTimer, 1000)
     }
     // Знак в шапке: при подключении/переподключении анимирован всё время, в звонке — статичный
     const sigil = document.querySelector('.room-topbar .ank-pulse')
@@ -3499,7 +3507,7 @@ async function enterRoom(joinData, opts = {}) {
     if (VL.leaveCall === cleanupAndGoLobby) VL.leaveCall = null
     VL.toggleMic = null
     clearInterval(screenTilesReconcileInterval)
-    clearInterval(callTimerId)
+    clearTimeout(callTimerId)
     stopConnStats()
     closeCallPip()
     if (miniWindow) setMiniWindow(false)
