@@ -1775,11 +1775,25 @@ async function enterRoom(joinData, opts = {}) {
     pplCount.textContent = String(Math.max(1, cameraTilesMap.size))
     // Панель участников объявлена ниже (после подключения) — до этого просто пропускаем
     try { refreshPeoplePanel() } catch {}
-    const screenTiles = Array.from(screenTilesMap.values(), (t) => t.tile)
-    const cameraTiles = Array.from(cameraTilesMap.values(), (t) => t.tile)
-    const hasScreenShares = screenTiles.length > 0
+    // Демонстрация показывается прямо в плитке участника: сетка та же, что без неё, только на
+    // месте его плитки — его экран (крупной отдельной сцены и колонки сбоку больше нет)
+    const screensBy = new Map()
+    screenTilesMap.forEach((t, sid) => {
+      const info = state.screenShares.get(sid)
+      const who = info ? info.identity : ''
+      if (!screensBy.has(who)) screensBy.set(who, [])
+      screensBy.get(who).push(t.tile)
+    })
+    const gridTiles = []
+    cameraTilesMap.forEach((t, identity) => {
+      const own = screensBy.get(identity)
+      if (own) { gridTiles.push(...own); screensBy.delete(identity) } else gridTiles.push(t.tile)
+    })
+    screensBy.forEach((tiles) => gridTiles.push(...tiles)) // демонстрация без плитки камеры (на всякий случай)
+    const cameraTiles = gridTiles
+    const hasScreenShares = false
     // "Я один в комнате" - особая раскладка с приглашением (см. getSoloInviteCard)
-    const isSolo = !hasScreenShares && cameraTiles.length === 1
+    const isSolo = cameraTiles.length === 1
     // Как в канвасе: камеры — равной сеткой плиток 16:9 (без «главного» участника)
     const isSpotlight = false
     // Две демонстрации рядом имеют смысл только на очень широкой сцене: паре кадров 16:9
@@ -1787,7 +1801,7 @@ async function enterRoom(joinData, opts = {}) {
     // (на телефоне и в узком окне — тем более). Считаем по фактической сцене, а не по ширине окна.
     const stageH = stage.clientHeight
     const stageRatio = stageH > 0 ? stage.clientWidth / stageH : 1.6
-    const sideBySideScreens = screenTiles.length > 1 && stageRatio >= 3.1
+    const sideBySideScreens = false
 
     stage.classList.toggle('g-grid', !hasScreenShares)
     stage.classList.toggle('stage-solo', isSolo)
@@ -1801,11 +1815,9 @@ async function enterRoom(joinData, opts = {}) {
     const camCount = hasScreenShares || isSpotlight ? 0 : Math.min(cameraTiles.length, 5)
     for (let n = 1; n <= 5; n++) stage.classList.toggle(`cam-count-${n}`, camCount === n)
 
-    if (hasScreenShares) {
-      placeTiles(stage, screenTiles)
-      placeTiles(sidebar, cameraTiles)
-      sidebar.style.display = cameraTiles.length ? 'flex' : 'none'
-    } else if (isSpotlight) {
+    // Плитки камер, уступившие место демонстрации, — вне сцены (звук идёт отдельными <audio>)
+    cameraTilesMap.forEach((t) => { if (!gridTiles.includes(t.tile) && t.tile.parentNode) t.tile.remove() })
+    if (isSpotlight) {
       const mainId = pickSpotlight()
       const localId = room.localParticipant.identity
       const others = Array.from(cameraTilesMap.keys()).filter((id) => id !== mainId)
@@ -2637,6 +2649,11 @@ async function enterRoom(joinData, opts = {}) {
     for (const [identity, t] of cameraTilesMap.entries()) {
       t.tile.classList.toggle('speaking', speakingIds.has(identity))
     }
+    // Демонстрация стоит на месте плитки участника — рамка «говорит» и на ней
+    for (const [sid, t] of screenTilesMap.entries()) {
+      const info = state.screenShares.get(sid)
+      t.tile.classList.toggle('speaking', !!info && speakingIds.has(info.identity))
+    }
     // Самый громкий собеседник (не я) через ~0,9 с становится главным, если всё ещё говорит —
     // короткие звуки и перебивания не перекидывают сцену туда-сюда
     const loudest = speakers.find((p) => p.identity !== room.localParticipant.identity)
@@ -2989,7 +3006,7 @@ async function enterRoom(joinData, opts = {}) {
       currentScreenTrackSid = pub.trackSid
       screenBtn.classList.add('active')
 
-      const t = ensureScreenTile(room.localParticipant.identity, state.displayName + ' (Вы)', pub.trackSid, true)
+      const t = ensureScreenTile(room.localParticipant.identity, state.displayName, pub.trackSid, true)
       pub.track.attach(t.video)
 
       // Применяем текущее состояние "Поделиться звуком стрима" к только что созданному аудио-треку
