@@ -3470,7 +3470,9 @@ async function enterRoom(joinData, opts = {}) {
         isHost ? el('span', { class: 'g-prow__crown', title: 'Создатель комнаты', 'aria-label': 'Создатель комнаты' }, [gIcon('crown', 17)]) : null
       ]),
       micMuted ? el('span', { class: 'g-prow__muted', title: 'Микрофон выключен' }, [gIcon('micOff', 18)]) : null,
-      kick
+      // У создателя в своей строке — пустое место под «Выгнать», чтобы значки микрофона
+      // стояли на одной линии во всех строках
+      kick || (state.isHost ? el('span', { class: 'g-prow__slot', 'aria-hidden': 'true' }) : null)
     ])
   }
   function refreshPeoplePanel() {

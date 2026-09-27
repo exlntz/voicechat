@@ -1519,3 +1519,7 @@ html[data-theme] .room-screen .tile .g-tt.g-tt--fs:active { transform: scale(.92
 @media (hover: none) {
   html[data-theme] .room-screen .tile .g-tt.g-tt--fs, html[data-theme] .room-screen .tile .g-vol { opacity: 1; translate: 0 0; scale: 1; pointer-events: auto; }
 }
+
+/* Участники: «Выгнать» видна сразу (не только при наведении); в своей строке — место той же ширины */
+.g-prow__kick { opacity: 1; }
+.g-prow__slot { width: 36px; height: 36px; flex-shrink: 0; }
