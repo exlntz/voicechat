@@ -1270,3 +1270,19 @@ html[data-theme="light"] .g-ppl-btn:not(.is-on):hover { background: #f7f6f3; }
 /* Пинг и время звонка — без капсулы и обводки, прямо на фоне страницы */
 .room-topbar .room-status { background: none !important; box-shadow: none !important; border: 0; padding: 0 6px; }
 .room-topbar .room-status .room-timer { color: var(--g-sub); }
+
+/* Пинг: отступ от «Скопировать ссылку» (style.css тянул капсулу отрицательным margin) */
+.room-topbar .room-status { margin: 0 8px 0 0; }
+/* Полоски связи: яркий зелёный, как рамка говорящего; сколько горит — столько и качество */
+.room-info { --q: #22c55e; }
+.room-info[data-q="excellent"] { --q: #22c55e; }
+.room-info[data-q="good"] { --q: #eab308; }
+.room-info[data-q="poor"] { --q: #ef4444; }
+.room-info[data-q="lost"], .room-info[data-q="unknown"] { --q: #8f8981; }
+.room-topbar .room-info .conn-bars i { background: var(--g-line); }
+.room-topbar .room-info[data-q="excellent"] .conn-bars i,
+.room-topbar .room-info[data-q="good"] .conn-bars i:nth-child(-n+3),
+.room-topbar .room-info[data-q="poor"] .conn-bars i:nth-child(1) { background: var(--q); }
+
+/* Рамка говорящего (6px наружу) больше не обрезается по краям сетки */
+.room-screen .stage.g-grid, .room-screen .stage.g-grid.stage-solo { padding: 8px; }
