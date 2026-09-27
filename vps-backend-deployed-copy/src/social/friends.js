@@ -180,6 +180,23 @@ export function registerFriendRoutes(app, { db, hub, push }) {
   // (друг, заявка) или общая личка. Для заблокировавшего — как будто пользователя нет.
   const sharedConv = db.prepare(`SELECT 1 FROM conversation_members a JOIN conversation_members b
     ON b.conversation_id = a.conversation_id WHERE a.user_id = ? AND b.user_id = ? LIMIT 1`)
+  // Окно «Добавить друга»: карточка человека по ТОЧНОМУ юзернейму (без поиска по началу —
+  // перебрать всех пользователей так нельзя). Заблокировавший вас — «не найден», как в /request.
+  app.get('/api/users/lookup', (c) => {
+    const me = Number(c.get('user').id)
+    if (!rateLimit(`ulookup:${me}`, 60, 60000)) return c.json({ error: 'rate_limited', message: 'Слишком часто, подождите минуту' }, 429)
+    const username = String(c.req.query('username') || '').trim().replace(/^@+/, '').toLowerCase()
+    const notFound = () => c.json({ error: 'not_found', message: 'Пользователь не найден' }, 404)
+    if (!username || username.length > 32) return notFound()
+    const user = publicUser(byUsername.get(username))
+    if (!user) return notFound()
+    if (user.id === me) return c.json({ user, status: 'self' })
+    const r = row(me, user.id)
+    const status = relationFor(me, r)
+    if (r && status === null) return notFound()
+    return c.json({ user, status: status || 'none' })
+  })
+
   app.get('/api/users/:id{[0-9]+}', (c) => {
     const me = Number(c.get('user').id)
     const other = toInt(c.req.param('id'))

@@ -1286,3 +1286,89 @@ html[data-theme="light"] .g-ppl-btn:not(.is-on):hover { background: #f7f6f3; }
 
 /* Рамка говорящего (6px наружу) больше не обрезается по краям сетки */
 .room-screen .stage.g-grid, .room-screen .stage.g-grid.stage-solo { padding: 8px; }
+
+/* ─────────── «Добавить друга»: кнопка, окно (ПК) и шторка (телефон) ─────────── */
+.g-addfriend .vl-ico { width: 19px; height: 19px; transition: transform .45s var(--g-spring); }
+.g-addfriend:hover .vl-ico { transform: scale(1.1) rotate(-6deg); }
+.g-addfriend:active { transform: scale(.97); transition-duration: .1s; }
+.g-headadd { display: none; }
+.g-fadd { gap: 14px; padding: 24px 22px 20px; }
+.g-fadd__grab { display: none; }
+.g-fadd__text { margin: -6px 6px 0; font-size: 15px; line-height: 1.45; color: var(--g-sub); }
+.g-fadd__field { height: 54px; border-radius: 27px; padding: 0 18px; gap: 4px; font-size: 17px; }
+.g-fadd__field .g-field__input { font-size: 17px; }
+.g-fadd__at { color: var(--g-sub); font-weight: 600; }
+.g-fadd__res { min-height: 72px; display: flex; flex-direction: column; justify-content: center; }
+.g-fadd__hint { display: flex; align-items: center; gap: 12px; padding: 0 6px; font-size: 14px; color: var(--g-sub); animation: g-fadd-in .4s var(--g-spring) both; }
+.g-fadd__hint .vl-ico { width: 20px; height: 20px; flex-shrink: 0; }
+.g-fadd__hint.is-wait { gap: 12px; }
+.g-fadd__hint.is-wait .g-skel--line { width: 50%; }
+.g-fadd__card { height: 72px; border-radius: 22px; background: var(--g-field); display: flex; align-items: center; gap: 12px; padding: 0 12px 0 14px; animation: g-fadd-in .45s var(--g-spring) both; }
+.g-fadd__card .vl-avatar { flex-shrink: 0; }
+.g-fadd__who { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.g-fadd__who b { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-fadd__who span { font-size: 14px; color: var(--g-sub); }
+.g-fadd__act { height: 40px !important; padding: 0 16px !important; border-radius: 20px !important; flex-shrink: 0; }
+.g-fadd__act.is-soft { background: var(--g-field-h) !important; color: var(--g-dim) !important; opacity: 1 !important; cursor: default !important; }
+.g-fadd__act .vl-ico { width: 15px; height: 15px; }
+.g-fadd__act:disabled:not(.is-soft) { opacity: .5; }
+@keyframes g-fadd-in { from { opacity: 0; transform: translateY(6px); } }
+.g-fadd__foot { display: flex; align-items: center; gap: 10px; padding: 14px 6px 0; border-top: 1px solid var(--g-divider, var(--g-line)); font-size: 14px; color: var(--g-sub); }
+.g-fadd__foot > span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-fadd__foot b { color: var(--g-ink); font-weight: 600; }
+.g-fadd__copy { height: 34px; padding: 0 14px !important; border-radius: 17px !important; background: var(--g-field) !important; font-size: 13px !important; font-weight: 600 !important; flex-shrink: 0; transition: background-color .2s, transform .45s var(--g-spring); }
+.g-fadd__copy:hover { background: var(--g-field-h) !important; }
+.g-fadd__copy:active { transform: scale(.95); transition-duration: .1s; }
+@media (max-width: 860px) {
+  .g-pane--friends > .g-addfriend { display: none; }
+  .g-side__title { margin-right: auto; }
+  #vl-sidebar[data-tab="friends"] .g-headadd { display: flex; width: 38px; height: 38px; border-radius: 19px; align-items: center; justify-content: center; flex-shrink: 0; background: var(--g-acc); color: var(--g-on-acc); border: 0; padding: 0; cursor: pointer; animation: g-fadd-in .35s var(--g-spring) both; transition: transform .45s var(--g-spring); }
+  #vl-sidebar[data-tab="friends"] .g-headadd:active { transform: scale(.92); transition-duration: .1s; }
+  .g-headadd .vl-ico { width: 19px; height: 19px; }
+  /* Шторка снизу вместо окна по центру */
+  .g-fadd-ov { align-items: flex-end; }
+  .g-fadd-ov .g-fadd { width: calc(100vw - 16px); max-height: calc(100dvh - 60px); margin: 0 8px calc(env(safe-area-inset-bottom) + 8px); border-radius: 34px; padding: 10px 20px 22px; animation: g-sheet-in .6s var(--g-spring) both; }
+  .g-fadd-ov.is-out .g-fadd { animation: g-sheet-out .3s cubic-bezier(.4, 0, 1, 1) both; }
+  .g-fadd__grab { display: block; align-self: center; width: 40px; height: 5px; border-radius: 3px; background: var(--g-line); margin-bottom: 2px; }
+}
+@keyframes g-sheet-in { from { transform: translateY(calc(100% + 24px)); } }
+@keyframes g-sheet-out { to { transform: translateY(calc(100% + 24px)); } }
+.g-fadd-ov.is-out { animation: g-fade-out .3s both; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ТЁМНАЯ ТЕМА v2 — «графит» (доски ChatsDark2 / CallDark2 / PhoneDark2):
+   вместо чистого чёрного тёплые слои, каждый заметно светлее предыдущего
+   ═══════════════════════════════════════════════════════════════════════════ */
+html:not([data-theme="light"]) {
+  --bg: #1a1917; --surface: #262422; --surface-2: #2c2a27; --surface-3: #33302d;
+  --text-dim: #cac4bb; --text-faint: #aba59c; --accent: #4a4642; --accent-hover: #504c47;
+  --border: rgba(255, 255, 255, 0.08); --border-strong: rgba(255, 255, 255, 0.16);
+  --vl-stage: #1a1917; --vl-panel: #262422; --vl-raised: #2c2a27; --vl-raised-2: #33302d; --vl-field: #33302d; --vl-hover: #33302d;
+  --vl-ava-0: #3d3a36; --vl-ava-1: #3d3a36; --vl-ava-2: #3d3a36; --vl-ava-3: #3d3a36; --vl-ava-4: #3d3a36; --vl-ava-5: #3d3a36;
+  --rd-page: #1a1917; --rd-panel: #262422; --rd-field: #33302d; --rd-field-hover: #3d3a36; --rd-line: #403d39;
+  --rd-sub: #aba59c; --rd-faint: #8f897f; --rd-acc: #4a4642; --rd-acc-hover: #504c47;
+  --rd-bub-their: #36332f; --rd-bub-mine: #304456; --rd-input: #282624; --rd-tile: #2b2926; --rd-tile-me: #33302d; --rd-tile-av: #3d3a36;
+  --g-page: #1a1917; --g-panel: #262422; --g-field: #33302d; --g-field-h: #3d3a36; --g-line: #403d39;
+  --g-faint: #8f897f; --g-sub: #aba59c; --g-dim: #cac4bb; --g-muted: #bab4ab;
+  --g-acc: #4a4642; --g-acc-h: #504c47; --g-input: #282624; --g-kbd: #282624;
+  --g-ava: #3d3a36; --g-divider: #35322f;
+  --g-bub-mine: #304456; --g-bub-their: #36332f; --g-ava-me: #403d39; --g-ava-peer: #47433f;
+  --g-island: #4a4642; --g-island-a: #6a655f; --g-island-b: #5a5550; --g-clip: #b0aaa1; --g-pin-h: #34312e;
+  --g-scrim: rgba(12, 11, 10, 0.6);
+  --g-tile: #2b2926; --g-tile-ava: #3d3a36;
+  --g-tile-me: #33302d; --g-tile-me-av: #47433f; --g-prow: #2c2a27; --g-prow-av: #403d39; --g-muted-ico: #8f897f;
+  --g-vol-fill: #aba59c; --g-vol-track: #4a4642; --g-outline: #47433f;
+  --g-on-bg: #5f5a54; --g-on-bg-h: #6a655f;
+}
+@media (max-width: 860px) {
+  html:not([data-theme="light"]) { --g-glass: rgba(46, 44, 41, 0.84); --g-glass-ring: rgba(255, 255, 255, 0.09); }
+}
+/* Выбранный чат — самый светлый слой */
+html:not([data-theme="light"]) .g-row.is-on { background-color: #4a4642; }
+/* Профиль и настройки: без белых акцентов — выбор и кнопки графитовые, включённый тумблер зелёный */
+html:not([data-theme="light"]) .g-pf-overlay { --g-acc: #4a4642; --g-on-acc: #f2f0ec; --g-acc-h: #504c47; --g-scrim: rgba(12, 11, 10, 0.6); }
+html:not([data-theme="light"]) .g-seg__k { background: #504c47; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 6px rgba(0, 0, 0, 0.35); }
+html:not([data-theme="light"]) .g-seg button[data-on="1"] { color: #f2f0ec !important; }
+html:not([data-theme="light"]) .g-tgl { background: #47433f; }
+html:not([data-theme="light"]) .g-tgl::after { background: #f2f0ec; }
+html:not([data-theme="light"]) .g-tgl[data-on="1"] { background: #22c55e; }

@@ -7,6 +7,7 @@ import { api } from './api.js'
 import { h, icon, avatar, displayName, presenceText, messagePreview, timeShort, showMenu, toast, isSavedConv, msgStatus, ticks, onLongPress, contactName, confirmDialog } from './ui.js'
 import { askDeleteChat } from './chat.js'
 import { openContactDialog } from './contact-dialog.js'
+import { openFriendAdd } from './friend-add.js'
 import { openUserCard } from './user-card.js'
 import { openWallpaperPicker } from './wallpapers.js'
 import { notificationsNeedPermission, requestNotificationPermission } from './notify.js'
@@ -31,7 +32,9 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
   const logo = window.VLLogo ? window.VLLogo(36) : h('span', { class: 'g-logo' }, [icon('logo')])
   const brand = h('div', { class: 'g-brand' }, [logo, h('span', { class: 'g-brand__name' }, 'Voice Lobby')])
   const mobileTitle = h('span', { class: 'g-side__title' }, 'Чаты')
-  const head = h('div', { class: 'g-side__head' }, [brand, mobileTitle, meBtn])
+  const headAdd = h('button', { type: 'button', class: 'g-headadd', 'aria-label': 'Добавить друга', title: 'Добавить друга' }, [icon('user-plus')])
+  headAdd.addEventListener('click', () => openFriendAdd({ openDmWith }))
+  const head = h('div', { class: 'g-side__head' }, [brand, mobileTitle, headAdd, meBtn])
 
   function renderMe() {
     if (!store.me) return
@@ -340,25 +343,11 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
   }
 
   // ---------- Панель «Друзья» ----------
-  const addInput = h('input', { type: 'text', class: 'g-field__input', placeholder: 'Юзернейм друга', maxlength: '25', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Юзернейм друга' })
-  const addBtn = h('button', { type: 'button', class: 'g-field__add', 'aria-label': 'Добавить', title: 'Отправить заявку' }, [icon('plus')])
-  const addField = h('label', { class: 'g-field' }, [addInput, addBtn])
+  // «Добавить друга» — кнопка во всю ширину (как «Новый звонок»); на телефоне — круглая в шапке
+  const addFriendBtn = h('button', { type: 'button', class: 'g-btn g-btn--acc g-btn--wide g-addfriend' }, [icon('user-plus'), 'Добавить друга'])
+  addFriendBtn.addEventListener('click', () => openFriendAdd({ openDmWith }))
   const friendsList = h('div', { class: 'g-list g-list--friends' })
-  const friendsPane = h('div', { class: 'g-pane g-pane--friends' }, [addField, friendsList])
-  async function addFriend() {
-    const username = addInput.value.replace(/^@+/, '').trim()
-    if (!username) { addInput.focus(); return }
-    addBtn.disabled = true
-    try {
-      const res = await api.requestFriend(username)
-      setFriend(res.friend)
-      addInput.value = ''
-      toast(res.friend.status === 'friend' ? `Теперь вы друзья: ${displayName(res.friend.user)}` : `Заявка отправлена: ${displayName(res.friend.user)}`, 'success')
-    } catch (e) { toast(e.message, 'error') }
-    addBtn.disabled = false
-  }
-  addBtn.addEventListener('click', (e) => { e.preventDefault(); addFriend() })
-  addInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addFriend() } })
+  const friendsPane = h('div', { class: 'g-pane g-pane--friends' }, [addFriendBtn, friendsList])
 
   async function run(fn, okText) {
     try { await fn(); if (okText) toast(okText, 'success') } catch (e) { toast(e.message, 'error') }
