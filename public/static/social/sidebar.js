@@ -329,8 +329,10 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
       const lab = callLabel(m)
       const row = h('button', { type: 'button', class: 'g-crow' }, [
         rowAvatar(who, { size: 40 }),
-        h('span', { class: 'g-crow__text' }, [h('span', { class: 'g-crow__name' }, displayName(who)), h('span', { class: `g-crow__sub${lab.bad ? ' is-bad' : ''}` }, lab.text)]),
-        h('span', { class: 'g-crow__when' }, timeShort(m.createdAt))
+        h('span', { class: 'g-crow__text' }, [
+          h('span', { class: 'g-crow__top' }, [h('span', { class: 'g-crow__name' }, displayName(who)), h('span', { class: 'g-crow__when' }, timeShort(m.createdAt))]),
+          h('span', { class: `g-crow__sub${lab.bad ? ' is-bad' : ''}` }, lab.text)
+        ])
       ])
       row.addEventListener('click', () => { if (conv) { setTab('chats'); navigate('/dm/' + conv.id) } })
       return row

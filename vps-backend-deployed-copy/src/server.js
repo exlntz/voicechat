@@ -10,8 +10,8 @@ import { DatabaseSync } from 'node:sqlite'
 import { randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
-import { readFile } from 'node:fs/promises'
+import { dirname, join, resolve, sep } from 'node:path'
+import { readFile, stat } from 'node:fs/promises'
 import { totalmem, freemem, loadavg, cpus } from 'node:os'
 import { initSocialSchema, USERNAME_RE as SOCIAL_USERNAME_RE, USERNAME_HINT, publicUser } from './social/db.js'
 import { createHub } from './social/events.js'
@@ -150,6 +150,21 @@ app.use('/api/*', (c, next) => {
   return requireAuth(c, next)
 })
 // Статика фронтенда (HTML отдаём вручную ниже, а /static/* — файлы напрямую)
+// Скрипты и стили: браузер обязан сверяться с сервером (no-cache + ETag), иначе Safari на
+// iPhone неделями держал старые файлы после выкладки. Не изменился файл — ответ 304 без тела.
+const PUBLIC_ROOT = resolve(__dirname, '..', 'public')
+app.use('/static/*', async (c, next) => {
+  const path = c.req.path
+  if (!/\.(js|css|svg|webmanifest)$/.test(path)) return next()
+  const file = resolve(PUBLIC_ROOT, '.' + decodeURIComponent(path))
+  if (!file.startsWith(PUBLIC_ROOT + sep)) return next()
+  let st
+  try { st = await stat(file) } catch { return next() }
+  const tag = `W/"${st.size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`
+  if (c.req.header('if-none-match') === tag) return c.body(null, 304, { ETag: tag, 'Cache-Control': 'no-cache' })
+  await next()
+  if (c.res.status === 200) { c.header('ETag', tag); c.header('Cache-Control', 'no-cache') }
+})
 app.use('/static/*', serveStatic({ root: join(__dirname, '..', 'public') }))
 // Иконки сайта: браузеры и iOS запрашивают их из корня, сами файлы лежат в public/static
 app.get('/favicon.ico', serveStatic({ root: join(__dirname, '..', 'public', 'static') }))
