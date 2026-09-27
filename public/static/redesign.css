@@ -1292,44 +1292,48 @@ html[data-theme="light"] .g-ppl-btn:not(.is-on):hover { background: #f7f6f3; }
 .g-addfriend:hover .vl-ico { transform: scale(1.1) rotate(-6deg); }
 .g-addfriend:active { transform: scale(.97); transition-duration: .1s; }
 .g-headadd { display: none; }
-.g-fadd { gap: 14px; padding: 24px 22px 20px; }
+.g-fadd-ov { align-items: flex-start; padding-top: min(22vh, 200px); }
+.g-fadd { width: min(480px, calc(100vw - 32px)); border-radius: 28px; background: var(--g-panel); box-shadow: var(--g-pop); padding: 8px; box-sizing: border-box; display: flex; flex-direction: column; animation: g-pop-in .5s var(--g-spring) both; }
 .g-fadd__grab { display: none; }
-.g-fadd__text { margin: -6px 6px 0; font-size: 15px; line-height: 1.45; color: var(--g-sub); }
-.g-fadd__field { height: 54px; border-radius: 27px; padding: 0 18px; gap: 4px; font-size: 17px; }
-.g-fadd__field .g-field__input { font-size: 17px; }
-.g-fadd__at { color: var(--g-sub); font-weight: 600; }
-.g-fadd__res { min-height: 72px; display: flex; flex-direction: column; justify-content: center; }
-.g-fadd__hint { display: flex; align-items: center; gap: 12px; padding: 0 6px; font-size: 14px; color: var(--g-sub); animation: g-fadd-in .4s var(--g-spring) both; }
-.g-fadd__hint .vl-ico { width: 20px; height: 20px; flex-shrink: 0; }
-.g-fadd__hint.is-wait { gap: 12px; }
-.g-fadd__hint.is-wait .g-skel--line { width: 50%; }
-.g-fadd__card { height: 72px; border-radius: 22px; background: var(--g-field); display: flex; align-items: center; gap: 12px; padding: 0 12px 0 14px; animation: g-fadd-in .45s var(--g-spring) both; }
+.g-fadd__row { height: 60px; display: flex; align-items: center; gap: 12px; padding: 0 10px 0 16px; cursor: text; }
+.g-fadd__row > .vl-ico { width: 22px; height: 22px; color: var(--g-sub); flex-shrink: 0; }
+.g-fadd__input { flex: 1 1 auto; min-width: 0; border: 0; outline: none; background: transparent; font: 500 18px var(--font); color: var(--g-ink); padding: 0; }
+.g-fadd__input::placeholder { color: var(--g-faint); font-weight: 400; }
+.g-fadd__x { flex-shrink: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 8px; }
+.g-fadd__x > .vl-ico { display: none; width: 14px; height: 14px; }
+.g-fadd__esc { font: 12px var(--mono); color: var(--g-faint); padding: 3px 7px; border-radius: 6px; background: var(--g-field); transition: background-color .2s, color .2s; }
+.g-fadd__x:hover .g-fadd__esc { background: var(--g-field-h); color: var(--g-ink); }
+.g-fadd__grow { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .45s var(--g-spring); }
+.g-fadd.is-open .g-fadd__grow { grid-template-rows: 1fr; }
+.g-fadd__grow > div { overflow: hidden; min-height: 0; }
+.g-fadd__sep { height: 1px; background: var(--g-divider); margin: 0 8px 6px; }
+.g-fadd__res { display: flex; flex-direction: column; }
+.g-fadd__hint { padding: 10px 14px 12px; font-size: 14px; color: var(--g-sub); animation: g-fadd-in .4s var(--g-spring) both; }
+.g-fadd__card { height: 62px; border-radius: 20px; background: var(--g-field); display: flex; align-items: center; gap: 12px; padding: 0 10px 0 12px; animation: g-fadd-in .45s var(--g-spring) both; }
+.g-fadd__card.is-wait .g-skel--line { width: 45%; }
 .g-fadd__card .vl-avatar { flex-shrink: 0; }
-.g-fadd__who { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.g-fadd__who b { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.g-fadd__who span { font-size: 14px; color: var(--g-sub); }
-.g-fadd__act { height: 40px !important; padding: 0 16px !important; border-radius: 20px !important; flex-shrink: 0; }
+.g-fadd__who { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.g-fadd__who b { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-fadd__who span { font-size: 13px; color: var(--g-sub); }
+.g-fadd__act { height: 38px !important; padding: 0 14px !important; border-radius: 19px !important; font-size: 14px !important; flex-shrink: 0; }
 .g-fadd__act.is-soft { background: var(--g-field-h) !important; color: var(--g-dim) !important; opacity: 1 !important; cursor: default !important; }
 .g-fadd__act .vl-ico { width: 15px; height: 15px; }
 .g-fadd__act:disabled:not(.is-soft) { opacity: .5; }
 @keyframes g-fadd-in { from { opacity: 0; transform: translateY(6px); } }
-.g-fadd__foot { display: flex; align-items: center; gap: 10px; padding: 14px 6px 0; border-top: 1px solid var(--g-divider, var(--g-line)); font-size: 14px; color: var(--g-sub); }
-.g-fadd__foot > span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.g-fadd__foot b { color: var(--g-ink); font-weight: 600; }
-.g-fadd__copy { height: 34px; padding: 0 14px !important; border-radius: 17px !important; background: var(--g-field) !important; font-size: 13px !important; font-weight: 600 !important; flex-shrink: 0; transition: background-color .2s, transform .45s var(--g-spring); }
-.g-fadd__copy:hover { background: var(--g-field-h) !important; }
-.g-fadd__copy:active { transform: scale(.95); transition-duration: .1s; }
 @media (max-width: 860px) {
   .g-pane--friends > .g-addfriend { display: none; }
   .g-side__title { margin-right: auto; }
   #vl-sidebar[data-tab="friends"] .g-headadd { display: flex; width: 38px; height: 38px; border-radius: 19px; align-items: center; justify-content: center; flex-shrink: 0; background: var(--g-acc); color: var(--g-on-acc); border: 0; padding: 0; cursor: pointer; animation: g-fadd-in .35s var(--g-spring) both; transition: transform .45s var(--g-spring); }
   #vl-sidebar[data-tab="friends"] .g-headadd:active { transform: scale(.92); transition-duration: .1s; }
   .g-headadd .vl-ico { width: 19px; height: 19px; }
-  /* Шторка снизу вместо окна по центру */
-  .g-fadd-ov { align-items: flex-end; }
-  .g-fadd-ov .g-fadd { width: calc(100vw - 16px); max-height: calc(100dvh - 60px); margin: 0 8px calc(env(safe-area-inset-bottom) + 8px); border-radius: 34px; padding: 10px 20px 22px; animation: g-sheet-in .6s var(--g-spring) both; }
+  /* Шторка снизу вместо окна по центру: та же строка поиска, крестик вместо esc */
+  .g-fadd-ov { align-items: flex-end; padding-top: 0; }
+  .g-fadd-ov .g-fadd { width: calc(100vw - 16px); margin: 0 8px calc(env(safe-area-inset-bottom) + 8px); border-radius: 30px; padding: 8px 8px 12px; animation: g-sheet-in .6s var(--g-spring) both; }
   .g-fadd-ov.is-out .g-fadd { animation: g-sheet-out .3s cubic-bezier(.4, 0, 1, 1) both; }
-  .g-fadd__grab { display: block; align-self: center; width: 40px; height: 5px; border-radius: 3px; background: var(--g-line); margin-bottom: 2px; }
+  .g-fadd__grab { display: block; align-self: center; width: 40px; height: 5px; border-radius: 3px; background: var(--g-line); margin: 2px 0 2px; }
+  .g-fadd__esc { display: none; }
+  .g-fadd-ov .g-fadd__x { width: 34px; height: 34px; border-radius: 17px; background: var(--g-field); }
+  .g-fadd__x > .vl-ico { display: block; }
 }
 @keyframes g-sheet-in { from { transform: translateY(calc(100% + 24px)); } }
 @keyframes g-sheet-out { to { transform: translateY(calc(100% + 24px)); } }
@@ -1410,3 +1414,7 @@ html:not([data-theme="light"]) .g-tgl[data-on="1"] { background: #22c55e; }
    лого стояло на 46px ниже, чем на обычном экране входа */
 body.vl-solo .lobby-screen.g-join { padding-top: 18px; }
 @media (max-width: 860px) { body.vl-solo .lobby-screen.g-join { padding-top: calc(env(safe-area-inset-top) + 10px); } }
+
+/* Плитки собеседников в светлой теме — «мягкий графит» (вариант B из канваса):
+   тёмные, но не чёрные — капсула громкости #000 и подпись на них хорошо видны */
+html[data-theme="light"] { --g-tile: #4a4541; --g-tile-ava: #625c56; --rd-tile: #4a4541; }

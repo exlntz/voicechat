@@ -1,7 +1,7 @@
 // ===================== «Добавить друга»: окно (ПК) / шторка снизу (телефон) =====================
 // Вводят юзернейм — сервер ищет человека по точному совпадению (/api/users/lookup) и показывает
 // карточку с кнопкой по отношению к нему: добавить, принять встречную заявку, написать другу.
-import { store, setFriend, loadFriends } from './store.js'
+import { setFriend, loadFriends } from './store.js'
 import { api } from './api.js'
 import { h, icon, avatar, displayName, toast } from './ui.js'
 
@@ -9,18 +9,15 @@ let current = null
 
 export function openFriendAdd({ openDmWith } = {}) {
   if (current) return
-  const input = h('input', { type: 'text', class: 'g-field__input', placeholder: 'username', maxlength: '32', autocomplete: 'off', spellcheck: 'false', autocapitalize: 'off', 'aria-label': 'Юзернейм друга' })
-  const close = h('button', { type: 'button', class: 'g-close', 'aria-label': 'Закрыть' }, [icon('xmark')])
+  // Вариант B из канваса: окно — одна строка поиска (без заголовка и подписей), карточка
+  // человека выезжает под ней. На телефоне — та же строка в шторке снизу.
+  const input = h('input', { type: 'text', class: 'g-fadd__input', placeholder: 'Юзернейм друга', maxlength: '32', autocomplete: 'off', spellcheck: 'false', autocapitalize: 'off', enterkeyhint: 'search', 'aria-label': 'Юзернейм друга' })
+  const close = h('button', { type: 'button', class: 'g-fadd__x', 'aria-label': 'Закрыть' }, [h('span', { class: 'g-fadd__esc' }, 'esc'), icon('xmark')])
   const result = h('div', { class: 'g-fadd__res', 'aria-live': 'polite' })
-  const me = store.me ? store.me.username : ''
-  const copyBtn = h('button', { type: 'button', class: 'g-fadd__copy' }, 'Скопировать')
-  const card = h('div', { class: 'g-modal g-fadd', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Добавить друга' }, [
+  const card = h('div', { class: 'g-fadd', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Добавить друга' }, [
     h('span', { class: 'g-fadd__grab', 'aria-hidden': 'true' }),
-    h('div', { class: 'g-modal__head' }, [h('span', { class: 'g-modal__title' }, 'Добавить друга'), close]),
-    h('p', { class: 'g-fadd__text' }, 'Юзернейм есть в профиле друга после @'),
-    h('label', { class: 'g-field g-fadd__field' }, [h('span', { class: 'g-fadd__at' }, '@'), input]),
-    result,
-    h('div', { class: 'g-fadd__foot' }, [h('span', {}, ['Ваш юзернейм ', h('b', {}, '@' + me)]), copyBtn])
+    h('label', { class: 'g-fadd__row' }, [icon('user-plus'), input, close]),
+    h('div', { class: 'g-fadd__grow' }, [h('div', {}, [h('div', { class: 'g-fadd__sep' }), result])])
   ])
   const overlay = h('div', { class: 'g-overlay g-fadd-ov' }, [card])
   current = overlay
@@ -30,9 +27,13 @@ export function openFriendAdd({ openDmWith } = {}) {
   let found = null // { user, status }
   let busy = false
 
-  function hint(text, ico = 'magnifying-glass') {
+  // Пустое поле — область результата схлопнута; иначе выезжает под строкой
+  function setOpen(on) { card.classList.toggle('is-open', on) }
+  function hint(text) {
     found = null
-    result.replaceChildren(h('div', { class: 'g-fadd__hint' }, [icon(ico), text]))
+    if (!text) { setOpen(false); return }
+    result.replaceChildren(h('div', { class: 'g-fadd__hint' }, text))
+    setOpen(true)
   }
   function actionFor(f) {
     const s = f.status
@@ -48,8 +49,9 @@ export function openFriendAdd({ openDmWith } = {}) {
     const a = actionFor(f)
     const btn = h('button', { type: 'button', class: `g-btn g-btn--sm g-fadd__act ${a.cls}`, disabled: !!a.done }, [a.done && f.status === 'outgoing' ? icon('check') : null, a.label])
     if (a.run) btn.addEventListener('click', () => a.run(btn))
+    setOpen(true)
     result.replaceChildren(h('div', { class: 'g-fadd__card' }, [
-      avatar(f.user, { size: 46 }),
+      avatar(f.user, { size: 42 }),
       h('span', { class: 'g-fadd__who' }, [h('b', {}, displayName(f.user)), h('span', {}, '@' + f.user.username)]),
       btn
     ]))
@@ -63,16 +65,18 @@ export function openFriendAdd({ openDmWith } = {}) {
       renderFound()
     } catch (e) {
       if (my !== seq) return
-      if (e.status === 404 || /не найден/i.test(e.message || '')) hint(`Никого с юзернеймом @${name}`, 'circle-xmark')
-      else hint(e.message || 'Не получилось проверить', 'circle-xmark')
+      if (e.status === 404 || /не найден/i.test(e.message || '')) hint(`Не нашли @${name}`)
+      else hint(e.message || 'Не получилось проверить')
     }
   }
   function onInput() {
     const name = input.value.replace(/^@+/, '').trim()
     clearTimeout(timer)
     seq++
-    if (name.length < 2) { hint('Юзернейм друга — например, anya'); return }
-    result.replaceChildren(h('div', { class: 'g-fadd__hint is-wait' }, [h('span', { class: 'g-skel g-skel--ava is-sm' }), h('span', { class: 'g-skel g-skel--line' })]))
+    if (name.length < 2) { hint(''); return }
+    // Пока ищем — заготовка карточки, чтобы область не прыгала по высоте
+    result.replaceChildren(h('div', { class: 'g-fadd__card is-wait' }, [h('span', { class: 'g-skel g-skel--ava is-sm' }), h('span', { class: 'g-skel g-skel--line' })]))
+    setOpen(true)
     timer = setTimeout(() => lookup(name), 280)
   }
   async function add(btn) {
@@ -126,14 +130,9 @@ export function openFriendAdd({ openDmWith } = {}) {
   }
   input.addEventListener('input', onInput)
   close.addEventListener('click', done)
-  copyBtn.addEventListener('click', () => {
-    const copy = window.VL && window.VL.copyToClipboard ? window.VL.copyToClipboard('@' + me) : Promise.resolve(false)
-    copy.then((ok) => toast(ok ? 'Юзернейм скопирован' : 'Не удалось скопировать', ok ? 'success' : 'error'))
-  })
   overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) done() })
   document.addEventListener('keydown', onKey, true)
   document.body.appendChild(overlay)
-  hint('Юзернейм друга — например, anya')
   // На телефоне клавиатура выезжает вместе со шторкой — фокус после начала анимации
   setTimeout(() => input.focus(), 60)
 }
