@@ -1504,3 +1504,18 @@ html[data-theme] .room-screen .tile .g-tt--kick:hover { background: #ef4444 !imp
 html[data-theme="light"] .g-cb:not([data-off="1"]) { background: rgba(28, 25, 23, .78) !important; color: #fff !important; }
 html[data-theme="light"] .g-cb:not([data-off="1"]):hover { background: #1c1917 !important; }
 html[data-theme="light"] .g-cb[data-off="1"] { background: rgba(239, 68, 68, .16) !important; }
+
+/* Громкость и «На весь экран» появляются синхронно одной анимацией: выезжают снизу с пружиной.
+   Сдвиг — свойствами translate/scale, а не transform: transform у громкости занят «резиновым»
+   перетягиванием ползунка */
+html[data-theme] .room-screen .tile .g-tt.g-tt--fs, html[data-theme] .room-screen .tile .g-vol {
+  opacity: 0; translate: 0 10px; scale: .92; transform: none;
+  transition: opacity .22s ease, translate .5s var(--g-spring), scale .5s var(--g-spring), background-color .2s, transform .7s var(--g-spring);
+}
+html[data-theme] .room-screen .tile .g-vol[data-drag="1"] { transition: opacity .22s ease, translate .5s var(--g-spring), scale .5s var(--g-spring); }
+html[data-theme] .room-screen .tile:hover .g-tt.g-tt--fs, html[data-theme] .room-screen .tile.is-fullscreen .g-tt.g-tt--fs, html[data-theme] .room-screen .tile .g-tt.g-tt--fs:focus-visible,
+html[data-theme] .room-screen .tile:hover .g-vol, html[data-theme] .room-screen .tile .g-vol[data-drag="1"], html[data-theme] .room-screen .tile .g-vol:focus-visible { opacity: 1; translate: 0 0; scale: 1; pointer-events: auto; }
+html[data-theme] .room-screen .tile .g-tt.g-tt--fs:active { transform: scale(.92); transition-duration: .1s; }
+@media (hover: none) {
+  html[data-theme] .room-screen .tile .g-tt.g-tt--fs, html[data-theme] .room-screen .tile .g-vol { opacity: 1; translate: 0 0; scale: 1; pointer-events: auto; }
+}
