@@ -968,7 +968,22 @@ async function renderLobby(prefillRoomCode = '') {
   const roomInput = el('input', { type: 'text', class: 'g-join__inp', placeholder: 'Код комнаты', value: urlRoom, autocomplete: 'off', spellcheck: 'false' })
   const spkField = field('Динамики', makeDropdown(spkSelect, 'spk'))
   if (!speakerSelectionSupported()) spkField.style.display = 'none'
-  const joinBtn = el('button', { type: 'button', class: 'g-join__btn' }, 'Войти в звонок')
+  // Кнопка входа — морф: текст → круг с загрузкой («Подключаемся…») → галочка → звонок.
+  // Звонок в это время собирается скрытым за экраном входа и показывается уже готовым.
+  const joinOk = svgIcon('<svg class="g-jb__ok" viewBox="0 0 36 36" width="28" height="28" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18.5l6 6 12-13"/></svg>')
+  const joinBtn = el('button', { type: 'button', class: 'g-join__btn', 'data-st': 'idle' }, [
+    el('span', { class: 'g-jb__label' }, 'Войти в звонок'),
+    el('span', { class: 'g-jb__spin', 'aria-hidden': 'true' }),
+    joinOk
+  ])
+  const joinCap = el('div', { class: 'g-join__cap', 'aria-live': 'polite' })
+  function setJoinState(st, caption = '') {
+    joinBtn.dataset.st = st
+    joinBtn.disabled = st !== 'idle'
+    joinBtn.setAttribute('aria-label', st === 'idle' ? 'Войти в звонок' : caption)
+    if (caption) joinCap.textContent = caption
+    joinCap.classList.toggle('is-on', !!caption && st !== 'idle')
+  }
   const card = el('div', { class: 'g-join__card' }, [
     el('span', { class: 'g-join__title' }, 'Войти в звонок'),
     field('Код комнаты', roomInput),
@@ -976,7 +991,8 @@ async function renderLobby(prefillRoomCode = '') {
     spkField,
     field('Камера', makeDropdown(camSelect, 'cam')),
     errorSlot,
-    joinBtn
+    joinBtn,
+    joinCap
   ])
 
   screen.appendChild(gCallHeader('Вход в звонок'))
@@ -1097,9 +1113,15 @@ async function renderLobby(prefillRoomCode = '') {
     // чтобы при повторном входе (например, обновление страницы) права хоста восстановились
     const savedHostSecret = roomCode ? localStorage.getItem(`hostSecret:${roomCode}`) : null
 
-    joinBtn.disabled = true
-    joinBtn.replaceChildren(el('span', { class: 'g-spin' }), 'Подключаемся…')
+    setJoinState('load', 'Подключаемся…')
     errorSlot.style.display = 'none'
+    const startedAt = Date.now()
+    const fail = (e) => {
+      errorSlot.style.display = 'block'
+      errorSlot.className = 'error-box g-join__err'
+      errorSlot.textContent = (e && e.message) || 'Ошибка подключения. Проверьте интернет-соединение.'
+      setJoinState('idle')
+    }
 
     try {
       // displayName больше не передаётся - сервер берёт имя из авторизованной сессии (куки-cookie)
@@ -1125,15 +1147,21 @@ async function renderLobby(prefillRoomCode = '') {
         localStorage.setItem(`hostSecret:${data.roomCode}`, data.hostSecret)
       }
 
-      stopPreview()
-      vlNavigate(`/room/${data.roomCode}`)
-      await enterRoom(data)
+      await enterRoom(data, {
+        onStage: (stage) => { if (stage === 'media') setJoinState('load', 'Включаем микрофон и камеру…') },
+        // Всё подключено и отрисовано: загрузка превращается в галочку, затем открывается звонок
+        onReady: async () => {
+          const wait = 700 - (Date.now() - startedAt)
+          if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+          setJoinState('ok', 'Готово')
+          await new Promise((r) => setTimeout(r, 620))
+          stopPreview()
+          vlNavigate(`/room/${data.roomCode}`)
+        },
+        onFail: fail
+      })
     } catch (e) {
-      errorSlot.style.display = 'block'
-      errorSlot.className = 'error-box g-join__err'
-      errorSlot.textContent = e.message || 'Ошибка подключения. Проверьте интернет-соединение.'
-      joinBtn.disabled = false
-      joinBtn.textContent = 'Войти в звонок'
+      fail(e)
     }
   }
 
@@ -1143,7 +1171,7 @@ async function renderLobby(prefillRoomCode = '') {
 
 // ===================== КОМНАТА (звонок) =====================
 
-async function enterRoom(joinData) {
+async function enterRoom(joinData, opts = {}) {
   const { token, url, roomCode, displayName, maxParticipants, maxScreenShares, isHost, hostSecret } = joinData
   state.roomCode = roomCode
   state.displayName = displayName
@@ -1164,9 +1192,13 @@ async function enterRoom(joinData) {
   // перехода, и браузер оставляет страницу чуть прокрученной — экран звонка «ездил»
   // вверх-вниз. Снимаем фокус и возвращаем прокрутку в ноль до и после отрисовки.
   resetPageScroll(true)
-  root.innerHTML = ''
+  // behind: вход из экрана «Войти в звонок» — звонок собирается скрытым поверх него и
+  // показывается, только когда подключение, камера/микрофон и участники уже готовы
+  const behind = typeof opts.onReady === 'function'
+  let preloadConnected = false
+  if (!behind) root.innerHTML = ''
 
-  const screen = el('div', { class: 'room-screen' })
+  const screen = el('div', { class: behind ? 'room-screen is-preloading' : 'room-screen' })
 
   // ---- Верхняя панель ----
   const topbar = el('div', { class: 'room-topbar' })
@@ -1564,6 +1596,16 @@ async function enterRoom(joinData) {
         }
       }
     }
+    // Треков нет вовсе (вошли без камеры и микрофона, одни) — пинг сигнального канала LiveKit
+    if (rtt === null) {
+      const sig = room.engine && room.engine.client && room.engine.client.rtt
+      if (typeof sig === 'number' && sig > 0) rtt = sig / 1000
+    }
+    if (rtt !== null) {
+      pingPill.dataset.ok = '1'
+      // Оценки LiveKit ещё нет — полоски сразу по пингу (его оценка потом заменит эту)
+      if (roomInfo.dataset.q === 'unknown') setConnQuality(rtt < 0.15 ? 'excellent' : rtt < 0.3 ? 'good' : 'poor')
+    }
     connPing.textContent = rtt === null ? '—' : `${Math.round(rtt * 1000)} мс`
     pingPill.textContent = rtt === null ? '— мс' : `${Math.round(rtt * 1000)} мс`
     connVideoRow.hidden = !lp.isCameraEnabled
@@ -1588,6 +1630,17 @@ async function enterRoom(joinData) {
     connStatsTimer = setInterval(run, 1000)
   }
   function stopConnStats() { clearInterval(connStatsTimer); connStatsTimer = 0 }
+  // Пинг в шапке виден всегда: сразу после входа опрашиваем часто, пока не появится первое
+  // значение, дальше — раз в 2 с (карточка по наведению обновляет его ещё и каждую секунду)
+  function startPingLoop() {
+    const tick = () => {
+      if (callCleanedUp) return
+      readConnStats().catch(() => {}).finally(() => {
+        if (!callCleanedUp) setTimeout(tick, pingPill.dataset.ok ? 2000 : 300)
+      })
+    }
+    tick()
+  }
   roomStatus.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') startConnStats() })
   roomStatus.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && !roomStatus.classList.contains('is-open')) stopConnStats() })
   roomStatus.addEventListener('focus', startConnStats)
@@ -2573,6 +2626,17 @@ async function enterRoom(joinData) {
   })
 
   room.on(LK.RoomEvent.Disconnected, (reason) => {
+    // Звонок ещё собирается за экраном входа: ошибку покажет сам экран входа (catch ниже)
+    if (behind && screen.classList.contains('is-preloading')) {
+      if (!preloadConnected || callCleanedUp) return
+      callCleanedUp = true
+      setCallActive(false)
+      state.room = null
+      state.roomCode = null
+      screen.remove()
+      opts.onFail(new Error('Соединение прервалось, попробуйте ещё раз'))
+      return
+    }
     setStatus('Отключено', 'disconnected')
     setCallActive(false)
     if (reason === LK.DisconnectReason.PARTICIPANT_REMOVED) {
@@ -2597,6 +2661,8 @@ async function enterRoom(joinData) {
     await room.connect(url, token)
     setStatus('Подключено', '')
     setCallActive(true)
+    startPingLoop()
+    if (opts.onStage) opts.onStage('media')
 
     // Публикуем камеру/микрофон согласно выбору пользователя в лобби (можно войти с выключенными)
     await room.localParticipant.setCameraEnabled(state.cameraEnabled)
@@ -2637,10 +2703,32 @@ async function enterRoom(joinData) {
         }
       })
     })
+    if (behind) {
+      preloadConnected = true
+      opts.onReady().then(() => {
+        if (callCleanedUp) return
+        for (const n of Array.from(root.children)) if (n !== screen) n.remove()
+        screen.classList.remove('is-preloading')
+        screen.classList.add('is-reveal')
+        scheduleRelayout()
+        setTimeout(() => screen.classList.remove('is-reveal'), 700)
+      })
+    }
   } catch (e) {
     // Трубку положили, пока шло подключение, — это не ошибка
     if (callCleanedUp) return
     console.error(e)
+    if (behind) {
+      // Экран входа на месте: возвращаем кнопку и показываем ошибку в карточке, без тоста
+      callCleanedUp = true
+      setCallActive(false)
+      try { room.disconnect() } catch {}
+      state.room = null
+      state.roomCode = null
+      screen.remove()
+      opts.onFail(new Error('Не удалось подключиться к звонку: ' + e.message))
+      return
+    }
     showToast('Не удалось подключиться к звонку: ' + e.message, 'error')
     // cleanupAndGoLobby() здесь звать нельзя: интервалы и таймер, которые он чистит, объявлены
     // ниже и ещё не созданы (обращение к ним — ReferenceError)
