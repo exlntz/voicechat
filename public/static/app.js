@@ -251,8 +251,12 @@ function setCallActive(active) {
 
 // Плавное появление узла (плитка, приглашение, кнопка): класс .is-entering с задержкой,
 // снимается после анимации — при перестановке узла в сетке анимация не повторяется
+// Пока звонок собирается скрытым за экраном входа, появления копятся здесь и
+// проигрываются в момент показа — иначе они заканчивались, пока экран был невидим
+let deferredEnters = null
 function playEnter(node, delay = 0) {
   if (!node) return
+  if (deferredEnters) { deferredEnters.push([node, delay]); return }
   try { if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return } catch {}
   node.style.setProperty('--enter-delay', delay + 'ms')
   node.classList.add('is-entering')
@@ -968,21 +972,30 @@ async function renderLobby(prefillRoomCode = '') {
   const roomInput = el('input', { type: 'text', class: 'g-join__inp', placeholder: 'Код комнаты', value: urlRoom, autocomplete: 'off', spellcheck: 'false' })
   const spkField = field('Динамики', makeDropdown(spkSelect, 'spk'))
   if (!speakerSelectionSupported()) spkField.style.display = 'none'
-  // Кнопка входа — морф: текст → круг с загрузкой («Подключаемся…») → галочка → звонок.
-  // Звонок в это время собирается скрытым за экраном входа и показывается уже готовым.
-  const joinOk = svgIcon('<svg class="g-jb__ok" viewBox="0 0 36 36" width="28" height="28" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18.5l6 6 12-13"/></svg>')
-  const joinBtn = el('button', { type: 'button', class: 'g-join__btn', 'data-st': 'idle' }, [
-    el('span', { class: 'g-jb__label' }, 'Войти в звонок'),
-    el('span', { class: 'g-jb__spin', 'aria-hidden': 'true' }),
-    joinOk
+  // Кнопка входа — «шаги подключения»: слева загрузка, текст шага перелистывается
+  // («Соединяемся…» → «Микрофон и камера…»), справа точки прогресса; в конце кнопка
+  // заливается зелёным и рисуется галочка. Звонок в это время собирается скрытым за
+  // экраном входа и показывается уже готовым.
+  const joinOk = svgIcon('<svg class="g-jb__ok" viewBox="0 0 36 36" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18.5l6 6 12-13"/></svg>')
+  let joinTxt = el('span', { class: 'g-jb__txt' }, 'Войти в звонок')
+  const joinDots = [el('i'), el('i'), el('i')]
+  const joinBtn = el('button', { type: 'button', class: 'g-join__btn g-jbc', 'data-st': 'idle' }, [
+    el('span', { class: 'g-jb__ico', 'aria-hidden': 'true' }, [el('span', { class: 'g-jb__spin' }), joinOk]),
+    el('span', { class: 'g-jb__txtbox' }, [joinTxt]),
+    el('span', { class: 'g-jb__dots', 'aria-hidden': 'true' }, joinDots)
   ])
-  const joinCap = el('div', { class: 'g-join__cap', 'aria-live': 'polite' })
-  function setJoinState(st, caption = '') {
+  function setJoinState(st, text = '', step = 0) {
     joinBtn.dataset.st = st
     joinBtn.disabled = st !== 'idle'
-    joinBtn.setAttribute('aria-label', st === 'idle' ? 'Войти в звонок' : caption)
-    if (caption) joinCap.textContent = caption
-    joinCap.classList.toggle('is-on', !!caption && st !== 'idle')
+    const label = st === 'idle' ? 'Войти в звонок' : text
+    joinBtn.setAttribute('aria-label', label)
+    if (joinTxt.textContent !== label) {
+      // Новый текст шага въезжает снизу
+      const next = el('span', { class: 'g-jb__txt is-in' }, label)
+      joinTxt.replaceWith(next)
+      joinTxt = next
+    }
+    joinDots.forEach((d, i) => { d.dataset.on = i < step ? '1' : '0' })
   }
   const card = el('div', { class: 'g-join__card' }, [
     el('span', { class: 'g-join__title' }, 'Войти в звонок'),
@@ -991,8 +1004,7 @@ async function renderLobby(prefillRoomCode = '') {
     spkField,
     field('Камера', makeDropdown(camSelect, 'cam')),
     errorSlot,
-    joinBtn,
-    joinCap
+    joinBtn
   ])
 
   screen.appendChild(gCallHeader('Вход в звонок'))
@@ -1113,9 +1125,10 @@ async function renderLobby(prefillRoomCode = '') {
     // чтобы при повторном входе (например, обновление страницы) права хоста восстановились
     const savedHostSecret = roomCode ? localStorage.getItem(`hostSecret:${roomCode}`) : null
 
-    setJoinState('load', 'Подключаемся…')
+    setJoinState('load', 'Соединяемся…', 1)
     errorSlot.style.display = 'none'
     const startedAt = Date.now()
+    let mediaAt = 0
     const fail = (e) => {
       errorSlot.style.display = 'block'
       errorSlot.className = 'error-box g-join__err'
@@ -1148,12 +1161,14 @@ async function renderLobby(prefillRoomCode = '') {
       }
 
       await enterRoom(data, {
-        onStage: (stage) => { if (stage === 'media') setJoinState('load', 'Включаем микрофон и камеру…') },
+        onStage: (stage) => { if (stage === 'media') { mediaAt = Date.now(); setJoinState('load', 'Микрофон и камера…', 2) } },
         // Всё подключено и отрисовано: загрузка превращается в галочку, затем открывается звонок
         onReady: async () => {
-          const wait = 700 - (Date.now() - startedAt)
+          // Каждый шаг успевает прочитаться: всего не меньше секунды, «Микрофон и камера» — 450 мс
+          const now = Date.now()
+          const wait = Math.max(1000 - (now - startedAt), mediaAt ? 450 - (now - mediaAt) : 0)
           if (wait > 0) await new Promise((r) => setTimeout(r, wait))
-          setJoinState('ok', 'Готово')
+          setJoinState('ok', 'Вы в звонке', 3)
           await new Promise((r) => setTimeout(r, 620))
           stopPreview()
           vlNavigate(`/room/${data.roomCode}`)
@@ -1196,6 +1211,7 @@ async function enterRoom(joinData, opts = {}) {
   // показывается, только когда подключение, камера/микрофон и участники уже готовы
   const behind = typeof opts.onReady === 'function'
   let preloadConnected = false
+  deferredEnters = behind ? [] : null
   if (!behind) root.innerHTML = ''
 
   const screen = el('div', { class: behind ? 'room-screen is-preloading' : 'room-screen' })
@@ -2642,6 +2658,7 @@ async function enterRoom(joinData, opts = {}) {
       state.room = null
       state.roomCode = null
       screen.remove()
+      deferredEnters = null
       opts.onFail(new Error('Соединение прервалось, попробуйте ещё раз'))
       return
     }
@@ -2714,12 +2731,14 @@ async function enterRoom(joinData, opts = {}) {
     if (behind) {
       preloadConnected = true
       opts.onReady().then(() => {
-        if (callCleanedUp) return
+        if (callCleanedUp) { deferredEnters = null; return }
         for (const n of Array.from(root.children)) if (n !== screen) n.remove()
         screen.classList.remove('is-preloading')
-        screen.classList.add('is-reveal')
         scheduleRelayout()
-        setTimeout(() => screen.classList.remove('is-reveal'), 700)
+        // Та же анимация появления, что и без предзагрузки: плитки, карточка, кнопки по очереди
+        const q = deferredEnters || []
+        deferredEnters = null
+        q.forEach(([n, d]) => playEnter(n, d))
       })
     }
   } catch (e) {
@@ -2734,6 +2753,7 @@ async function enterRoom(joinData, opts = {}) {
       state.room = null
       state.roomCode = null
       screen.remove()
+      deferredEnters = null
       opts.onFail(new Error('Не удалось подключиться к звонку: ' + e.message))
       return
     }
