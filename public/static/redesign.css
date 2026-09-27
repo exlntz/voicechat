@@ -1258,3 +1258,15 @@ html[data-theme="light"] .g-ppl-btn:not(.is-on):hover { background: #f7f6f3; }
   body.vl-show-app .room-screen .room-topbar { padding-left: 0; }
   .room-topbar .room-status, .room-screen .room-copy-btn, .room-topbar .g-ppl-btn { flex-shrink: 0; }
 }
+
+/* Недавние звонки: сброс .g-side button обнулял отступы — дата упиралась в край строки.
+   Дата теперь справа на одной линии с именем, как время в списке чатов */
+.g-side .g-crow { padding: 0 14px 0 10px; }
+.g-side button.g-row { padding: 0 12px; }
+.g-crow__top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.g-crow__top .g-crow__name { flex: 1 1 auto; min-width: 0; }
+.g-crow__when { font-size: 13px; color: var(--g-sub); }
+
+/* Пинг и время звонка — без капсулы и обводки, прямо на фоне страницы */
+.room-topbar .room-status { background: none !important; box-shadow: none !important; border: 0; padding: 0 6px; }
+.room-topbar .room-status .room-timer { color: var(--g-sub); }

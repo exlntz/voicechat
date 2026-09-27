@@ -28,9 +28,12 @@ export function openContactDialog(user) {
     try {
       // То же, что имя в профиле, — это не контакт, а просто имя: не храним
       const clean = String(name || '').trim()
-      await saveContact(user.id, clean && clean !== profileName(user) ? clean : '')
+      const keep = clean && clean !== profileName(user) ? clean : ''
+      // Контакта не было и имя осталось как в профиле — сохранять нечего, «Удалено» тут неправда
+      if (!keep && !current) { done(); return }
+      await saveContact(user.id, keep)
       done()
-      toast(clean && clean !== profileName(user) ? 'Контакт сохранён' : 'Удалено из контактов', 'success')
+      toast(keep ? 'Контакт сохранён' : 'Удалено из контактов', 'success')
     } catch (e) {
       busy = false
       toast(e.message, 'error')
