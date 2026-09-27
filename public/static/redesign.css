@@ -1372,3 +1372,24 @@ html:not([data-theme="light"]) .g-seg button[data-on="1"] { color: #f2f0ec !impo
 html:not([data-theme="light"]) .g-tgl { background: #47433f; }
 html:not([data-theme="light"]) .g-tgl::after { background: #f2f0ec; }
 html:not([data-theme="light"]) .g-tgl[data-on="1"] { background: #22c55e; }
+
+/* ─────────── Вход в звонок: морф кнопки и показ уже готового звонка ─────────── */
+.g-join__btn { position: relative; align-self: center; overflow: hidden; transition: width .6s var(--g-spring), background-color .3s, transform .45s var(--g-spring), opacity .2s; }
+.g-join__btn:disabled { opacity: 1; }
+.g-join__btn[data-st="load"], .g-join__btn[data-st="ok"] { width: 50px; pointer-events: none; }
+.g-jb__label { transition: opacity .18s, transform .3s var(--g-spring), filter .18s; white-space: nowrap; }
+.g-join__btn:not([data-st="idle"]) .g-jb__label { opacity: 0; transform: scale(.85); filter: blur(4px); }
+.g-jb__spin, .g-jb__ok { position: absolute; left: 50%; top: 50%; pointer-events: none; }
+.g-jb__spin { width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%; border: 3px solid color-mix(in srgb, currentColor 25%, transparent); border-top-color: currentColor; box-sizing: border-box; opacity: 0; transform: scale(.4); transition: opacity .2s, transform .45s var(--g-spring); animation: g-spin .75s linear infinite; }
+.g-join__btn[data-st="load"] .g-jb__spin { opacity: 1; transform: scale(1); transition-delay: .12s; }
+.g-jb__ok { width: 28px; height: 28px; margin: -14px 0 0 -14px; opacity: 0; transform: scale(.5); transition: opacity .15s, transform .5s var(--g-spring); }
+.g-jb__ok path { stroke-dasharray: 30; stroke-dashoffset: 30; transition: stroke-dashoffset .42s cubic-bezier(.65, 0, .35, 1) .08s; }
+.g-join__btn[data-st="ok"] .g-jb__ok { opacity: 1; transform: none; }
+.g-join__btn[data-st="ok"] .g-jb__ok path { stroke-dashoffset: 0; }
+.g-join__btn[data-st="ok"] { background: #22c55e !important; color: #fff !important; }
+.g-join__cap { margin-top: -8px; min-height: 18px; text-align: center; font-size: 14px; color: var(--g-sub); opacity: 0; transform: translateY(-4px); transition: opacity .25s, transform .4s var(--g-spring); }
+.g-join__cap.is-on { opacity: 1; transform: none; }
+/* Звонок собирается невидимым поверх экрана входа (раскладка уже считается по реальному размеру) */
+.room-screen.is-preloading { position: fixed !important; inset: 0 !important; visibility: hidden !important; pointer-events: none !important; }
+.room-screen.is-reveal { animation: g-room-in .55s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes g-room-in { from { opacity: 0; transform: scale(.985); } }
