@@ -60,35 +60,57 @@ function loadImage(url) {
   })
 }
 
-// Размеры и, если нужно, пережатие фото. Возвращает {file, meta}
-export async function prepareImage(file, { maxSide = MAX_SIDE, force = false } = {}) {
+// Крошечная копия фото (до 24 px по длинной стороне, JPEG ~0,5–1 КБ): её показывают
+// размытой, пока у собеседника грузится само фото
+function makeThumb(img) {
+  try {
+    const k = 24 / Math.max(img.naturalWidth, img.naturalHeight)
+    const c = document.createElement('canvas')
+    c.width = Math.max(1, Math.round(img.naturalWidth * k))
+    c.height = Math.max(1, Math.round(img.naturalHeight * k))
+    const ctx = c.getContext('2d')
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, c.width, c.height)
+    ctx.drawImage(img, 0, 0, c.width, c.height)
+    const url = c.toDataURL('image/jpeg', 0.6)
+    return url.length <= 4000 ? url : null
+  } catch { return null }
+}
+
+// Размеры и, если нужно, пережатие фото. Возвращает {file, meta}; thumb — добавить в meta превью
+export async function prepareImage(file, { maxSide = MAX_SIDE, force = false, thumb = false } = {}) {
   const url = URL.createObjectURL(file)
   try {
     const img = await loadImage(url)
-    let w = img.naturalWidth
-    let h = img.naturalHeight
-    const isGif = file.type === 'image/gif'
-    const big = Math.max(w, h) > maxSide
-    if (isGif || (!force && !big && file.size < RECOMPRESS_OVER)) return { file, meta: { width: w, height: h } }
-    const k = Math.min(1, maxSide / Math.max(w, h))
-    w = Math.round(w * k)
-    h = Math.round(h * k)
-    const canvas = document.createElement('canvas')
-    canvas.width = w
-    canvas.height = h
-    const ctx = canvas.getContext('2d')
-    ctx.fillStyle = '#fff' // прозрачный PNG в JPEG — на белом, а не на чёрном
-    ctx.fillRect(0, 0, w, h)
-    ctx.drawImage(img, 0, 0, w, h)
-    const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.86))
-    if (!blob || blob.size >= file.size) return { file, meta: { width: img.naturalWidth, height: img.naturalHeight } }
-    const out = new File([blob], String(file.name || 'photo').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' })
-    return { file: out, meta: { width: w, height: h } }
+    const res = await shrinkImage(file, img, { maxSide, force })
+    if (thumb) { const t = makeThumb(img); if (t) res.meta.thumb = t }
+    return res
   } catch {
     return { file, meta: {} }
   } finally {
     URL.revokeObjectURL(url)
   }
+}
+async function shrinkImage(file, img, { maxSide, force }) {
+  let w = img.naturalWidth
+  let h = img.naturalHeight
+  const isGif = file.type === 'image/gif'
+  const big = Math.max(w, h) > maxSide
+  if (isGif || (!force && !big && file.size < RECOMPRESS_OVER)) return { file, meta: { width: w, height: h } }
+  const k = Math.min(1, maxSide / Math.max(w, h))
+  w = Math.round(w * k)
+  h = Math.round(h * k)
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#fff' // прозрачный PNG в JPEG — на белом, а не на чёрном
+  ctx.fillRect(0, 0, w, h)
+  ctx.drawImage(img, 0, 0, w, h)
+  const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.86))
+  if (!blob || blob.size >= file.size) return { file, meta: { width: img.naturalWidth, height: img.naturalHeight } }
+  const out = new File([blob], String(file.name || 'photo').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' })
+  return { file: out, meta: { width: w, height: h } }
 }
 
 export function probeMedia(file) {
@@ -114,7 +136,7 @@ export function probeMedia(file) {
 export async function prepareAttachment(file) {
   const kind = kindOf(file)
   if (kind === 'image') {
-    const { file: out, meta } = await prepareImage(file)
+    const { file: out, meta } = await prepareImage(file, { thumb: true })
     return { file: out, kind, meta, previewUrl: URL.createObjectURL(out) }
   }
   if (kind === 'video' || kind === 'audio') {

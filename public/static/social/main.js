@@ -379,7 +379,11 @@ async function exitSolo(path, { openLatestChat = false } = {}) {
   hideSoloChatsButton()
   if (VL.teardownLobby) VL.teardownLobby()
   body.classList.remove('vl-solo')
-  appRoot.replaceChildren()
+  // Звонок идёт — его экран остаётся (оболочка спрячет его и покажет плашку «В звонке»);
+  // раньше он удалялся вместе с лобби, и нажатие на плашку вело на пустой экран
+  const keep = '.room-screen, .pip-placeholder'
+  if (appRoot.querySelector(keep)) { for (const n of Array.from(appRoot.children)) if (!n.matches(keep)) n.remove() }
+  else appRoot.replaceChildren()
   history.pushState({}, '', path)
   await startSession(me)
   if (!openLatestChat) return

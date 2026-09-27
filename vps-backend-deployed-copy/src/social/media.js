@@ -152,6 +152,9 @@ export function registerMediaRoutes(app, { db, dataDir, profile }) {
     if (num(m.height, 20000)) meta.height = Math.round(num(m.height, 20000))
     if (num(m.duration, 24 * 3600)) meta.duration = Math.round(num(m.duration, 24 * 3600) * 10) / 10
     if (Array.isArray(m.waveform)) meta.waveform = m.waveform.slice(0, 64).map((v) => Math.max(0, Math.min(1, Number(v) || 0)))
+    // Крошечное размытое превью фото (~24 px, как в Телеграме): показывается, пока грузится
+    // само фото. Только картинка в base64 и не больше 4 КБ
+    if (kind === 'image' && typeof m.thumb === 'string' && m.thumb.length <= 4000 && /^data:image\/(jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(m.thumb)) meta.thumb = m.thumb
 
     const fileId = randomBytes(16).toString('hex')
     renameSync(u.path, join(filesDir, fileId))

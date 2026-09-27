@@ -8,6 +8,10 @@ import { openContactDialog } from './contact-dialog.js'
 import { voicePlayer, fileCard, openLightbox } from './media-ui.js'
 
 let current = null
+// Где нажали перед открытием: карточка вырастает из этой точки (аватарка в шапке чата,
+// строка друга и т. п.), а при закрытии сжимается обратно
+let lastPress = { x: 0, y: 0, t: 0 }
+document.addEventListener('pointerdown', (e) => { lastPress = { x: e.clientX, y: e.clientY, t: Date.now() } }, true)
 
 export function closeUserCard() {
   if (!current) return
@@ -17,7 +21,7 @@ export function closeUserCard() {
   if (off) off()
   overlay.querySelectorAll('video').forEach((v) => v.pause())
   overlay.classList.add('is-leaving')
-  setTimeout(() => overlay.remove(), 180)
+  setTimeout(() => overlay.remove(), 260)
 }
 
 const TABS = [
@@ -184,6 +188,14 @@ export function openUserCard({ userId = 0, convId = 0, saved = false, onMessage,
   overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) closeUserCard() })
   document.addEventListener('keydown', onKey, true)
   document.body.appendChild(overlay)
+  if (Date.now() - lastPress.t < 800) {
+    // Мерить без анимации: во время неё карточка уже сжата и координаты врут
+    card.style.animation = 'none'
+    const r = card.getBoundingClientRect()
+    card.style.animation = ''
+    card.style.setProperty('--ox', Math.round(lastPress.x - r.left) + 'px')
+    card.style.setProperty('--oy', Math.round(lastPress.y - r.top) + 'px')
+  }
   // Имя контакта поменяли, пока карточка открыта
   current = { overlay, onKey, off: on('contacts', () => renderHead()) }
   renderHead()

@@ -428,7 +428,7 @@ export function createChatView({ convId, navigate, menuButton }) {
   }
 
   // Загрузить файлы черновика по очереди; прогресс — общий по байтам
-  function uploadAll(items, sink) {
+  function uploadAll(items, sink, signal) {
     const total = items.reduce((s, p) => s + p.size, 0) || 1
     let done = 0
     return (async () => {
@@ -438,6 +438,7 @@ export function createChatView({ convId, navigate, menuButton }) {
           name: p.name,
           voice: p.kind === 'voice',
           meta: p.meta,
+          signal,
           onProgress: (frac) => setProgress(sink, (done + frac * p.size) / total)
         })
         done += p.size
@@ -473,11 +474,17 @@ export function createChatView({ convId, navigate, menuButton }) {
     if (!items.length) { sendMessage(convId, text, reply).catch(() => {}); return }
     const sink = { draft: null } // черновик в ленте, куда писать прогресс загрузки
     const attachments = items.map((p) => ({ kind: p.kind, name: p.name, size: p.size, meta: p.meta, previewUrl: p.previewUrl, url: p.kind === 'voice' ? p.previewUrl : null }))
-    const start = () => { if (sink.draft) sink.draft.progress = 0; return uploadAll(items, sink) }
+    // Крестик на фото отменяет отправку: загрузка прерывается, черновик убирается из ленты
+    let ac = null
+    const start = () => { if (sink.draft) sink.draft.progress = 0; ac = new AbortController(); return uploadAll(items, sink, ac.signal) }
     sendMessage(convId, text, reply, { attachments, upload: start() }).catch(() => {})
-    // Черновик уже в ленте: дать ему прогресс и «загрузить заново» для кнопки «Повторить»
+    // Черновик уже в ленте: дать ему прогресс, «загрузить заново» для «Повторить» и отмену
     const draft = getChat(convId).list.find((m) => !m.id && m.attachments === attachments)
-    if (draft) { draft.retry = start; sink.draft = draft }
+    if (draft) {
+      draft.retry = start
+      draft.cancel = () => { if (ac) ac.abort(); discardDraft(convId, draft.clientId) }
+      sink.draft = draft
+    }
   }
   function draftProgress(m) { return typeof m.progress === 'number' ? m.progress : 0 }
 
@@ -797,7 +804,7 @@ export function createChatView({ convId, navigate, menuButton }) {
       }
       if (m.reply) parts.push(buildQuote(m))
       if (files.length) {
-        const uploading = m.pending && m.upload ? { progress: draftProgress(m) } : null
+        const uploading = m.pending && m.upload ? { progress: draftProgress(m), onCancel: m.cancel || null } : null
         parts.push(...renderAttachments(files, {
           mine,
           uploading,
