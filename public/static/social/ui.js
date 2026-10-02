@@ -522,7 +522,8 @@ export function showMenu(items, anchor) {
   return menu
 }
 document.addEventListener('mousedown', (e) => { if (openMenu && !openMenu.contains(e.target)) closeMenu() }, true)
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu() })
+// Esc при открытом меню закрывает только меню: событие помечаем, чтобы чат не закрылся следом
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openMenu) { e.preventDefault(); e.stopPropagation(); closeMenu() } }, true)
 window.addEventListener('blur', closeMenu)
 window.addEventListener('resize', closeMenu)
 

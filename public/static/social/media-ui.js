@@ -3,6 +3,16 @@ import { h, icon, fmtSize, fmtClock } from './ui.js'
 
 // ---------- Одно проигрывание за раз (голосовые и аудио) ----------
 let playing = null // {audio, stop}
+
+// Голосовое подгружается заранее, как только показалось на экране (с запасом 400px):
+// иначе загрузка начиналась только по нажатию и звук стартовал с задержкой
+const prefetchIO = typeof IntersectionObserver === 'function'
+  ? new IntersectionObserver((entries) => entries.forEach((e) => {
+    if (!e.isIntersecting) return
+    prefetchIO.unobserve(e.target)
+    if (e.target.__prefetch) e.target.__prefetch()
+  }), { rootMargin: '400px 0px' })
+  : null
 function claimPlayback(entry) {
   if (playing && playing !== entry) playing.stop()
   playing = entry
@@ -19,10 +29,25 @@ export function voicePlayer(file, { mine = false } = {}) {
   const node = h('div', { class: `vl-voice${mine ? ' is-mine' : ''}`, style: { '--p': '0' } }, [btn, h('div', { class: 'vl-voice__body' }, [wave, time])])
   let audio = null
   let raf = 0
+  let blobUrl = null
+  let loading = null
   const entry = { stop }
+  // Небольшой файл целиком скачиваем в память — тогда play() начинается мгновенно;
+  // большой (длинная запись) просто начинаем буферизовать
+  function prefetch() {
+    if (audio || loading) return loading
+    if (file.size && file.size > 4 * 1024 * 1024) { ensure().load(); return null }
+    loading = fetch(file.url, { credentials: 'same-origin' })
+      .then((r) => (r.ok ? r.blob() : null))
+      .then((b) => { if (b && !audio) blobUrl = URL.createObjectURL(b) })
+      .catch(() => {})
+    return loading
+  }
+  node.__prefetch = prefetch
+  if (prefetchIO && file.url) prefetchIO.observe(node)
   function ensure() {
     if (audio) return audio
-    audio = new Audio(file.url)
+    audio = new Audio(blobUrl || file.url)
     audio.preload = 'auto'
     audio.addEventListener('ended', () => { setPlaying(false); node.style.setProperty('--p', '0'); time.textContent = fmtClock(meta.duration || audio.duration) })
     audio.addEventListener('pause', () => setPlaying(false))
@@ -44,10 +69,18 @@ export function voicePlayer(file, { mine = false } = {}) {
     if (on) raf = requestAnimationFrame(tick)
   }
   function stop() { if (audio) audio.pause() }
-  btn.addEventListener('click', (e) => {
+  // Наведение/касание — сигнал, что сейчас нажмут: начинаем загрузку, если ещё не начали
+  btn.addEventListener('pointerenter', () => prefetch())
+  btn.addEventListener('pointerdown', () => prefetch())
+  btn.addEventListener('click', async (e) => {
     e.stopPropagation()
+    if (!audio && loading) {
+      // Файл уже качается — дождаться его быстрее, чем начинать второе скачивание
+      setPlaying(true)
+      await loading
+    }
     const a = ensure()
-    if (a.paused) { claimPlayback(entry); a.play().catch(() => {}) } else a.pause()
+    if (a.paused) { claimPlayback(entry); a.play().catch(() => setPlaying(false)) } else a.pause()
   })
   function seek(frac) {
     const a = ensure()

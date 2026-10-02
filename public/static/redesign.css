@@ -1660,3 +1660,58 @@ html[data-theme] .g-frow.is-req { padding: 0 9px; }
   html[data-theme] .g-frow, html[data-theme] .g-frow.is-req { height: 68px; padding: 0 11px; }
 }
 html[data-theme] .g-row { padding-left: 11px; padding-right: 11px; }
+
+/* Поля в окнах (переслать, лобби и т.п.): при наведении — на тон светлее, а не чёрные (старое #0b0d11) */
+html[data-theme] .fld input, html[data-theme] .password-field input { background: var(--g-field); }
+html[data-theme] .fld input:hover, html[data-theme] .fld input:focus { background: var(--g-field-h); }
+html[data-theme] .fld input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px var(--g-field) inset; box-shadow: 0 0 0 1000px var(--g-field) inset; -webkit-text-fill-color: var(--text); }
+
+/* Голосовое в ленте: ровные отступы 8px вокруг кнопки, время отправки — в строке с длительностью */
+.vl-view--chat .vl-bubble.is-voice { position: relative; padding: 8px 16px 8px 8px; }
+.vl-view--chat .vl-bubble.is-voice .vl-voice { gap: 12px; min-width: 250px; }
+.vl-view--chat .vl-bubble.is-voice .vl-voice__body { gap: 2px; }
+.vl-view--chat .vl-bubble.is-voice .vl-voice__wave { height: 24px; }
+.vl-view--chat .vl-bubble.is-voice .vl-voice__time { line-height: 16px; }
+.vl-view--chat .vl-bubble.is-voice .vl-bubble__text { position: absolute; right: 16px; bottom: 8px; margin: 0; padding: 0; line-height: 16px; }
+.vl-view--chat .vl-bubble.is-voice .vl-bubble__meta { position: static; float: none; margin: 0; height: 16px; }
+html[data-theme="light"] .vl-voice.is-mine .vl-voice__wave i { background: #1c1917; }
+html[data-theme="light"] .vl-voice.is-mine .vl-voice__btn { background: #1c1917; color: #fff; }
+
+/* Действия у сообщения: только «⋯» сбоку; проявляется, если задержать курсор на сообщении ~0.8 с,
+   и сразу гаснет, когда курсор ушёл */
+.vl-view--chat .vl-msg__tools { padding: 0; background: none; box-shadow: none; transform: scale(.85); transition: opacity .18s ease-out, transform .35s var(--g-spring); transition-delay: 0s; }
+.vl-view--chat .vl-msg__wrap:focus-within .vl-msg__tools { opacity: 0; transform: scale(.85); pointer-events: none; }
+.vl-view--chat .vl-msg__wrap:hover .vl-msg__tools { opacity: 1; transform: none; pointer-events: auto; transition-delay: .8s; }
+.vl-view--chat .vl-msg__tools .vl-round { width: 30px; height: 30px; background: var(--g-field); color: var(--g-sub); box-shadow: none; }
+.vl-view--chat .vl-msg__tools .vl-round:hover { background: var(--g-field-h); color: var(--g-ink); }
+.vl-view--chat.is-selecting .vl-msg__tools { display: none; }
+
+/* Режим выделения: слева у сообщений кружок-отметка, выбранные — с мягкой подложкой */
+.vl-view--chat .vl-msg { position: relative; transition: padding-left .35s var(--g-spring), background-color .2s; }
+.vl-view--chat.is-selecting .vl-msg[data-key^="m"] { padding-left: 40px; cursor: pointer; border-radius: 18px; }
+.vl-view--chat.is-selecting .vl-msg[data-key^="m"] * { cursor: pointer; }
+.vl-view--chat.is-selecting .vl-msg[data-key^="m"]::before { content: ''; position: absolute; left: 8px; bottom: 8px; width: 22px; height: 22px; border-radius: 11px; background: var(--g-field-h); transition: background-color .2s, transform .35s var(--g-spring); animation: g-sel-in .35s var(--g-spring) both; }
+.vl-view--chat.is-selecting .vl-msg.is-selected { background: color-mix(in srgb, var(--g-field) 55%, transparent); }
+.vl-view--chat.is-selecting .vl-msg.is-selected::before { background: #22c55e url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M6 12.5l4 4 8-9'/></svg>") center / 13px no-repeat; transform: scale(1.06); }
+@keyframes g-sel-in { from { opacity: 0; transform: scale(.4); } }
+.vl-view--chat.is-selecting .vl-msg { user-select: none; -webkit-user-select: none; }
+/* Панель вместо поля ввода */
+.vl-view--chat .vl-composer:has(.g-sel:not([hidden])) .vl-composer__box,
+.vl-view--chat .vl-composer:has(.g-sel:not([hidden])) .vl-reply-bar,
+.vl-view--chat .vl-composer:has(.g-sel:not([hidden])) .vl-tray { display: none !important; }
+.g-sel { display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 8px; box-sizing: border-box; border-radius: 28px; background: var(--g-input, var(--g-field)); animation: g-sel-bar .4s var(--g-spring) both; }
+.g-sel[hidden] { display: none; }
+@keyframes g-sel-bar { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+.g-sel__x { width: 40px; height: 40px; border-radius: 20px; display: flex; align-items: center; justify-content: center; color: var(--g-sub); transition: background-color .2s, color .2s; }
+.g-sel__x:hover { background: var(--g-field); color: var(--g-ink); }
+.g-sel__count { font-size: 15px; font-weight: 650; color: var(--g-ink); font-variant-numeric: tabular-nums; }
+.g-sel__sp { flex: 1; }
+.g-sel__btn { height: 40px; padding: 0 16px; border-radius: 20px; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--g-ink); background: var(--g-field); transition: background-color .2s, transform .45s var(--g-spring); }
+.g-sel__btn[hidden] { display: none; }
+.g-sel__btn:hover { background: var(--g-field-h); }
+.g-sel__btn:active { transform: scale(.96); transition-duration: .1s; }
+.g-sel__btn .vl-ico { width: 17px; height: 17px; }
+.g-sel__btn.is-danger { color: #ef4444; }
+@media (max-width: 860px) { .g-sel__btn span { display: none; } .g-sel__btn { width: 40px; padding: 0; justify-content: center; } }
+.g-sel button { border: 0; outline: 0; appearance: none; font: inherit; cursor: pointer; }
+.g-sel__x { background: none; }
