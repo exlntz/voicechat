@@ -122,7 +122,7 @@ function loadFavicon() {
     const img = new Image()
     img.onload = () => { faviconImg = img; resolve(img) }
     img.onerror = () => resolve(null)
-    img.src = '/static/favicon.svg?v=2'
+    img.src = '/static/favicon.svg?v=3'
   })
   return faviconReady
 }
