@@ -1341,39 +1341,39 @@ html[data-theme="light"] .g-ppl-btn:not(.is-on):hover { background: #f7f6f3; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    ТЁМНАЯ ТЕМА v2 — «графит» (доски ChatsDark2 / CallDark2 / PhoneDark2):
-   вместо чистого чёрного тёплые слои, каждый заметно светлее предыдущего
+   почти чёрные нейтральные слои (#232123, как на референсе), каждый заметно светлее предыдущего
    ═══════════════════════════════════════════════════════════════════════════ */
 html:not([data-theme="light"]) {
-  --bg: #1a1917; --surface: #262422; --surface-2: #2c2a27; --surface-3: #33302d;
-  --text-dim: #cac4bb; --text-faint: #aba59c; --accent: #4a4642; --accent-hover: #504c47;
+  --bg: #171617; --surface: #232123; --surface-2: #2a282a; --surface-3: #2f2d2f;
+  --text-dim: #c9c7c9; --text-faint: #aaa8aa; --accent: #444244; --accent-hover: #4a484a;
   --border: rgba(255, 255, 255, 0.08); --border-strong: rgba(255, 255, 255, 0.16);
-  --vl-stage: #1a1917; --vl-panel: #262422; --vl-raised: #2c2a27; --vl-raised-2: #33302d; --vl-field: #33302d; --vl-hover: #33302d;
-  --vl-ava-0: #3d3a36; --vl-ava-1: #3d3a36; --vl-ava-2: #3d3a36; --vl-ava-3: #3d3a36; --vl-ava-4: #3d3a36; --vl-ava-5: #3d3a36;
-  --rd-page: #1a1917; --rd-panel: #262422; --rd-field: #33302d; --rd-field-hover: #3d3a36; --rd-line: #403d39;
-  --rd-sub: #aba59c; --rd-faint: #8f897f; --rd-acc: #4a4642; --rd-acc-hover: #504c47;
-  --rd-bub-their: #36332f; --rd-bub-mine: #304456; --rd-input: #282624; --rd-tile: #2b2926; --rd-tile-me: #33302d; --rd-tile-av: #3d3a36;
-  --g-page: #1a1917; --g-panel: #262422; --g-field: #33302d; --g-field-h: #3d3a36; --g-line: #403d39;
-  --g-faint: #8f897f; --g-sub: #aba59c; --g-dim: #cac4bb; --g-muted: #bab4ab;
-  --g-acc: #4a4642; --g-acc-h: #504c47; --g-input: #282624; --g-kbd: #282624;
-  --g-ava: #3d3a36; --g-divider: #35322f;
-  --g-bub-mine: #304456; --g-bub-their: #36332f; --g-ava-me: #403d39; --g-ava-peer: #47433f;
-  --g-island: #4a4642; --g-island-a: #6a655f; --g-island-b: #5a5550; --g-clip: #b0aaa1; --g-pin-h: #34312e;
-  --g-scrim: rgba(12, 11, 10, 0.6);
-  --g-tile: #2b2926; --g-tile-ava: #3d3a36;
-  --g-tile-me: #33302d; --g-tile-me-av: #47433f; --g-prow: #2c2a27; --g-prow-av: #403d39; --g-muted-ico: #8f897f;
-  --g-vol-fill: #aba59c; --g-vol-track: #4a4642; --g-outline: #47433f;
-  --g-on-bg: #5f5a54; --g-on-bg-h: #6a655f;
+  --vl-stage: #171617; --vl-panel: #232123; --vl-raised: #2a282a; --vl-raised-2: #2f2d2f; --vl-field: #2f2d2f; --vl-hover: #2f2d2f;
+  --vl-ava-0: #383638; --vl-ava-1: #383638; --vl-ava-2: #383638; --vl-ava-3: #383638; --vl-ava-4: #383638; --vl-ava-5: #383638;
+  --rd-page: #171617; --rd-panel: #232123; --rd-field: #2f2d2f; --rd-field-hover: #383638; --rd-line: #3c3a3c;
+  --rd-sub: #aaa8aa; --rd-faint: #8d8b8d; --rd-acc: #444244; --rd-acc-hover: #4a484a;
+  --rd-bub-their: #343234; --rd-bub-mine: #304456; --rd-input: #262426; --rd-tile: #2a282a; --rd-tile-me: #2f2d2f; --rd-tile-av: #383638;
+  --g-page: #171617; --g-panel: #232123; --g-field: #2f2d2f; --g-field-h: #383638; --g-line: #3c3a3c;
+  --g-faint: #8d8b8d; --g-sub: #aaa8aa; --g-dim: #c9c7c9; --g-muted: #b9b7b9;
+  --g-acc: #444244; --g-acc-h: #4a484a; --g-input: #262426; --g-kbd: #262426;
+  --g-ava: #383638; --g-divider: #302e30;
+  --g-bub-mine: #304456; --g-bub-their: #343234; --g-ava-me: #3c3a3c; --g-ava-peer: #403e40;
+  --g-island: #444244; --g-island-a: #646264; --g-island-b: #555355; --g-clip: #aeacae; --g-pin-h: #2f2d2f;
+  --g-scrim: rgba(10, 10, 10, 0.6);
+  --g-tile: #2a282a; --g-tile-ava: #383638;
+  --g-tile-me: #2f2d2f; --g-tile-me-av: #403e40; --g-prow: #2a282a; --g-prow-av: #3c3a3c; --g-muted-ico: #8d8b8d;
+  --g-vol-fill: #aaa8aa; --g-vol-track: #444244; --g-outline: #403e40;
+  --g-on-bg: #5a585a; --g-on-bg-h: #646264;
 }
 @media (max-width: 860px) {
-  html:not([data-theme="light"]) { --g-glass: rgba(46, 44, 41, 0.84); --g-glass-ring: rgba(255, 255, 255, 0.09); }
+  html:not([data-theme="light"]) { --g-glass: rgba(40, 38, 40, 0.84); --g-glass-ring: rgba(255, 255, 255, 0.09); }
 }
 /* Выбранный чат — самый светлый слой */
-html:not([data-theme="light"]) .g-row.is-on { background-color: #4a4642; }
+html:not([data-theme="light"]) .g-row.is-on { background-color: #444244; }
 /* Профиль и настройки: без белых акцентов — выбор и кнопки графитовые, включённый тумблер зелёный */
-html:not([data-theme="light"]) .g-pf-overlay { --g-acc: #4a4642; --g-on-acc: #f2f0ec; --g-acc-h: #504c47; --g-scrim: rgba(12, 11, 10, 0.6); }
-html:not([data-theme="light"]) .g-seg__k { background: #504c47; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 6px rgba(0, 0, 0, 0.35); }
+html:not([data-theme="light"]) .g-pf-overlay { --g-acc: #444244; --g-on-acc: #f2f0ec; --g-acc-h: #4a484a; --g-scrim: rgba(10, 10, 10, 0.6); }
+html:not([data-theme="light"]) .g-seg__k { background: #4a484a; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 6px rgba(0, 0, 0, 0.35); }
 html:not([data-theme="light"]) .g-seg button[data-on="1"] { color: #f2f0ec !important; }
-html:not([data-theme="light"]) .g-tgl { background: #47433f; }
+html:not([data-theme="light"]) .g-tgl { background: #403e40; }
 html:not([data-theme="light"]) .g-tgl::after { background: #f2f0ec; }
 html:not([data-theme="light"]) .g-tgl[data-on="1"] { background: #22c55e; }
 
