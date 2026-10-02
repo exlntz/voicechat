@@ -1634,3 +1634,29 @@ html[data-theme] .auth-ghost-btn:active { transform: scale(.96); transition-dura
 /* translate, а не transform: у формы на телефоне transform: none !important (style.css) */
 @keyframes auth-in-r { from { opacity: 0; translate: 40px 0; } }
 @keyframes auth-in-l { from { opacity: 0; translate: -40px 0; } }
+
+/* Ошибка и успех в полях — подсветка фона вместо обводки */
+html[data-theme] .fld.is-err input, html[data-theme] .fld.is-ok input { outline: 0; }
+html[data-theme] .fld.is-err input, html[data-theme] .auth-form-panel .fld.is-err input { background: rgba(239, 68, 68, .14); }
+html[data-theme] .fld.is-ok input, html[data-theme] .auth-form-panel .fld.is-ok input { background: rgba(34, 197, 94, .12); }
+html[data-theme] .fld.is-err .fld__lbl { color: #f08a8a; }
+html[data-theme] .fld.is-ok .fld__lbl { color: #6fcf97; }
+html[data-theme="light"] .fld.is-err .fld__lbl { color: #b42318; }
+html[data-theme="light"] .fld.is-ok .fld__lbl { color: #15803d; }
+html[data-theme] .fld.is-err input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px #3a2628 inset; box-shadow: 0 0 0 1000px #3a2628 inset; }
+html[data-theme] .fld.is-ok input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px #233229 inset; box-shadow: 0 0 0 1000px #233229 inset; }
+
+/* Сообщение над формой: мягкая плашка со значком, без рамки */
+html[data-theme] .auth-error { position: relative; display: flex; align-items: center; gap: 10px; min-height: 48px; box-sizing: border-box; margin: 0 0 4px; padding: 12px 16px 12px 12px; border: 0; border-radius: 24px; background: rgba(239, 68, 68, .12); color: #f3a3a3; font-size: 14px; font-weight: 500; line-height: 1.35; animation: auth-msg-in .5s var(--g-spring) both; }
+html[data-theme] .auth-error[style*="display: block"] { display: flex !important; }
+html[data-theme] .auth-error::before { content: '!'; flex-shrink: 0; width: 24px; height: 24px; border-radius: 12px; background: #ef4444; color: #fff; font-size: 14px; font-weight: 700; line-height: 24px; text-align: center; }
+html[data-theme] .auth-error.success { background: rgba(34, 197, 94, .12); color: #86dcaa; }
+html[data-theme] .auth-error.success::before { content: ''; background: #22c55e url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M6 12.5l4 4 8-9'/></svg>") center / 14px no-repeat; }
+html[data-theme="light"] .auth-error { background: rgba(239, 68, 68, .1); color: #b42318; }
+html[data-theme="light"] .auth-error.success { background: rgba(34, 197, 94, .12); color: #15803d; }
+@keyframes auth-msg-in { from { opacity: 0; transform: translateY(-6px) scale(.97); } }
+
+/* Баннер «включите уведомления»: текст и кнопка с нормальными отступами */
+html[data-theme] .g-notif { gap: 12px; padding: 12px 10px 12px 18px; border-radius: 24px; font-size: 13px; line-height: 1.35; }
+html[data-theme] .g-notif .g-btn { flex-shrink: 0; height: 36px; padding: 0 18px; border-radius: 18px; font-size: 14px !important; font-weight: 650; }
+html[data-theme] .g-notif .g-rbtn { flex-shrink: 0; width: 32px; height: 32px; margin-left: -4px; }
