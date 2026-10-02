@@ -1825,3 +1825,11 @@ html[data-theme] .vl-view--chat .vl-composer__input { padding: 14px 0; font-size
   html[data-theme] .g-search, html[data-theme] .g-pane--friends > .g-field { height: var(--cap-h); border-radius: 26px; background: var(--g-panel); }
 }
 html[data-theme] .vl-view--chat .vl-composer__attach { margin-top: 16px; margin-bottom: 16px; }
+
+/* Высота пузыря — целое и чётное: межстрочный 20px → пузырь 34px, шаг серии 34 + 2 = 36px.
+   При масштабе экрана 125%/150% это 45/54 физических пикселя — все зазоры одинаковые
+   (было 20.7px → 34.69px, и соседние зазоры округлялись по-разному) */
+.vl-view--chat .vl-bubble { line-height: 1.34; line-height: round(down, calc(var(--vl-msg-size, 15px) * 1.34), 1px); }
+.g-sel { padding: 0 8px 0 20px; }
+.g-sel__btn.is-soft { background: transparent; color: var(--g-sub); }
+.g-sel__btn.is-soft:hover { background: var(--g-field); color: var(--g-ink); }

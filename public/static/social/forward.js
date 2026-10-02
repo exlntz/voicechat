@@ -3,7 +3,9 @@ import { sortedConversations, friendsBy, dmWith, ensureSaved, forwardMessage, se
 import { api } from './api.js'
 import { h, icon, avatar, displayName, presenceText, toast } from './ui.js'
 
+// message — одно сообщение или список (пересылка выделенных)
 export function openForwardPicker(message) {
+  const messages = Array.isArray(message) ? message : [message]
   // Вид — как у окна «Новый звонок»: заголовок и крестик, поле поиска, «Избранное» отдельной
   // строкой сверху (как «Комната по коду»), ниже — чаты и друзья
   const input = h('input', { type: 'text', class: 'g-field__input', placeholder: 'Кому переслать', autocomplete: 'off', spellcheck: 'false' })
@@ -67,9 +69,10 @@ export function openForwardPicker(message) {
         if (existing) convId = existing.id
         else { const { conversation } = await api.openDm(t.userId); setConversation(conversation); convId = conversation.id }
       }
-      await forwardMessage(convId, message.id)
+      for (const m of messages) await forwardMessage(convId, m.id)
       done()
-      toast(t.saved ? 'Сохранено в «Избранное»' : `Переслано: ${t.name}`, 'success')
+      const n = messages.length > 1 ? ` (${messages.length})` : ''
+      toast(t.saved ? `Сохранено в «Избранное»${n}` : `Переслано${n}: ${t.name}`, 'success')
     } catch (e) {
       busy = false
       toast(e.message, 'error')
