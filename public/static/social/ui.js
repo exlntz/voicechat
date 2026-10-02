@@ -61,7 +61,7 @@ const ICONS = {
   'microphone-slash': '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M4 4l16 16"/>',
   video: '<rect x="3" y="6" width="13" height="12" rx="3"/><path d="M16 10l5-3v10l-5-3"/>',
   'magnifying-glass': '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
-  hashtag: '<path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/>',
+  hashtag: '<path d="M5 9.5h14M5 14.5h14M9.5 5v14M14.5 5v14"/>',
   'circle-xmark': '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/>',
   'circle-exclamation': '<circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>',
   'check-double': '<path d="M18 6 7 17l-5-5M22 10l-7.5 7.5L13 16"/>',

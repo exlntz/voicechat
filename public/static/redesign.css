@@ -1537,20 +1537,11 @@ html[data-theme] .room-screen .tile .g-tt.g-tt--fs:active { transform: scale(.92
 
 /* ═══════════════════════════════════════════════════════════════════════════
    ВХОД И РЕГИСТРАЦИЯ — вариант C «Свет» (канвас, доски AuthC / AuthPhone):
-   панель с плывущим «сиянием» и переливающимся названием, луч бежит по рамке карточки,
-   по форме за курсором — мягкая подсветка. Механика сдвига (.6s) не тронута.
+   панель с плывущим «сиянием» и переливающимся названием, по форме за курсором — мягкая подсветка. Механика сдвига (.6s) не тронута.
    ═══════════════════════════════════════════════════════════════════════════ */
-@property --auth-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 html[data-theme] .auth-screen { background: var(--g-page); }
 html[data-theme] .auth-container { width: 940px; max-width: 100%; height: 560px; min-height: 560px; background: var(--g-panel); border: 0; border-radius: 28px; box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .7); }
 html[data-theme="light"] .auth-container { box-shadow: 0 30px 80px -34px rgba(28, 25, 23, .28); }
-/* Луч по рамке */
-.auth-beam::before { content: ''; position: absolute; inset: 0; z-index: 20; border-radius: inherit; padding: 1.5px; pointer-events: none;
-  background: conic-gradient(from var(--auth-a), transparent 0 72%, rgba(242, 240, 236, .9) 86%, transparent 92%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
-  animation: auth-beam 6s linear infinite; }
-html[data-theme="light"] .auth-beam::before { background: conic-gradient(from var(--auth-a), transparent 0 72%, rgba(28, 25, 23, .6) 86%, transparent 92%); }
-@keyframes auth-beam { to { --auth-a: 360deg; } }
 
 /* Формы */
 html[data-theme] .auth-form-panel { background: transparent; padding: 0 64px; gap: 12px; }
@@ -1574,12 +1565,10 @@ html[data-theme] .auth-form-panel .fld input:-webkit-autofill:focus { -webkit-bo
 html[data-theme] .auth-form-panel .password-toggle-btn { top: 6px; bottom: auto; right: 6px; width: 44px; height: 44px; border-radius: 22px; color: var(--g-faint); transition: color .2s, background-color .2s; }
 html[data-theme] .auth-form-panel .password-toggle-btn:hover { color: var(--text); background: var(--g-acc); }
 html[data-theme="light"] .auth-form-panel .password-toggle-btn:hover { color: #fff; }
-/* Главная кнопка: по ней периодически проходит блик */
+/* Главная кнопка — спокойная, как на остальном сайте */
 html[data-theme] .auth-form-panel .auth-submit-btn { margin-top: 6px; min-height: 56px; height: 56px; border: 0; border-radius: 28px; background: var(--g-acc); color: var(--g-on-acc); font-size: 16px; font-weight: 650; box-shadow: none; overflow: hidden; isolation: isolate; transition: background-color .2s, transform .5s var(--g-spring); }
 html[data-theme] .auth-form-panel .auth-submit-btn:hover { background: var(--g-acc-h); box-shadow: none; }
 html[data-theme] .auth-form-panel .auth-submit-btn:active { transform: scale(.97); transition-duration: .12s; }
-.auth-form-panel .auth-submit-btn::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .16) 50%, transparent 65%); background-size: 250% 100%; animation: auth-shim 3.2s ease-in-out infinite; }
-@keyframes auth-shim { 0% { background-position: 130% 0; } 60%, 100% { background-position: -30% 0; } }
 html[data-theme] .auth-error { margin: 0 0 4px; border-radius: 16px; }
 
 /* Панель: «сияние» из размытых пятен + лёгкий шум */
@@ -1602,8 +1591,9 @@ html[data-theme] .auth-overlay-panel { padding: 40px; color: #f2f0ec; }
 .auth-logo .ank-pulse .pl-bubble path, html[data-theme] .auth-logo .ank-pulse .pl-bubble path { stroke: #444244; }
 .auth-logo .ank-pulse .pl-bar, html[data-theme] .auth-logo .ank-pulse .pl-bar { fill: #f2f0ec; }
 /* Название переливается */
-.auth-ttl { margin: 20px 0 28px; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -.04em; background: linear-gradient(100deg, #8d8b8d 0%, #f2f0ec 40%, #8d8b8d 60%, #8d8b8d 100%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: auth-tsh 4s ease-in-out infinite; }
-@keyframes auth-tsh { 0% { background-position: 120% 0; } 70%, 100% { background-position: -20% 0; } }
+.auth-ttl { margin: 20px 0 28px; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -.04em; background: linear-gradient(100deg, #8d8b8d 0%, #8d8b8d 25%, #f2f0ec 50%, #8d8b8d 75%, #8d8b8d 100%) 0 0 / 200% 100% repeat-x; -webkit-background-clip: text; background-clip: text; color: transparent; animation: auth-tsh 4.5s linear infinite; }
+/* Сдвиг ровно на период узора (200% ширины) — блик идёт по кругу без остановки и скачка */
+@keyframes auth-tsh { to { background-position: -200% 0; } }
 .auth-q { margin: 0 0 16px; font-size: 15px; color: #aaa8aa; }
 /* Кнопка-переключатель — стекло */
 html[data-theme] .auth-ghost-btn { width: auto; min-width: 220px; max-width: none; height: 48px; min-height: 48px; padding: 0 26px; border: 0; border-radius: 24px; background: rgba(242, 240, 236, .08); color: #f2f0ec; font-size: 15px; font-weight: 650; -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: inset 0 0 0 1px rgba(242, 240, 236, .14); transition: background-color .25s, transform .5s var(--g-spring); }
@@ -1619,7 +1609,6 @@ html[data-theme] .auth-ghost-btn:active { transform: scale(.96); transition-dura
   .auth-hero .auth-logo .ank-pulse { width: 72px; height: 72px; }
   .auth-hero .auth-ttl { margin: 14px 0 0; font-size: 38px; }
   html[data-theme] .auth-container { width: auto; height: auto; min-height: 0; flex: 1 0 auto; max-width: none; margin-top: -28px; border-radius: 28px 28px 0 0; box-shadow: none; }
-  .auth-beam::before { display: none; }
   html[data-theme] .auth-form-panel { padding: 30px 22px calc(28px + env(safe-area-inset-bottom)); justify-content: flex-start; }
   html[data-theme] .auth-form-panel h1 { font-size: 30px; margin-bottom: 6px; }
   .auth-form-panel::before { display: none; }
@@ -1646,17 +1635,28 @@ html[data-theme="light"] .fld.is-ok .fld__lbl { color: #15803d; }
 html[data-theme] .fld.is-err input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px #3a2628 inset; box-shadow: 0 0 0 1000px #3a2628 inset; }
 html[data-theme] .fld.is-ok input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px #233229 inset; box-shadow: 0 0 0 1000px #233229 inset; }
 
-/* Сообщение над формой: мягкая плашка со значком, без рамки */
-html[data-theme] .auth-error { position: relative; display: flex; align-items: center; gap: 10px; min-height: 48px; box-sizing: border-box; margin: 0 0 4px; padding: 12px 16px 12px 12px; border: 0; border-radius: 24px; background: rgba(239, 68, 68, .12); color: #f3a3a3; font-size: 14px; font-weight: 500; line-height: 1.35; animation: auth-msg-in .5s var(--g-spring) both; }
-html[data-theme] .auth-error[style*="display: block"] { display: flex !important; }
-html[data-theme] .auth-error::before { content: '!'; flex-shrink: 0; width: 24px; height: 24px; border-radius: 12px; background: #ef4444; color: #fff; font-size: 14px; font-weight: 700; line-height: 24px; text-align: center; }
-html[data-theme] .auth-error.success { background: rgba(34, 197, 94, .12); color: #86dcaa; }
-html[data-theme] .auth-error.success::before { content: ''; background: #22c55e url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M6 12.5l4 4 8-9'/></svg>") center / 14px no-repeat; }
-html[data-theme="light"] .auth-error { background: rgba(239, 68, 68, .1); color: #b42318; }
-html[data-theme="light"] .auth-error.success { background: rgba(34, 197, 94, .12); color: #15803d; }
+/* Сообщения над формой: каждая ошибка — отдельная мягкая плашка со значком, без рамки */
+html[data-theme] .auth-error { margin: 0 0 4px; padding: 0; border: 0; border-radius: 0; background: none; animation: none; }
+html[data-theme] .auth-error[style*="display: block"] { display: flex !important; flex-direction: column; gap: 6px; }
+.auth-msg { display: flex; align-items: center; gap: 10px; min-height: 44px; box-sizing: border-box; padding: 10px 16px 10px 10px; border-radius: 22px; background: rgba(239, 68, 68, .12); color: #f3a3a3; font-size: 14px; font-weight: 500; line-height: 1.35; text-align: left; animation: auth-msg-in .5s var(--g-spring) both; }
+.auth-msg:nth-child(2) { animation-delay: .05s; } .auth-msg:nth-child(3) { animation-delay: .1s; } .auth-msg:nth-child(n+4) { animation-delay: .15s; }
+.auth-msg::before { content: '!'; flex-shrink: 0; width: 24px; height: 24px; border-radius: 12px; background: #ef4444; color: #fff; font-size: 14px; font-weight: 700; line-height: 24px; text-align: center; }
+.auth-error.success .auth-msg { background: rgba(34, 197, 94, .12); color: #86dcaa; }
+.auth-error.success .auth-msg::before { content: ''; background: #22c55e url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M6 12.5l4 4 8-9'/></svg>") center / 14px no-repeat; }
+html[data-theme="light"] .auth-msg { background: rgba(239, 68, 68, .1); color: #b42318; }
+html[data-theme="light"] .auth-error.success .auth-msg { background: rgba(34, 197, 94, .12); color: #15803d; }
 @keyframes auth-msg-in { from { opacity: 0; transform: translateY(-6px) scale(.97); } }
 
 /* Баннер «включите уведомления»: текст и кнопка с нормальными отступами */
 html[data-theme] .g-notif { gap: 12px; padding: 12px 10px 12px 18px; border-radius: 24px; font-size: 13px; line-height: 1.35; }
 html[data-theme] .g-notif .g-btn { flex-shrink: 0; height: 36px; padding: 0 18px; border-radius: 18px; font-size: 14px !important; font-weight: 650; }
 html[data-theme] .g-notif .g-rbtn { flex-shrink: 0; width: 32px; height: 32px; margin-left: -4px; }
+
+/* Строки друзей и меню «Новый звонок»: аватарка отстоит от краёв строки одинаково со всех сторон
+   (отступ = (высота строки − аватарка) / 2) */
+html[data-theme] .g-frow { padding: 0 8px; }
+html[data-theme] .g-frow.is-req { padding: 0 9px; }
+@media (max-width: 860px) {
+  html[data-theme] .g-frow, html[data-theme] .g-frow.is-req { height: 68px; padding: 0 11px; }
+}
+html[data-theme] .g-row { padding-left: 11px; padding-right: 11px; }
