@@ -400,10 +400,11 @@ export function createChatView({ convId, navigate, menuButton }) {
   let selecting = false
   const selected = new Set() // id сообщений строками
   const selCount = h('span', { class: 'g-sel__count' })
+  const selFwd = h('button', { type: 'button', class: 'g-sel__btn' }, [icon('share'), h('span', {}, 'Переслать')])
   const selCopy = h('button', { type: 'button', class: 'g-sel__btn' }, [icon('copy'), h('span', {}, 'Копировать')])
   const selDel = h('button', { type: 'button', class: 'g-sel__btn is-danger' }, [icon('trash'), h('span', {}, 'Удалить')])
-  const selClose = h('button', { type: 'button', class: 'g-sel__x', 'aria-label': 'Снять выделение' }, [icon('xmark')])
-  const selBar = h('div', { class: 'g-sel', hidden: true }, [selClose, selCount, h('span', { class: 'g-sel__sp' }), selCopy, selDel])
+  const selClose = h('button', { type: 'button', class: 'g-sel__btn is-soft', 'aria-label': 'Отменить выбор' }, [icon('xmark'), h('span', {}, 'Отмена')])
+  const selBar = h('div', { class: 'g-sel', hidden: true }, [selCount, h('span', { class: 'g-sel__sp' }), selFwd, selCopy, selDel, selClose])
   const composer = h('div', { class: 'vl-composer' }, [replyBar, tray, composerBox, selBar, blockedNote, typingLine])
 
   const node = h('section', { class: `vl-view vl-view--chat${saved ? ' is-saved' : ''}` }, [header, pinBar, searchBar, chatMain, composer])
@@ -798,6 +799,7 @@ export function createChatView({ convId, navigate, menuButton }) {
     for (const [k, e] of nodes) e.node.classList.toggle('is-selected', selecting && k[0] === 'm' && selected.has(k.slice(1)))
     selCount.textContent = 'Выбрано: ' + selected.size
     selCopy.hidden = !selectedMsgs().some((x) => x.body)
+    selFwd.hidden = !selectedMsgs().some((x) => x.kind === 'text')
     selBar.hidden = !selecting
   }
   function startSelect(m) { selecting = true; selected.clear(); selected.add(String(m.id)); applySelection() }
@@ -814,6 +816,13 @@ export function createChatView({ convId, navigate, menuButton }) {
     if (!selected.size) stopSelect(); else applySelection()
   }, true)
   selClose.addEventListener('click', stopSelect)
+  // Переслать выделенные (карточки звонков пересылать нельзя — их пропускаем)
+  selFwd.addEventListener('click', () => {
+    const msgs = selectedMsgs().filter((x) => x.kind === 'text')
+    if (!msgs.length) return
+    stopSelect()
+    openForwardPicker(msgs)
+  })
 
   // Выделение протягиванием, как в Телеграме: зажать кнопку мыши на сообщении и вести вверх/вниз —
   // отмечаются все сообщения по пути. Пока курсор в пределах одного сообщения, работает обычное
