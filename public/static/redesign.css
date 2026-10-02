@@ -1757,3 +1757,7 @@ html[data-theme] .vl-picker .vl-picker__row { min-height: 56px; padding: 8px; ga
 html[data-theme] .vl-picker .vl-picker__row.is-first { background: transparent; }
 html[data-theme] .vl-picker .vl-picker__row:hover { background: var(--g-field); }
 html[data-theme] .vl-picker .vl-picker__row:active { transform: scale(.98); transition-duration: .1s; }
+
+/* Отступ в серии сообщений — ровно 2px у всех (текст, голосовые, фото): место под аватарку
+   (36px) больше не раздувает строку, поэтому у текста (пузырь 35px) зазор был на ~1px больше */
+.vl-view--chat .vl-msg .g-mava { margin-top: -12px; }
