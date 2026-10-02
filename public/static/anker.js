@@ -159,7 +159,6 @@
 
   /* ─────────────── 2. Поля ввода ─────────────── */
 
-  var fldSeq = 0
 
   function enhanceField(input) {
     if (input.__ankField) return
@@ -170,17 +169,8 @@
     if (!host) return
     input.__ankField = true
 
-    var ph = input.getAttribute('placeholder') || ''
-    // Длинный плейсхолдер («Код комнаты (оставьте пустым — создать новую)»): во всплывающую
-    // подпись идёт только короткая часть, пояснение в скобках не показываем
-    var paren = ph.match(/^([^(]{2,26})\s*\((.+)\)\s*$/)
-    var phShort = paren ? paren[1].trim() : ph
-    // Плейсхолдер заменяем пробелом: :placeholder-shown продолжает работать,
-    // а видимую роль подписи берёт на себя всплывающий label.
-    input.setAttribute('placeholder', ' ')
-    input.dataset.ph = ph
-
-    // Обёртка поля: у пароля она уже есть (.password-field с «глазиком»)
+    // Единый стиль «капсула»: подсказка остаётся внутри поля (обычный placeholder), всплывающей
+    // подписи и её анимации больше нет. Обёртка .fld нужна только для подсветки ошибки
     var wrap = input.parentElement && input.parentElement.classList.contains('password-field')
       ? input.parentElement
       : null
@@ -191,20 +181,6 @@
     }
     wrap.classList.add('fld')
 
-    if (!input.id) input.id = 'ank-f' + (++fldSeq)
-
-    var label = make('label', 'fld__lbl', phShort)
-    label.setAttribute('for', input.id)
-    var bar = make('span', 'fld__bar')
-    bar.setAttribute('aria-hidden', 'true')
-
-    // Порядок важен: label и bar должны идти ПОСЛЕ input — на этом держатся
-    // CSS-селекторы всплытия подписи (input:focus ~ .fld__lbl).
-    var after = input.nextSibling
-    wrap.insertBefore(label, after)
-    wrap.insertBefore(bar, after)
-
-    // Подсказок под строкой больше нет — только всплывающая подпись
     input.addEventListener('focus', function () { wrap.classList.add('is-focus') })
     input.addEventListener('blur', function () { wrap.classList.remove('is-focus') })
     input.addEventListener('input', function () {
