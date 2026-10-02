@@ -1537,7 +1537,7 @@ html[data-theme] .room-screen .tile .g-tt.g-tt--fs:active { transform: scale(.92
 
 /* ═══════════════════════════════════════════════════════════════════════════
    ВХОД И РЕГИСТРАЦИЯ — вариант C «Свет» (канвас, доски AuthC / AuthPhone):
-   панель с плывущим «сиянием» и переливающимся названием, по форме за курсором — мягкая подсветка. Механика сдвига (.6s) не тронута.
+   панель с плывущим «сиянием» и переливающимся названием. Механика сдвига (.6s) не тронута.
    ═══════════════════════════════════════════════════════════════════════════ */
 html[data-theme] .auth-screen { background: var(--g-page); }
 html[data-theme] .auth-container { width: 940px; max-width: 100%; height: 560px; min-height: 560px; background: var(--g-panel); border: 0; border-radius: 28px; box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .7); }
@@ -1545,8 +1545,6 @@ html[data-theme="light"] .auth-container { box-shadow: 0 30px 80px -34px rgba(28
 
 /* Формы */
 html[data-theme] .auth-form-panel { background: transparent; padding: 0 64px; gap: 12px; }
-.auth-form-panel::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(420px circle at var(--mx, -999px) var(--my, -999px), rgba(242, 240, 236, .06), transparent 60%); }
-html[data-theme="light"] .auth-form-panel::before { background: radial-gradient(420px circle at var(--mx, -999px) var(--my, -999px), rgba(28, 25, 23, .05), transparent 60%); }
 .auth-form-panel > * { position: relative; }
 html[data-theme] .auth-form-panel h1 { margin: 0 0 14px; font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: -.03em; color: var(--text); }
 /* Поле: капсула 56px; подпись лежит внутри и при вводе уменьшается к верхнему краю капсулы */
@@ -1611,7 +1609,6 @@ html[data-theme] .auth-ghost-btn:active { transform: scale(.96); transition-dura
   html[data-theme] .auth-container { width: auto; height: auto; min-height: 0; flex: 1 0 auto; max-width: none; margin-top: -28px; border-radius: 28px 28px 0 0; box-shadow: none; }
   html[data-theme] .auth-form-panel { padding: 30px 22px calc(28px + env(safe-area-inset-bottom)); justify-content: flex-start; }
   html[data-theme] .auth-form-panel h1 { font-size: 30px; margin-bottom: 6px; }
-  .auth-form-panel::before { display: none; }
   html[data-theme] .auth-mobile-switch { margin-top: 4px; }
   html[data-theme] .auth-switch-link { min-height: 44px; margin: 0; padding: 0; border: 0; background: none; color: var(--g-sub); font-size: 15px; font-weight: 500; }
   html[data-theme] .auth-switch-link:hover { background: none; color: var(--g-sub); }
@@ -1753,3 +1750,10 @@ html[data-theme="light"] .vl-view--chat.is-selecting .vl-msg.is-selected .g-call
 .vl-view--chat .vl-msg__tools .vl-round .vl-ico { width: 15px; height: 15px; }
 .vl-view--chat .vl-msg__tools .vl-round:hover { scale: 1.14; }
 .vl-view--chat .vl-msg__tools .vl-round:active { scale: .92; transition-duration: .1s; }
+
+/* Окно «Переслать»: ничего не подсвечено заранее, строки-капсулы с зазором — без «полосок» между ними */
+.vl-picker .vl-picker__list { gap: 4px; }
+html[data-theme] .vl-picker .vl-picker__row { min-height: 56px; padding: 8px; gap: 12px; border-radius: 28px; background: transparent; box-shadow: none; transition: background-color .2s, transform .45s var(--g-spring); }
+html[data-theme] .vl-picker .vl-picker__row.is-first { background: transparent; }
+html[data-theme] .vl-picker .vl-picker__row:hover { background: var(--g-field); }
+html[data-theme] .vl-picker .vl-picker__row:active { transform: scale(.98); transition-duration: .1s; }

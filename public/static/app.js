@@ -777,13 +777,6 @@ function renderAuthScreen(afterLoginRoomCode = '') {
   container.appendChild(loginPanel)
   container.appendChild(registerPanel)
   container.appendChild(overlayContainer)
-  // По форме за курсором идёт мягкая подсветка
-  ;[loginPanel, registerPanel].forEach((panel) => panel.addEventListener('pointermove', (e) => {
-    if (e.pointerType !== 'mouse') return
-    const r = panel.getBoundingClientRect()
-    panel.style.setProperty('--mx', (e.clientX - r.left) + 'px')
-    panel.style.setProperty('--my', (e.clientY - r.top) + 'px')
-  }))
   // На телефоне сдвигающейся панели нет — то же «сияние» с лого шапкой над формой
   screen.appendChild(el('div', { class: 'auth-brand-mobile auth-hero' }, [aurora(), el('div', { class: 'auth-noise' }), el('div', { class: 'auth-hero__in' }, [authLogo(), el('div', { class: 'auth-ttl' }, 'Voice Lobby')])]))
   screen.appendChild(container)
