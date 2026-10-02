@@ -60,14 +60,75 @@ export function createChatView({ convId, navigate, menuButton }) {
   const headWho = h('button', { type: 'button', class: 'g-chat__who', title: 'Профиль, медиа и файлы' }, [headAvatar, h('span', { class: 'g-chat__titles' }, [headName, headSub])])
   headWho.addEventListener('click', () => openCard())
   const searchBtn = h('button', { type: 'button', class: 'g-hbtn', title: 'Поиск по чату', 'aria-label': 'Поиск по чату' }, [icon('magnifying-glass')])
+  // «Позвонить» — морф как в канвасе: кнопка → кружок с загрузкой → галочка → звонок;
+  // во время звонка с этим собеседником — «● В звонке 00:12»
   const callLabel = h('span', { class: 'g-chat__call-label' }, 'Позвонить')
-  const callBtn = h('button', { type: 'button', class: 'g-btn g-btn--acc g-chat__call', title: 'Позвонить', 'aria-label': 'Позвонить', hidden: saved }, [icon('phone'), callLabel])
+  const callTimer = h('span', { class: 'g-cm__timer' }, '00:00')
+  const callLayers = [
+    h('span', { class: 'g-cm is-on' }, [icon('phone'), callLabel]),
+    h('span', { class: 'g-cm' }, [h('span', { class: 'g-cm__spin' })]),
+    h('span', { class: 'g-cm' }, [svgCheck()]),
+    h('span', { class: 'g-cm g-cm--live' }, [h('span', { class: 'g-cm__dot' }), h('span', { class: 'g-chat__call-label' }, 'В звонке'), callTimer])
+  ]
+  const callBtn = h('button', { type: 'button', class: 'g-btn g-btn--acc g-chat__call', title: 'Позвонить', 'aria-label': 'Позвонить', hidden: saved, 'data-st': '0' }, callLayers)
+  let callStage = 0
+  let callBusy = false
+  function svgCheck() {
+    const t = document.createElement('template')
+    t.innerHTML = '<svg class="g-cm__ok" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12.5l4.5 4.5 8.5-9.5"/></svg>'
+    return t.content.firstElementChild
+  }
+  // Ширина кнопки — по содержимому текущего слоя (слои лежат друг на друге), чтобы её можно было анимировать
+  function fitCallBtn() {
+    if (destroyed || callBtn.hidden) return
+    if (!callBtn.isConnected) { requestAnimationFrame(fitCallBtn); return } // чат ещё не вставлен в страницу
+    const lay = callLayers[callStage]
+    const hgt = callBtn.offsetHeight || 46
+    const pad = callStage === 1 || callStage === 2 ? 0 : parseFloat(getComputedStyle(callBtn).getPropertyValue('--cm-pad')) || 0
+    callBtn.style.width = Math.max(hgt, Math.ceil(lay.scrollWidth + pad * 2)) + 'px'
+  }
+  function setCallStage(n) {
+    callStage = n
+    callBtn.dataset.st = String(n)
+    callLayers.forEach((l, i) => l.classList.toggle('is-on', i === n))
+    fitCallBtn()
+  }
+  const fmtCall = (ms) => { const t = Math.max(0, Math.floor(ms / 1000)); const hh = Math.floor(t / 3600); const mm = String(Math.floor((t % 3600) / 60)).padStart(2, '0'); const ss = String(t % 60).padStart(2, '0'); return hh ? `${hh}:${mm}:${ss}` : `${mm}:${ss}` }
+  let callTick = 0
+  function tickCallBtn() {
+    clearTimeout(callTick)
+    if (callStage !== 3) return
+    const st = window.VL.state.callStartedAt
+    const live = document.body.classList.contains('in-call') && st
+    const ms = live ? Date.now() - st : 0
+    const txt = live ? fmtCall(ms) : '00:00'
+    if (callTimer.textContent !== txt) { callTimer.textContent = txt; fitCallBtn() }
+    callTick = setTimeout(tickCallBtn, live ? 1000 - (ms % 1000) + 25 : 500)
+  }
+  window.addEventListener('resize', fitCallBtn)
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitCallBtn)
+  unsub.push(() => { window.removeEventListener('resize', fitCallBtn); clearTimeout(callTick) })
   // «Ещё» (обои, уведомления, удалить) — правой кнопкой по шапке и в меню чата слева
   const moreBtn = h('button', { type: 'button', class: 'g-hbtn g-chat__more', title: 'Ещё', 'aria-label': 'Ещё' }, [icon('ellipsis-vertical')])
   searchBtn.addEventListener('click', () => (searchBar.hidden ? openSearch() : closeSearch()))
-  callBtn.addEventListener('click', () => {
+  callBtn.addEventListener('click', async () => {
     if (inCall() && callState.conversationId === convId) { navigate('/room/' + window.VL.state.roomCode); return }
-    startCall(convId)
+    if (callBusy) return
+    callBusy = true
+    setCallStage(1)
+    const t0 = Date.now()
+    const ok = await startCall(convId, {
+      beforeEnter: async () => {
+        // Загрузка видна хотя бы 450 мс, галочка — 550 мс, потом открывается звонок
+        const wait = 450 - (Date.now() - t0)
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+        setCallStage(2)
+        await new Promise((r) => setTimeout(r, 550))
+      }
+    })
+    callBusy = false
+    if (!ok) setCallStage(0)
+    else renderHeader()
   })
   const openMore = (anchor) => {
     const c = conv()
@@ -142,7 +203,12 @@ export function createChatView({ convId, navigate, menuButton }) {
     const here = inCall() && callState.conversationId === convId
     callBtn.classList.toggle('is-live', here)
     callBtn.title = here ? 'Открыть звонок' : 'Позвонить'
-    callLabel.textContent = here ? 'В звонок' : 'Позвонить'
+    callBtn.setAttribute('aria-label', callBtn.title)
+    if (!callBusy) {
+      const want = here ? 3 : 0
+      if (callStage !== want) setCallStage(want); else fitCallBtn()
+      if (want === 3) tickCallBtn()
+    }
     applyWallpaper()
   }
 
@@ -1261,6 +1327,20 @@ export function createChatView({ convId, navigate, menuButton }) {
   }
   document.addEventListener('keydown', onEsc)
   unsub.push(() => document.removeEventListener('keydown', onEsc))
+
+  // Клик мышью по кнопке, которая не закрывает чат (поиск, вкладки, меню, панель слева и т.п.), не
+  // забирает фокус у поля ввода — можно сразу продолжать печатать. Окна со своими полями не трогаем.
+  const keepFocus = (e) => {
+    if (e.button !== 0 || document.activeElement !== input || destroyed) return
+    const t = e.target
+    if (!(t instanceof Element) || t === input) return
+    if (t.closest('input, textarea, select, [contenteditable="true"]')) return
+    if (!t.closest('button, [role="button"], [role="tab"], [role="menuitem"], a[href]')) return
+    if (document.querySelector('.vl-modal-overlay, .g-overlay, .g-pf-overlay, .settings-overlay, .vl-lightbox')) return
+    e.preventDefault()
+  }
+  document.addEventListener('mousedown', keepFocus, true)
+  unsub.push(() => document.removeEventListener('mousedown', keepFocus, true))
 
   return {
     node,

@@ -486,11 +486,14 @@ export function confirmDialog({ title, text, confirmLabel = 'Подтверди�
 
 // ---- Всплывающее меню (ПКМ по сообщению/другу, «…») ----
 let openMenu = null
+// Меню гаснет плавно (короткое сжатие с проявлением), а не исчезает мгновенно
 export function closeMenu() {
   if (!openMenu) return
   const m = openMenu
   openMenu = null
-  m.remove()
+  m.classList.add('is-out')
+  m.style.pointerEvents = 'none'
+  setTimeout(() => m.remove(), 180)
 }
 // items: [{label, icon, danger, onClick}] | 'sep'
 export function showMenu(items, anchor) {
@@ -516,6 +519,10 @@ export function showMenu(items, anchor) {
   if (y + rect.height > window.innerHeight - 8) y = Math.max(8, y - rect.height - (anchor.clientY != null ? 0 : 40))
   menu.style.left = x + 'px'
   menu.style.top = y + 'px'
+  // Растёт из точки нажатия и туда же сжимается при закрытии
+  const ox = anchor && typeof anchor.clientX === 'number' ? anchor.clientX - x : rect.width
+  const oy = anchor && typeof anchor.clientY === 'number' ? anchor.clientY - y : 0
+  menu.style.transformOrigin = `${Math.max(0, Math.min(rect.width, ox))}px ${Math.max(0, Math.min(rect.height, oy))}px`
   openMenu = menu
   const first = menu.querySelector('button')
   if (first) first.focus({ preventScroll: true })
