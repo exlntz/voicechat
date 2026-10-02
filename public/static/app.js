@@ -851,7 +851,8 @@ function renderAuthScreen(afterLoginRoomCode = '') {
     const displayName = displayNameInput ? displayNameInput.value.trim() : undefined
 
     const check = validate(kind, usernameInput, passwordInput, displayNameInput)
-    if (check.errs.length) { showMessage(errorSlot, check.errs, 'error', check.bad); return }
+    // Показываем только первую ошибку — по одной за раз, без нагромождения
+    if (check.errs.length) { showMessage(errorSlot, check.errs[0], 'error', [check.bad[0]]); return }
 
     errorSlot.style.display = 'none'
     errorSlot.classList.remove('success')

@@ -1763,3 +1763,18 @@ html[data-theme] .vl-picker .vl-picker__row:active { transform: scale(.98); tran
 .vl-view--chat .vl-msg .g-mava { margin-top: -12px; }
 /* Пока протягиваем выделение — текст не выделяется */
 .vl-view--chat.is-dragsel, .vl-view--chat.is-dragsel * { user-select: none !important; -webkit-user-select: none !important; }
+
+/* Сообщения формы — тише и минималистичнее: одна строка, маленькая цветная точка вместо значка,
+   почти прозрачная подложка; после успеха поля не перекрашиваются, при ошибке — только едва заметно */
+html[data-theme] .auth-error[style*="display: block"] { gap: 0; }
+.auth-msg { min-height: 0; padding: 10px 16px; gap: 10px; border-radius: 18px; background: rgba(239, 68, 68, .07); color: #e7a3a3; font-size: 14px; font-weight: 500; }
+.auth-msg::before { content: ''; width: 6px; height: 6px; border-radius: 3px; background: #ef4444; line-height: 0; }
+.auth-error.success .auth-msg { background: rgba(34, 197, 94, .07); color: #9fd8b5; }
+.auth-error.success .auth-msg::before { background: #22c55e; width: 6px; height: 6px; }
+html[data-theme="light"] .auth-msg { background: rgba(239, 68, 68, .06); color: #b42318; }
+html[data-theme="light"] .auth-error.success .auth-msg { background: rgba(34, 197, 94, .08); color: #15803d; }
+html[data-theme] .auth-form-panel .fld.is-ok input { background: var(--g-field); }
+html[data-theme] .auth-form-panel .fld.is-ok .fld__lbl { color: var(--g-faint); }
+html[data-theme] .auth-form-panel .fld.is-err input { background: color-mix(in srgb, var(--g-field) 94%, #ef4444); }
+html[data-theme] .auth-form-panel .fld.is-err .fld__lbl { color: #d99a9a; }
+html[data-theme="light"] .auth-form-panel .fld.is-err .fld__lbl { color: #b42318; }
