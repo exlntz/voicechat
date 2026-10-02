@@ -1778,3 +1778,50 @@ html[data-theme] .auth-form-panel .fld.is-ok .fld__lbl { color: var(--g-faint); 
 html[data-theme] .auth-form-panel .fld.is-err input { background: color-mix(in srgb, var(--g-field) 94%, #ef4444); }
 html[data-theme] .auth-form-panel .fld.is-err .fld__lbl { color: #d99a9a; }
 html[data-theme="light"] .auth-form-panel .fld.is-err .fld__lbl { color: #b42318; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ЕДИНЫЙ ВИД ПОЛЕЙ — вариант A «Капсула» (канвас, доска InputsNew):
+   52 px, скругление 26, ровная заливка без рамки и обводки; при наведении — на полтона светлее,
+   в фокусе — на тон. Подсказка внутри поля, без всплывающих подписей и анимации текста.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root { --cap-h: 52px; --cap-bg: var(--g-field); --cap-hover: color-mix(in srgb, var(--g-field) 50%, var(--g-field-h)); --cap-focus: var(--g-field-h); }
+/* Поле само по себе — капсула: вход/регистрация, профиль, контакт, код комнаты, окна */
+html[data-theme] .fld input, html[data-theme] .password-field input,
+html[data-theme] .auth-form-panel .fld input, html[data-theme] .g-inp, html[data-theme] .g-join__inp,
+html[data-theme] .vl-modal input[type="text"], html[data-theme] .vl-modal input:not([type]) {
+  height: var(--cap-h); min-height: var(--cap-h); box-sizing: border-box; padding: 0 20px; border: 0; border-radius: 26px; outline: 0; box-shadow: none;
+  background: var(--cap-bg); color: var(--g-ink); font-family: var(--font); font-size: 16px; font-weight: 500; transition: background-color .25s;
+}
+html[data-theme] .password-field input, html[data-theme] .auth-form-panel .password-field input { padding-right: 60px; }
+html[data-theme] .fld input::placeholder, html[data-theme] .g-inp::placeholder, html[data-theme] .g-join__inp::placeholder,
+html[data-theme] .vl-modal input::placeholder { color: var(--g-faint); opacity: 1; }
+html[data-theme] .fld input:hover, html[data-theme] .g-inp:hover, html[data-theme] .g-join__inp:hover, html[data-theme] .vl-modal input:hover { background: var(--cap-hover); }
+html[data-theme] .fld input:focus, html[data-theme] .g-inp:focus, html[data-theme] .g-join__inp:focus, html[data-theme] .vl-modal input:focus { background: var(--cap-focus); }
+html[data-theme] .fld, html[data-theme] .auth-form-panel .fld { padding-top: 0; margin: 0; }
+.fld__lbl, .fld__bar { display: none !important; }
+html[data-theme] .auth-form-panel .password-toggle-btn, html[data-theme] .password-toggle-btn { top: 4px; bottom: auto; right: 6px; width: 44px; height: 44px; }
+html[data-theme] .vl-fld-host .fld { margin-bottom: 0; }
+
+/* Капсула с содержимым (значок, кнопки): поиск слева, поиск по чату, выбор друга, «Добавить друга», поле сообщения */
+html[data-theme] .g-search, html[data-theme] .g-sfield, html[data-theme] .g-field, html[data-theme] .g-fadd__row,
+html[data-theme] .vl-view--chat .vl-composer__field {
+  height: var(--cap-h); min-height: var(--cap-h); box-sizing: border-box; border: 0; border-radius: 26px; box-shadow: none;
+  background: var(--cap-bg); font-size: 16px; font-weight: 500; transition: background-color .25s;
+}
+html[data-theme] .vl-view--chat .vl-composer__field { height: auto; }
+html[data-theme] .g-search:hover, html[data-theme] .g-sfield:hover, html[data-theme] .g-field:hover, html[data-theme] .g-fadd__row:hover,
+html[data-theme] .vl-view--chat .vl-composer__field:hover { background: var(--cap-hover); }
+html[data-theme] .g-search:focus-within, html[data-theme] .g-sfield:focus-within, html[data-theme] .g-field:focus-within, html[data-theme] .g-fadd__row:focus-within,
+html[data-theme] .vl-view--chat .vl-composer__field:focus-within { background: var(--cap-focus); box-shadow: none; }
+html[data-theme] .g-search { padding: 0 16px 0 20px; gap: 10px; }
+html[data-theme] .g-field { padding: 0 6px 0 20px; }
+html[data-theme] .g-sfield { padding: 0 8px 0 18px; }
+html[data-theme] .g-fadd__row { padding: 0 8px 0 18px; gap: 10px; }
+html[data-theme] .g-fadd__row > .vl-ico { width: 19px; height: 19px; }
+html[data-theme] .g-field__input, html[data-theme] .g-sfield .vl-search__input, html[data-theme] .g-fadd__input, html[data-theme] .g-search input { font-size: 16px; font-weight: 500; }
+html[data-theme] .g-field__input::placeholder, html[data-theme] .g-sfield .vl-search__input::placeholder, html[data-theme] .g-fadd__input::placeholder { color: var(--g-faint); }
+html[data-theme] .vl-view--chat .vl-composer__input { padding: 14px 0; font-size: 16px; }
+@media (max-width: 860px) {
+  html[data-theme] .g-search, html[data-theme] .g-pane--friends > .g-field { height: var(--cap-h); border-radius: 26px; background: var(--g-panel); }
+}
+html[data-theme] .vl-view--chat .vl-composer__attach { margin-top: 16px; margin-bottom: 16px; }
