@@ -351,8 +351,9 @@
     var right = $('.auth-overlay-right', container)
     var left = $('.auth-overlay-left', container)
     // На входе и регистрации знак анимирован всё время
-    if (right && !$('.ank-sigil', right)) right.insertBefore(makeSigil(0, true), right.firstChild)
-    if (left && !$('.ank-sigil', left)) left.insertBefore(makeSigil(0, true), left.firstChild)
+    // Вместо ноутбука там теперь лого «Живой голос» (рисует app.js) — ноутбук не вставляем
+    if (right && !$('.ank-sigil, .auth-logo', right)) right.insertBefore(makeSigil(0, true), right.firstChild)
+    if (left && !$('.ank-sigil, .auth-logo', left)) left.insertBefore(makeSigil(0, true), left.firstChild)
 
     attachParallax(screen)
     reveal([container])

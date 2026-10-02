@@ -1534,3 +1534,103 @@ html[data-theme] .room-screen .tile .g-tt.g-tt--fs:active { transform: scale(.92
 .g-vol[data-drag="1"] .g-vol__spk { scale: 1.1; }
 .g-vol .g-vol__spk.is-bump { scale: 1.28; transition: scale .12s ease-out; }
 .g-vol[data-drag="1"][data-jump="1"] .g-vol__fl { transition: width .45s var(--g-spring); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ВХОД И РЕГИСТРАЦИЯ — вариант C «Свет» (канвас, доски AuthC / AuthPhone):
+   панель с плывущим «сиянием» и переливающимся названием, луч бежит по рамке карточки,
+   по форме за курсором — мягкая подсветка. Механика сдвига (.6s) не тронута.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@property --auth-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+html[data-theme] .auth-screen { background: var(--g-page); }
+html[data-theme] .auth-container { width: 940px; max-width: 100%; height: 560px; min-height: 560px; background: var(--g-panel); border: 0; border-radius: 28px; box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .7); }
+html[data-theme="light"] .auth-container { box-shadow: 0 30px 80px -34px rgba(28, 25, 23, .28); }
+/* Луч по рамке */
+.auth-beam::before { content: ''; position: absolute; inset: 0; z-index: 20; border-radius: inherit; padding: 1.5px; pointer-events: none;
+  background: conic-gradient(from var(--auth-a), transparent 0 72%, rgba(242, 240, 236, .9) 86%, transparent 92%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: auth-beam 6s linear infinite; }
+html[data-theme="light"] .auth-beam::before { background: conic-gradient(from var(--auth-a), transparent 0 72%, rgba(28, 25, 23, .6) 86%, transparent 92%); }
+@keyframes auth-beam { to { --auth-a: 360deg; } }
+
+/* Формы */
+html[data-theme] .auth-form-panel { background: transparent; padding: 0 64px; gap: 12px; }
+.auth-form-panel::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(420px circle at var(--mx, -999px) var(--my, -999px), rgba(242, 240, 236, .06), transparent 60%); }
+html[data-theme="light"] .auth-form-panel::before { background: radial-gradient(420px circle at var(--mx, -999px) var(--my, -999px), rgba(28, 25, 23, .05), transparent 60%); }
+.auth-form-panel > * { position: relative; }
+html[data-theme] .auth-form-panel h1 { margin: 0 0 14px; font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: -.03em; color: var(--text); }
+/* Поле: капсула 56px; подпись лежит внутри и при вводе уменьшается к верхнему краю капсулы */
+html[data-theme] .auth-form-panel .fld { padding-top: 0; margin: 0; }
+html[data-theme] .auth-form-panel .fld input { height: 56px; padding: 18px 22px 0; border-radius: 28px; background: var(--g-field); color: var(--text); font-size: 16px; font-weight: 500; transition: background-color .25s; }
+html[data-theme] .auth-form-panel .password-field input { padding-right: 60px; }
+html[data-theme] .auth-form-panel .fld input:hover { background: var(--g-field-h); }
+html[data-theme] .auth-form-panel .fld input:focus { background: var(--g-field-h); }
+html[data-theme] .auth-form-panel .fld__lbl { left: 22px; top: 28px; transform: translateY(-50%); transform-origin: left center; font-size: 16px; font-weight: 500; color: var(--g-faint); transition: transform .34s cubic-bezier(.22, 1, .36, 1), color .3s; }
+html[data-theme] .auth-form-panel .fld input:focus ~ .fld__lbl,
+html[data-theme] .auth-form-panel .fld input:not(:placeholder-shown) ~ .fld__lbl,
+html[data-theme] .auth-form-panel .fld.is-filled .fld__lbl { transform: translateY(calc(-50% - 11px)) scale(.74); }
+html[data-theme] .auth-form-panel .fld input:-webkit-autofill,
+html[data-theme] .auth-form-panel .fld input:-webkit-autofill:hover,
+html[data-theme] .auth-form-panel .fld input:-webkit-autofill:focus { -webkit-box-shadow: 0 0 0 1000px var(--g-field) inset; box-shadow: 0 0 0 1000px var(--g-field) inset; -webkit-text-fill-color: var(--text); }
+html[data-theme] .auth-form-panel .password-toggle-btn { top: 6px; bottom: auto; right: 6px; width: 44px; height: 44px; border-radius: 22px; color: var(--g-faint); transition: color .2s, background-color .2s; }
+html[data-theme] .auth-form-panel .password-toggle-btn:hover { color: var(--text); background: var(--g-acc); }
+html[data-theme="light"] .auth-form-panel .password-toggle-btn:hover { color: #fff; }
+/* Главная кнопка: по ней периодически проходит блик */
+html[data-theme] .auth-form-panel .auth-submit-btn { margin-top: 6px; min-height: 56px; height: 56px; border: 0; border-radius: 28px; background: var(--g-acc); color: var(--g-on-acc); font-size: 16px; font-weight: 650; box-shadow: none; overflow: hidden; isolation: isolate; transition: background-color .2s, transform .5s var(--g-spring); }
+html[data-theme] .auth-form-panel .auth-submit-btn:hover { background: var(--g-acc-h); box-shadow: none; }
+html[data-theme] .auth-form-panel .auth-submit-btn:active { transform: scale(.97); transition-duration: .12s; }
+.auth-form-panel .auth-submit-btn::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .16) 50%, transparent 65%); background-size: 250% 100%; animation: auth-shim 3.2s ease-in-out infinite; }
+@keyframes auth-shim { 0% { background-position: 130% 0; } 60%, 100% { background-position: -30% 0; } }
+html[data-theme] .auth-error { margin: 0 0 4px; border-radius: 16px; }
+
+/* Панель: «сияние» из размытых пятен + лёгкий шум */
+html[data-theme] .auth-overlay { background: #1e1d1e; overflow: hidden; }
+.auth-aurora { position: absolute; inset: 0; filter: blur(70px) saturate(1.1); opacity: .75; pointer-events: none; }
+.auth-aurora i { position: absolute; border-radius: 50%; mix-blend-mode: screen; }
+.auth-aurora i:nth-child(1) { width: 380px; height: 380px; left: 8%; top: 10%; background: #304456; animation: auth-au1 14s ease-in-out infinite alternate; }
+.auth-aurora i:nth-child(2) { width: 320px; height: 320px; left: 28%; top: 48%; background: #3a4a3c; animation: auth-au2 17s ease-in-out infinite alternate; }
+.auth-aurora i:nth-child(3) { width: 300px; height: 300px; left: 58%; top: 6%; background: #4a3f52; animation: auth-au3 15s ease-in-out infinite alternate; }
+.auth-aurora i:nth-child(4) { width: 360px; height: 360px; left: 70%; top: 46%; background: #304456; animation: auth-au2 19s ease-in-out infinite alternate-reverse; }
+@keyframes auth-au1 { to { transform: translate(120px, 90px) scale(1.2); } }
+@keyframes auth-au2 { to { transform: translate(-110px, -70px) scale(.85); } }
+@keyframes auth-au3 { to { transform: translate(-80px, 110px) scale(1.15); } }
+.auth-noise { position: absolute; inset: 0; opacity: .08; pointer-events: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence baseFrequency='.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+html[data-theme] .auth-overlay-panel { padding: 40px; color: #f2f0ec; }
+.auth-overlay-panel .ank-sigil { display: none; }
+.auth-logo { display: flex; }
+.auth-logo .ank-pulse { width: 84px; height: 84px; }
+.auth-logo .ank-pulse .pl-bubble, html[data-theme] .auth-logo .ank-pulse .pl-bubble { fill: #444244; }
+.auth-logo .ank-pulse .pl-bubble path, html[data-theme] .auth-logo .ank-pulse .pl-bubble path { stroke: #444244; }
+.auth-logo .ank-pulse .pl-bar, html[data-theme] .auth-logo .ank-pulse .pl-bar { fill: #f2f0ec; }
+/* Название переливается */
+.auth-ttl { margin: 20px 0 28px; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -.04em; background: linear-gradient(100deg, #8d8b8d 0%, #f2f0ec 40%, #8d8b8d 60%, #8d8b8d 100%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: auth-tsh 4s ease-in-out infinite; }
+@keyframes auth-tsh { 0% { background-position: 120% 0; } 70%, 100% { background-position: -20% 0; } }
+.auth-q { margin: 0 0 16px; font-size: 15px; color: #aaa8aa; }
+/* Кнопка-переключатель — стекло */
+html[data-theme] .auth-ghost-btn { width: auto; min-width: 220px; max-width: none; height: 48px; min-height: 48px; padding: 0 26px; border: 0; border-radius: 24px; background: rgba(242, 240, 236, .08); color: #f2f0ec; font-size: 15px; font-weight: 650; -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: inset 0 0 0 1px rgba(242, 240, 236, .14); transition: background-color .25s, transform .5s var(--g-spring); }
+html[data-theme] .auth-ghost-btn:hover { background: rgba(242, 240, 236, .14); color: #f2f0ec; border: 0; }
+html[data-theme] .auth-ghost-btn:active { transform: scale(.96); transition-duration: .12s; }
+.auth-hero { display: none; }
+
+/* Телефон: сверху «сияние» с лого, ниже — карточка с формой; переключатель — строкой текста */
+@media (max-width: 720px) {
+  html[data-theme] .auth-screen { padding: 0; justify-content: flex-start; align-items: stretch; }
+  html[data-theme] .auth-brand-mobile.auth-hero { position: relative; display: flex; flex-shrink: 0; align-items: center; justify-content: center; height: min(40vh, 340px); min-height: 250px; margin: 0; padding: env(safe-area-inset-top) 0 28px; background: #1e1d1e; overflow: hidden; text-transform: none; letter-spacing: normal; }
+  .auth-hero__in { position: relative; display: flex; flex-direction: column; align-items: center; }
+  .auth-hero .auth-logo .ank-pulse { width: 72px; height: 72px; }
+  .auth-hero .auth-ttl { margin: 14px 0 0; font-size: 38px; }
+  html[data-theme] .auth-container { width: auto; height: auto; min-height: 0; flex: 1 0 auto; max-width: none; margin-top: -28px; border-radius: 28px 28px 0 0; box-shadow: none; }
+  .auth-beam::before { display: none; }
+  html[data-theme] .auth-form-panel { padding: 30px 22px calc(28px + env(safe-area-inset-bottom)); justify-content: flex-start; }
+  html[data-theme] .auth-form-panel h1 { font-size: 30px; margin-bottom: 6px; }
+  .auth-form-panel::before { display: none; }
+  html[data-theme] .auth-mobile-switch { margin-top: 4px; }
+  html[data-theme] .auth-switch-link { min-height: 44px; margin: 0; padding: 0; border: 0; background: none; color: var(--g-sub); font-size: 15px; font-weight: 500; }
+  html[data-theme] .auth-switch-link:hover { background: none; color: var(--g-sub); }
+  .auth-switch-link b { color: var(--text); font-weight: 650; }
+  /* Смена формы — сдвиг вбок с проявлением, в ту же сторону, что и на компьютере */
+  .auth-container.right-panel-active .auth-signup { animation: auth-in-r .5s cubic-bezier(.22, 1, .36, 1) both; }
+  .auth-container[data-mode="login"].is-switched .auth-signin { animation: auth-in-l .5s cubic-bezier(.22, 1, .36, 1) both; }
+}
+/* translate, а не transform: у формы на телефоне transform: none !important (style.css) */
+@keyframes auth-in-r { from { opacity: 0; translate: 40px 0; } }
+@keyframes auth-in-l { from { opacity: 0; translate: -40px 0; } }
