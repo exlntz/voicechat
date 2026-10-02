@@ -1593,6 +1593,7 @@ async function enterRoom(joinData, opts = {}) {
     roomInfo.classList.toggle('is-live', cls === '')
     if (cls === '' && !callStartedAt) {
       callStartedAt = Date.now()
+      state.callStartedAt = callStartedAt // для таймера на кнопке «В звонке» в шапке чата
       tickCallTimer()
     }
     // Знак в шапке: при подключении/переподключении анимирован всё время, в звонке — статичный

@@ -74,7 +74,7 @@ function outgoingEnded(callId, what) {
 }
 
 // ---------- Вход в комнату из оболочки ----------
-export async function joinRoom({ roomCode, hostSecret = null, conversationId = null, outgoingCallId = null }) {
+export async function joinRoom({ roomCode, hostSecret = null, conversationId = null, outgoingCallId = null, beforeEnter = null }) {
   const vl = VL()
   if (inCall()) {
     if (vl.state.roomCode === roomCode) return true
@@ -92,6 +92,8 @@ export async function joinRoom({ roomCode, hostSecret = null, conversationId = n
     return false
   }
   if (data.isHost && data.hostSecret) safeSet(`hostSecret:${data.roomCode}`, data.hostSecret)
+  // Кнопка «Позвонить» в чате успевает показать галочку до того, как откроется звонок
+  if (beforeEnter) { try { await beforeEnter() } catch {} }
   callState.roomCode = data.roomCode
   callState.conversationId = conversationId
   callState.outgoingCallId = outgoingCallId
@@ -121,19 +123,20 @@ export function onCallEnded() {
   return ctx
 }
 
-export async function startCall(convId) {
+// Возвращает true, если звонок начат (нужно кнопке «Позвонить», чтобы вернуться в исходное при ошибке)
+export async function startCall(convId, { beforeEnter = null } = {}) {
   convId = Number(convId)
-  if (inCall() && callState.conversationId === convId) return
+  if (inCall() && callState.conversationId === convId) return true
   let res
   try {
     res = await api.startCall(convId)
   } catch (e) {
     toast(e.message || 'Не удалось позвонить', 'error')
-    return
+    return false
   }
   // Встречный звонок: собеседник уже звонил нам — сервер засчитал это как «принять»
   if (res.accepted) dismissIncoming(res.callId)
-  await joinRoom({ roomCode: res.roomCode, hostSecret: res.hostSecret, conversationId: convId, outgoingCallId: res.accepted ? null : res.callId })
+  return joinRoom({ roomCode: res.roomCode, hostSecret: res.hostSecret, conversationId: convId, outgoingCallId: res.accepted ? null : res.callId, beforeEnter })
 }
 
 // Кнопка «Присоединиться» у карточки звонка в чате

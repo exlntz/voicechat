@@ -537,7 +537,7 @@ html:not([data-theme="light"]) .g-chat__ava .g-ava.vl-avatar:not(.has-img) { col
 .vl-view--chat .vl-pinbar .vl-round:hover { background: var(--g-field-h); color: var(--g-ink); }
 
 /* ─────────── Лента: колонка 760 по центру ─────────── */
-.vl-view--chat .vl-chat__list { width: 100%; max-width: 808px; margin: 0 auto; padding: 24px 24px 8px; box-sizing: border-box; }
+.vl-view--chat .vl-chat__list { width: 100%; max-width: none; margin: 0; padding: 24px 22px 8px 26px; box-sizing: border-box; }
 .vl-day { margin: 12px 0; display: flex; justify-content: center; }
 .vl-day span { padding: 6px 14px; border-radius: 999px; background: var(--g-field); font-size: 13px; font-weight: 500; color: var(--g-muted); box-shadow: none; }
 .vl-unread-divider span { background: var(--g-field); color: var(--g-muted); }
@@ -599,7 +599,7 @@ html:not([data-theme="light"]) .g-mava.is-peer:not(.has-img) { color: var(--g-in
 .g-callbub__join { margin-left: 6px; height: 34px; }
 
 /* ─────────── Поле ввода: колонка 760, микрофон внутри рамки ─────────── */
-.vl-view--chat .vl-composer { width: 100%; max-width: 808px; margin: 0 auto; padding: 0 24px 18px; box-sizing: border-box; background: transparent; display: flex; flex-direction: column; gap: 8px; }
+.vl-view--chat .vl-composer { width: 100%; max-width: none; margin: 0; padding: 0 22px 18px 26px; box-sizing: border-box; background: transparent; display: flex; flex-direction: column; gap: 8px; }
 .vl-view--chat .vl-reply-bar { margin: 0; height: 54px; box-sizing: border-box; border-radius: 22px; background: var(--g-field); display: flex; align-items: center; gap: 12px; padding: 0 10px 0 16px; color: var(--g-green); animation: g-ca-in .35s cubic-bezier(.22, 1, .36, 1); }
 .vl-view--chat .vl-reply-bar[hidden] { display: none; }
 .vl-view--chat .vl-reply-bar > .vl-ico { width: 18px; height: 18px; color: var(--g-green); }
@@ -1686,15 +1686,21 @@ html[data-theme="light"] .vl-voice.is-mine .vl-voice__btn { background: #1c1917;
 .vl-view--chat .vl-msg__tools .vl-round:hover { background: var(--g-field-h); color: var(--g-ink); }
 .vl-view--chat.is-selecting .vl-msg__tools { display: none; }
 
-/* Режим выделения: слева у сообщений кружок-отметка, выбранные — с мягкой подложкой */
-.vl-view--chat .vl-msg { position: relative; transition: padding-left .35s var(--g-spring), background-color .2s; }
-.vl-view--chat.is-selecting .vl-msg[data-key^="m"] { padding-left: 40px; cursor: pointer; border-radius: 18px; }
+/* Режим выделения как в Телеграме: справа у каждого сообщения кружок-отметка, у выбранного
+   подсвечивается сам пузырь (без подложки на всю строку) */
+.vl-view--chat .vl-msg { position: relative; transition: padding-right .35s var(--g-spring); }
+.vl-view--chat.is-selecting .vl-msg[data-key^="m"] { padding-right: 44px; cursor: pointer; }
 .vl-view--chat.is-selecting .vl-msg[data-key^="m"] * { cursor: pointer; }
-.vl-view--chat.is-selecting .vl-msg[data-key^="m"]::before { content: ''; position: absolute; left: 8px; bottom: 8px; width: 22px; height: 22px; border-radius: 11px; background: var(--g-field-h); transition: background-color .2s, transform .35s var(--g-spring); animation: g-sel-in .35s var(--g-spring) both; }
-.vl-view--chat.is-selecting .vl-msg.is-selected { background: color-mix(in srgb, var(--g-field) 55%, transparent); }
-.vl-view--chat.is-selecting .vl-msg.is-selected::before { background: #22c55e url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M6 12.5l4 4 8-9'/></svg>") center / 13px no-repeat; transform: scale(1.06); }
+.vl-view--chat.is-selecting .vl-msg[data-key^="m"]::after { content: ''; position: absolute; right: 6px; bottom: 6px; width: 24px; height: 24px; border-radius: 12px; box-sizing: border-box; background: var(--g-field-h); transition: background-color .2s, transform .35s var(--g-spring); animation: g-sel-in .35s var(--g-spring) both; }
+.vl-view--chat.is-selecting .vl-msg.is-selected::after { background: #3b8fe0 url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M6 12.5l4 4 8-9'/></svg>") center / 13px no-repeat; transform: scale(1.08); }
 @keyframes g-sel-in { from { opacity: 0; transform: scale(.4); } }
 .vl-view--chat.is-selecting .vl-msg { user-select: none; -webkit-user-select: none; }
+.vl-view--chat .vl-bubble, .vl-view--chat .g-callbub { transition: background-color .25s, filter .25s; }
+.vl-view--chat.is-selecting .vl-msg.is-selected .vl-bubble,
+.vl-view--chat.is-selecting .vl-msg.is-selected .g-callbub { background: #2d5f8f !important; }
+.vl-view--chat.is-selecting .vl-msg.is-selected .vl-bubble.is-media-only { filter: brightness(.75) saturate(1.1); background: transparent !important; }
+html[data-theme="light"] .vl-view--chat.is-selecting .vl-msg.is-selected .vl-bubble,
+html[data-theme="light"] .vl-view--chat.is-selecting .vl-msg.is-selected .g-callbub { background: #c9def4 !important; }
 /* Панель вместо поля ввода */
 .vl-view--chat .vl-composer:has(.g-sel:not([hidden])) .vl-composer__box,
 .vl-view--chat .vl-composer:has(.g-sel:not([hidden])) .vl-reply-bar,
@@ -1715,3 +1721,35 @@ html[data-theme="light"] .vl-voice.is-mine .vl-voice__btn { background: #1c1917;
 @media (max-width: 860px) { .g-sel__btn span { display: none; } .g-sel__btn { width: 40px; padding: 0; justify-content: center; } }
 .g-sel button { border: 0; outline: 0; appearance: none; font: inherit; cursor: pointer; }
 .g-sel__x { background: none; }
+
+/* «Позвонить» в шапке чата — морф: кнопка → загрузка → галочка → «● В звонке 00:12».
+   Слои лежат друг на друге, ширина кнопки плавно подстраивается под текущий (chat.js) */
+.g-chat__call { --cm-pad: 20px; position: relative; overflow: hidden; padding: 0 !important; justify-content: center; transition: width .6s var(--g-spring), background-color .3s, transform .45s var(--g-spring); }
+.g-chat__call.is-live { background: var(--g-acc) !important; color: var(--g-on-acc) !important; }
+.g-cm { position: absolute; top: 0; bottom: 0; left: 50%; display: flex; align-items: center; justify-content: center; gap: 9px; white-space: nowrap; opacity: 0; filter: blur(6px); transform: translateX(-50%) scale(.92); pointer-events: none; transition: opacity .16s ease-out, filter .16s ease-out, transform .3s cubic-bezier(.3, 1.4, .5, 1); }
+.g-cm.is-on { opacity: 1; filter: none; transform: translateX(-50%) scale(1); transition-delay: .09s; }
+.g-cm__spin { width: 22px; height: 22px; box-sizing: border-box; border-radius: 50%; border: 2.6px solid color-mix(in srgb, currentColor 22%, transparent); border-top-color: currentColor; animation: g-spin .75s linear infinite; }
+.g-cm__ok path { stroke-dasharray: 24; stroke-dashoffset: 24; }
+.g-cm.is-on .g-cm__ok path { animation: g-cm-draw .4s .12s ease-out forwards; }
+@keyframes g-cm-draw { to { stroke-dashoffset: 0; } }
+.g-cm__dot { width: 9px; height: 9px; border-radius: 50%; background: #4ade80; flex-shrink: 0; animation: g-cm-pulse 1.8s ease-in-out infinite; }
+@keyframes g-cm-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, .45); } 50% { box-shadow: 0 0 0 5px rgba(74, 222, 128, 0); } }
+.g-cm__timer { font-family: 'Geist Mono', ui-monospace, monospace; font-size: 14px; font-weight: 500; opacity: .72; font-variant-numeric: tabular-nums; }
+@media (max-width: 860px) {
+  .g-chat__call { --cm-pad: 12px; }
+  .g-chat__call[data-st="0"] { --cm-pad: 0px; }
+  .g-cm { gap: 7px; }
+}
+
+/* Меню закрывается плавно: лёгкое сжатие к точке открытия и проявление */
+.vl-menu.is-out { animation: g-menu-out .18s cubic-bezier(.4, 0, 1, 1) both; }
+@keyframes g-menu-out { to { opacity: 0; transform: scale(.94); } }
+
+/* «⋯» у сообщения — маленький кружок у нижнего края пузыря (как в Телеграме): выпрыгивает с пружиной,
+   при наведении чуть увеличивается, по нажатию открывает меню */
+.vl-view--chat .vl-msg__tools { align-self: flex-end; margin-bottom: 2px; transform: scale(.4); transform-origin: 50% 50%; transition: opacity .16s ease-out, transform .45s var(--g-spring); }
+.vl-view--chat .vl-msg__wrap:hover .vl-msg__tools { transform: scale(1); }
+.vl-view--chat .vl-msg__tools .vl-round { width: 28px; height: 28px; border-radius: 14px; transition: scale .35s var(--g-spring), background-color .2s, color .2s; }
+.vl-view--chat .vl-msg__tools .vl-round .vl-ico { width: 15px; height: 15px; }
+.vl-view--chat .vl-msg__tools .vl-round:hover { scale: 1.14; }
+.vl-view--chat .vl-msg__tools .vl-round:active { scale: .92; transition-duration: .1s; }
