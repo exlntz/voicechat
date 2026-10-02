@@ -804,6 +804,7 @@ export function createChatView({ convId, navigate, menuButton }) {
   function stopSelect() { if (!selecting) return; selecting = false; selected.clear(); applySelection() }
   // В режиме выделения клик по сообщению отмечает его (а не открывает фото, голосовое и т.п.)
   list.addEventListener('click', (e) => {
+    if (suppressClick) { suppressClick = false; e.preventDefault(); e.stopPropagation(); return }
     if (!selecting) return
     const msg = e.target.closest('.vl-msg[data-key^="m"]')
     if (!msg) return
@@ -813,6 +814,78 @@ export function createChatView({ convId, navigate, menuButton }) {
     if (!selected.size) stopSelect(); else applySelection()
   }, true)
   selClose.addEventListener('click', stopSelect)
+
+  // Выделение протягиванием, как в Телеграме: зажать кнопку мыши на сообщении и вести вверх/вниз —
+  // отмечаются все сообщения по пути. Пока курсор в пределах одного сообщения, работает обычное
+  // выделение текста; у краёв ленты она сама прокручивается
+  let drag = null
+  const msgKeyAt = (y) => {
+    const els = [...list.querySelectorAll('.vl-msg[data-key^="m"]')]
+    for (const el of els) { const r = el.getBoundingClientRect(); if (y >= r.top - 1 && y <= r.bottom + 1) return el }
+    return null
+  }
+  const orderedKeys = () => [...list.querySelectorAll('.vl-msg[data-key^="m"]')].map((el) => el.dataset.key.slice(1))
+  function dragApply(y) {
+    const el = msgKeyAt(y)
+    if (!el) return
+    const key = el.dataset.key.slice(1)
+    if (!drag.active) {
+      if (key === drag.start) return
+      drag.active = true
+      try { window.getSelection().removeAllRanges() } catch {}
+      if (!selecting) { selecting = true; selected.clear() }
+      drag.base = new Set(selected)
+      drag.adding = !selected.has(drag.start)
+      node.classList.add('is-dragsel')
+    }
+    const keys = orderedKeys()
+    const a = keys.indexOf(drag.start), b = keys.indexOf(key)
+    if (a < 0 || b < 0) return
+    const range = keys.slice(Math.min(a, b), Math.max(a, b) + 1)
+    selected.clear()
+    drag.base.forEach((k) => selected.add(k))
+    range.forEach((k) => (drag.adding ? selected.add(k) : selected.delete(k)))
+    if (!selected.size) stopSelect(); else applySelection()
+  }
+  function dragTick() {
+    if (!drag) return
+    const r = scroller.getBoundingClientRect()
+    const edge = 48
+    let dy = 0
+    if (drag.y < r.top + edge) dy = -Math.ceil((r.top + edge - drag.y) / 4)
+    else if (drag.y > r.bottom - edge) dy = Math.ceil((drag.y - (r.bottom - edge)) / 4)
+    if (dy && drag.active) { scroller.scrollTop += dy; dragApply(drag.y) }
+    drag.raf = requestAnimationFrame(dragTick)
+  }
+  list.addEventListener('mousedown', (e) => {
+    if (e.button !== 0 || editingKey) return
+    const msg = e.target.closest('.vl-msg[data-key^="m"]')
+    if (!msg || e.target.closest('a, button, input, textarea, .vl-voice, .vl-media-cell, video')) return
+    drag = { start: msg.dataset.key.slice(1), y: e.clientY, active: false, raf: 0 }
+    drag.raf = requestAnimationFrame(dragTick)
+  })
+  const dragMove = (e) => {
+    if (!drag) return
+    drag.y = e.clientY
+    if (drag.active) { e.preventDefault(); try { window.getSelection().removeAllRanges() } catch {} }
+    dragApply(e.clientY)
+  }
+  document.addEventListener('mousemove', dragMove)
+  unsub.push(() => document.removeEventListener('mousemove', dragMove))
+  const dragEnd = () => {
+    if (!drag) return
+    cancelAnimationFrame(drag.raf)
+    if (drag.active) {
+      node.classList.remove('is-dragsel')
+      // Клик, который придёт следом за отпусканием, не должен снять отметку со стартового сообщения
+      suppressClick = true
+      setTimeout(() => { suppressClick = false }, 0)
+    }
+    drag = null
+  }
+  let suppressClick = false
+  document.addEventListener('mouseup', dragEnd)
+  unsub.push(() => { document.removeEventListener('mouseup', dragEnd); dragEnd() })
   selCopy.addEventListener('click', () => {
     const text = selectedMsgs().filter((x) => x.body).map((x) => x.body).join('\n\n')
     window.VL.copyToClipboard(text).then((ok) => toast(ok ? 'Скопировано' : 'Не удалось скопировать', ok ? 'success' : 'error'))
@@ -849,7 +922,7 @@ export function createChatView({ convId, navigate, menuButton }) {
       m.kind === 'text' ? { label: 'Переслать', icon: 'share', onClick: () => openForwardPicker(m) } : null,
       'sep',
       { label: 'Удалить', icon: 'trash', danger: true, onClick: () => askDelete(m, false) }
-    ], e)
+    ], e, { onEsc: () => { if (!selecting && !editingKey) input.focus({ preventScroll: true }) } })
   }
 
   // Смахнуть влево на телефоне — ответить (как в Телеграме)
