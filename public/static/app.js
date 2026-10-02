@@ -711,12 +711,11 @@ function renderAuthScreen(afterLoginRoomCode = '') {
 
   // Текстовая ссылка-переключатель под формой - видна только на узких экранах (телефон),
   // где двухпанельный слайдер физически не влезает (см. media query в style.css)
-  const mobileToRegister = el('button', { type: 'button', class: 'auth-switch-link' }, 'Зарегистрироваться')
-  const mobileSwitchToRegister = el('div', { class: 'auth-mobile-switch' }, ['Нет аккаунта? ', mobileToRegister])
+  const mobileToRegister = el('button', { type: 'button', class: 'auth-switch-link' }, ['Нет аккаунта? ', el('b', {}, 'Регистрация')])
+  const mobileSwitchToRegister = el('div', { class: 'auth-mobile-switch' }, [mobileToRegister])
 
   const loginPanel = el('div', { class: 'auth-form-panel auth-signin' }, [
     el('h1', {}, 'Вход'),
-    el('div', { class: 'auth-form-hint' }, 'Используйте юзернейм и пароль от аккаунта'),
     loginErrorSlot,
     loginUsername,
     loginPasswordField,
@@ -729,18 +728,17 @@ function renderAuthScreen(afterLoginRoomCode = '') {
   // участники звонка. "Юзернейм" - технический идентификатор для входа в аккаунт (и в будущем -
   // для добавления в друзья), поэтому строго ограничен латиницей/цифрами/_/- .
   const registerErrorSlot = el('div', { class: 'auth-error', style: 'display:none' })
-  const registerDisplayName = el('input', { type: 'text', placeholder: 'Отображаемое имя', maxlength: '40', autocomplete: 'name' })
-  const registerUsername = el('input', { type: 'text', placeholder: 'Юзернейм (для входа)', maxlength: '25', autocomplete: 'username' })
+  const registerDisplayName = el('input', { type: 'text', placeholder: 'Имя', maxlength: '40', autocomplete: 'name' })
+  const registerUsername = el('input', { type: 'text', placeholder: 'Юзернейм', maxlength: '25', autocomplete: 'username' })
   atPrefixField(registerUsername)
-  const { wrapper: registerPasswordField, input: registerPassword } = makePasswordField('Пароль (мин. 6 символов)', '100', 'new-password')
-  const registerSubmit = el('button', { type: 'button', class: 'auth-submit-btn' }, 'Зарегистрироваться')
+  const { wrapper: registerPasswordField, input: registerPassword } = makePasswordField('Пароль', '100', 'new-password')
+  const registerSubmit = el('button', { type: 'button', class: 'auth-submit-btn' }, 'Создать аккаунт')
 
-  const mobileToLogin = el('button', { type: 'button', class: 'auth-switch-link' }, 'Войти')
-  const mobileSwitchToLogin = el('div', { class: 'auth-mobile-switch' }, ['Уже есть аккаунт? ', mobileToLogin])
+  const mobileToLogin = el('button', { type: 'button', class: 'auth-switch-link' }, ['Уже есть аккаунт? ', el('b', {}, 'Войти')])
+  const mobileSwitchToLogin = el('div', { class: 'auth-mobile-switch' }, [mobileToLogin])
 
   const registerPanel = el('div', { class: 'auth-form-panel auth-signup' }, [
     el('h1', {}, 'Регистрация'),
-    el('div', { class: 'auth-form-hint' }, 'Создайте аккаунт, чтобы заходить в звонки с любого устройства'),
     registerErrorSlot,
     registerDisplayName,
     registerUsername,
@@ -749,32 +747,48 @@ function renderAuthScreen(afterLoginRoomCode = '') {
     mobileSwitchToLogin
   ])
 
-  // ---- Акцентная сдвигающаяся панель с призывом к действию (правая CTA = "войти в звонки",
-  // левая CTA = "уже есть аккаунт") ----
+  // ---- Сдвигающаяся панель (вариант C «Свет» из канваса): плывущее «сияние», лого,
+  // переливающееся название и одна строка-вопрос с кнопкой ----
+  // Лого рисует anker.js (он подключается после app.js) — ждём, пока появится
+  const authLogo = () => {
+    const box = el('span', { class: 'auth-logo' })
+    const fill = () => { if (window.VLLogo) box.appendChild(window.VLLogo(84, true)); else setTimeout(fill, 30) }
+    fill()
+    return box
+  }
+  const aurora = () => el('div', { class: 'auth-aurora', 'aria-hidden': 'true' }, [el('i'), el('i'), el('i'), el('i')])
   const toRegisterBtn = el('button', { type: 'button', class: 'auth-ghost-btn' }, 'Регистрация')
   const overlayRight = el('div', { class: 'auth-overlay-panel auth-overlay-right' }, [
-    el('div', { class: 'auth-brand' }, 'Voice Lobby'),
-    el('h1', {}, 'Привет!'),
-    el('p', {}, 'Введите логин и пароль, чтобы начать пользоваться сервисом'),
+    authLogo(),
+    el('div', { class: 'auth-ttl' }, 'Voice Lobby'),
+    el('p', { class: 'auth-q' }, 'Нет аккаунта?'),
     toRegisterBtn
   ])
 
   const toLoginBtn = el('button', { type: 'button', class: 'auth-ghost-btn' }, 'Войти')
   const overlayLeft = el('div', { class: 'auth-overlay-panel auth-overlay-left' }, [
-    el('div', { class: 'auth-brand' }, 'Voice Lobby'),
-    el('h1', {}, 'С возвращением!'),
-    el('p', {}, 'Чтобы продолжить, войдите с вашим логином и паролем'),
+    authLogo(),
+    el('div', { class: 'auth-ttl' }, 'Voice Lobby'),
+    el('p', { class: 'auth-q' }, 'Уже есть аккаунт?'),
     toLoginBtn
   ])
 
-  const overlay = el('div', { class: 'auth-overlay' }, [overlayLeft, overlayRight])
+  const overlay = el('div', { class: 'auth-overlay' }, [aurora(), el('div', { class: 'auth-noise' }), overlayLeft, overlayRight])
   const overlayContainer = el('div', { class: 'auth-overlay-container' }, [overlay])
 
   container.appendChild(loginPanel)
   container.appendChild(registerPanel)
   container.appendChild(overlayContainer)
-  // На телефоне акцентная панель с названием скрыта — выводим название отдельной шапкой
-  screen.appendChild(el('div', { class: 'auth-brand-mobile' }, 'Voice Lobby'))
+  // Карточка — с бегущим по рамке лучом; по форме за курсором идёт мягкая подсветка
+  container.classList.add('auth-beam')
+  ;[loginPanel, registerPanel].forEach((panel) => panel.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse') return
+    const r = panel.getBoundingClientRect()
+    panel.style.setProperty('--mx', (e.clientX - r.left) + 'px')
+    panel.style.setProperty('--my', (e.clientY - r.top) + 'px')
+  }))
+  // На телефоне сдвигающейся панели нет — то же «сияние» с лого шапкой над формой
+  screen.appendChild(el('div', { class: 'auth-brand-mobile auth-hero' }, [aurora(), el('div', { class: 'auth-noise' }), el('div', { class: 'auth-hero__in' }, [authLogo(), el('div', { class: 'auth-ttl' }, 'Voice Lobby')])]))
   screen.appendChild(container)
   root.appendChild(screen)
 
@@ -783,6 +797,7 @@ function renderAuthScreen(afterLoginRoomCode = '') {
   // «Зарегистрироваться», лежащей ровно под «Войти», и Enter/пробел запускал
   // регистрацию — на месте «Войти» появлялось «Регистрация…», кнопка блокировалась.
   function setMode(next) {
+    if (next !== mode) container.classList.add('is-switched')
     mode = next
     container.dataset.mode = mode
     container.classList.toggle('right-panel-active', mode === 'register')
@@ -872,7 +887,7 @@ function renderAuthScreen(afterLoginRoomCode = '') {
   }
 
   loginSubmit.addEventListener('click', () => submit('login', loginUsername, loginPassword, loginErrorSlot, loginSubmit, 'Войти', 'Вход...'))
-  registerSubmit.addEventListener('click', () => submit('register', registerUsername, registerPassword, registerErrorSlot, registerSubmit, 'Зарегистрироваться', 'Регистрация...', registerDisplayName))
+  registerSubmit.addEventListener('click', () => submit('register', registerUsername, registerPassword, registerErrorSlot, registerSubmit, 'Создать аккаунт', 'Создаём…', registerDisplayName))
 
   loginPassword.addEventListener('keydown', (e) => { if (e.key === 'Enter') loginSubmit.click() })
   loginUsername.addEventListener('keydown', (e) => { if (e.key === 'Enter') loginSubmit.click() })
