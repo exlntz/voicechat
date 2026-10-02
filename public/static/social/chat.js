@@ -330,7 +330,15 @@ export function createChatView({ convId, navigate, menuButton }) {
   const blockedNote = h('div', { class: 'vl-composer__blocked', hidden: true })
   // Для экранного диктора: «печатает…» теперь пузырь в ленте, а текст — здесь
   const typingLine = h('div', { class: 'vl-sr-only', 'aria-live': 'polite' })
-  const composer = h('div', { class: 'vl-composer' }, [replyBar, tray, composerBox, blockedNote, typingLine])
+  // Режим выделения (пункт «Выделить» в меню сообщения): вместо поля ввода — «Выбрано: N» и действия
+  let selecting = false
+  const selected = new Set() // id сообщений строками
+  const selCount = h('span', { class: 'g-sel__count' })
+  const selCopy = h('button', { type: 'button', class: 'g-sel__btn' }, [icon('copy'), h('span', {}, 'Копировать')])
+  const selDel = h('button', { type: 'button', class: 'g-sel__btn is-danger' }, [icon('trash'), h('span', {}, 'Удалить')])
+  const selClose = h('button', { type: 'button', class: 'g-sel__x', 'aria-label': 'Снять выделение' }, [icon('xmark')])
+  const selBar = h('div', { class: 'g-sel', hidden: true }, [selClose, selCount, h('span', { class: 'g-sel__sp' }), selCopy, selDel])
+  const composer = h('div', { class: 'vl-composer' }, [replyBar, tray, composerBox, selBar, blockedNote, typingLine])
 
   const node = h('section', { class: `vl-view vl-view--chat${saved ? ' is-saved' : ''}` }, [header, pinBar, searchBar, chatMain, composer])
 
@@ -714,11 +722,61 @@ export function createChatView({ convId, navigate, menuButton }) {
     return frag
   }
 
+  // ---------- Выделение сообщений ----------
+  function selectedMsgs() {
+    const c = getChat(convId)
+    return (c ? c.list : []).filter((x) => x.id && selected.has(String(x.id)))
+  }
+  function applySelection() {
+    node.classList.toggle('is-selecting', selecting)
+    for (const [k, e] of nodes) e.node.classList.toggle('is-selected', selecting && k[0] === 'm' && selected.has(k.slice(1)))
+    selCount.textContent = 'Выбрано: ' + selected.size
+    selCopy.hidden = !selectedMsgs().some((x) => x.body)
+    selBar.hidden = !selecting
+  }
+  function startSelect(m) { selecting = true; selected.clear(); selected.add(String(m.id)); applySelection() }
+  function stopSelect() { if (!selecting) return; selecting = false; selected.clear(); applySelection() }
+  // В режиме выделения клик по сообщению отмечает его (а не открывает фото, голосовое и т.п.)
+  list.addEventListener('click', (e) => {
+    if (!selecting) return
+    const msg = e.target.closest('.vl-msg[data-key^="m"]')
+    if (!msg) return
+    e.preventDefault(); e.stopPropagation()
+    const id = msg.dataset.key.slice(1)
+    if (selected.has(id)) selected.delete(id); else selected.add(id)
+    if (!selected.size) stopSelect(); else applySelection()
+  }, true)
+  selClose.addEventListener('click', stopSelect)
+  selCopy.addEventListener('click', () => {
+    const text = selectedMsgs().filter((x) => x.body).map((x) => x.body).join('\n\n')
+    window.VL.copyToClipboard(text).then((ok) => toast(ok ? 'Скопировано' : 'Не удалось скопировать', ok ? 'success' : 'error'))
+    stopSelect()
+  })
+  selDel.addEventListener('click', async () => {
+    const msgs = selectedMsgs()
+    if (!msgs.length) return
+    const allMine = msgs.every((x) => x.authorId === me.id)
+    const many = msgs.length > 1
+    const res = await deleteDialog({
+      title: many ? `Удалить сообщения (${msgs.length})?` : 'Удалить сообщение?',
+      text: saved ? (many ? 'Сообщения пропадут из «Избранного».' : 'Сообщение пропадёт из «Избранного».') : allMine ? 'Можно удалить только у себя или сразу у обоих.' : (many ? 'Сообщения пропадут только у вас — у собеседника останутся.' : 'Сообщение пропадёт только у вас — у собеседника останется.'),
+      checkLabel: allMine && !saved ? `Удалить и у ${displayName(userById(peer.id) || peer)}` : null
+    })
+    if (!res) return
+    const forAll = saved || (allMine && res.checked)
+    stopSelect()
+    for (const x of msgs) {
+      try { await api.del(`/api/conversations/${convId}/messages/${x.id}?for=${forAll ? 'all' : 'me'}`) } catch (e) { toast(e.message, 'error'); break }
+      removeMessage(convId, x.id)
+    }
+  })
+
   function messageMenu(m, e) {
     const mine = m.authorId === me.id
     const pinned = isPinned(m.id)
     showMenu([
       { label: 'Ответить', icon: 'reply', onClick: () => setReply(m) },
+      { label: 'Выделить', icon: 'check', onClick: () => startSelect(m) },
       mine && m.kind === 'text' && !m.forward ? { label: 'Изменить', icon: 'pen', onClick: () => startEdit(m) } : null,
       m.body ? { label: 'Копировать текст', icon: 'copy', onClick: () => window.VL.copyToClipboard(m.body).then((ok) => toast(ok ? 'Скопировано' : 'Не удалось скопировать', ok ? 'success' : 'error')) } : null,
       { label: pinned ? 'Открепить' : 'Закрепить', icon: pinned ? 'thumbtack-slash' : 'thumbtack', onClick: () => togglePin(m, !pinned) },
@@ -813,15 +871,14 @@ export function createChatView({ convId, navigate, menuButton }) {
       }
       if (m.body || !mediaOnly) parts.push(h('div', { class: 'vl-bubble__text is-selectable' }, [m.body ? textWithHighlight(m.body) : null, meta]))
       else parts.push(h('span', { class: 'vl-bubble__meta is-over-media' }, [...meta.childNodes]))
-      bubble = h('div', { class: `vl-bubble${files.length ? ' has-files' : ''}${mediaOnly ? ' is-media-only' : ''}${visual.length && !mediaOnly ? ' has-media' : ''}`, title: new Date(m.createdAt).toLocaleString('ru-RU') }, parts)
+      // Одно голосовое без текста: время отправки — в одной строке с длительностью, пузырь ниже
+      const voiceOnly = files.length === 1 && files[0].kind === 'voice' && !m.body && !m.reply && !m.forward
+      bubble = h('div', { class: `vl-bubble${files.length ? ' has-files' : ''}${voiceOnly ? ' is-voice' : ''}${mediaOnly ? ' is-media-only' : ''}${visual.length && !mediaOnly ? ' has-media' : ''}`, title: new Date(m.createdAt).toLocaleString('ru-RU') }, parts)
     }
 
     const tools = []
-    if (m.id && !editing) {
-      tools.push(toolButton('reply', 'Ответить', () => setReply(m)))
-      if (m.kind === 'text') tools.push(toolButton('share', 'Переслать', () => openForwardPicker(m)))
-      tools.push(toolButton('ellipsis', 'Ещё', (e) => messageMenu(m, e)))
-    }
+    // При наведении — только «⋯» сбоку (ответить/переслать — в меню, двойным кликом или свайпом)
+    if (m.id && !editing) tools.push(toolButton('ellipsis', 'Ещё', (e) => messageMenu(m, e)))
     const children = [msgAvatar(m.authorId, pos === 'last' || pos === 'single'), h('div', { class: 'vl-msg__wrap' }, [h('span', { class: 'vl-msg__swipe', 'aria-hidden': 'true' }, [icon('reply')]), bubble, tools.length ? h('div', { class: 'vl-msg__tools' }, tools) : null])]
     if (m.failed) {
       const retry = h('button', { type: 'button', class: 'vl-linkbtn' }, 'Повторить')
@@ -1032,6 +1089,7 @@ export function createChatView({ convId, navigate, menuButton }) {
     }
     for (const [k, e] of nodes) if (!seen.has(k)) { e.node.remove(); nodes.delete(k) }
     updateTicks(c, msgs)
+    if (selecting) applySelection()
   }
 
   // Галочки меняются на месте (узел сообщения не пересоздаётся) — так видна анимация
@@ -1198,6 +1256,7 @@ export function createChatView({ convId, navigate, menuButton }) {
     if (document.querySelector('.vl-modal-overlay, .g-overlay, .g-pf-overlay, .vl-lightbox, .vl-menu, .settings-overlay, .vl-incoming-wrap')) return
     if (node.offsetParent === null) return // чат скрыт (например, открыт звонок)
     e.preventDefault()
+    if (selecting) { stopSelect(); return } // сначала — снять выделение
     navigate(homePath())
   }
   document.addEventListener('keydown', onEsc)
