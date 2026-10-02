@@ -318,6 +318,136 @@
     }, { passive: true })
   }
 
+  /* ─────────────── 5б. Мягкий набор: плавная каретка ───────────────
+     Поверх настоящего поля лежит «зеркало» с тем же текстом: новые буквы проявляются за 0.08 с,
+     свой курсор плавно едет за текстом (0.07 с). Само поле остаётся настоящим — ввод, выделение,
+     автозаполнение и вставка работают как обычно; его текст и курсор просто прозрачные. */
+  var ST_SEL = 'input[type="text"], input[type="password"], input[type="search"], input:not([type]), textarea.vl-composer__input'
+  var ST_COPY = ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'letterSpacing', 'lineHeight', 'textTransform', 'textIndent', 'wordSpacing',
+    'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth']
+  var stValue = {
+    INPUT: Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value'),
+    TEXTAREA: Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')
+  }
+  var stRO = typeof ResizeObserver === 'function'
+    ? new ResizeObserver(function (es) { es.forEach(function (e) { if (e.target.__st) e.target.__st.layout() }) })
+    : null
+
+  function softType(el) {
+    if (el.__st || calm() || !stValue[el.tagName] || el.readOnly) return
+    var multi = el.tagName === 'TEXTAREA'
+    var mir = make('span', 'st-mir' + (multi ? ' is-multi' : ''))
+    mir.setAttribute('aria-hidden', 'true')
+    var txt = make('span', 'st-txt')
+    var car = make('span', 'st-car')
+    mir.appendChild(txt)
+    mir.appendChild(car)
+    el.insertAdjacentElement('afterend', mir)
+    el.classList.add('st-on')
+    var prev = ''
+    var off = false // автозаполнение браузера: пока оно не тронуто, показываем родной текст поля
+    var padL = 0, padT = 0, lineH = 20, carH = 18
+
+    function shown(v) { return el.type === 'password' ? v.replace(/[\s\S]/g, '•') : v }
+    function layout() {
+      if (!el.isConnected) return
+      var cs = getComputedStyle(el)
+      ST_COPY.forEach(function (k) { mir.style[k] = cs[k] })
+      mir.style.left = el.offsetLeft + 'px'
+      mir.style.top = el.offsetTop + 'px'
+      mir.style.width = el.offsetWidth + 'px'
+      mir.style.height = el.offsetHeight + 'px'
+      mir.style.justifyContent = cs.textAlign === 'center' ? 'center' : cs.textAlign === 'right' || cs.textAlign === 'end' ? 'flex-end' : 'flex-start'
+      padL = parseFloat(cs.paddingLeft) + parseFloat(cs.borderLeftWidth)
+      padT = parseFloat(cs.paddingTop) + parseFloat(cs.borderTopWidth)
+      var fs = parseFloat(cs.fontSize) || 16
+      lineH = parseFloat(cs.lineHeight) || fs * 1.25
+      carH = Math.round(fs * 1.2)
+      car.style.height = carH + 'px'
+      place()
+    }
+    function render(animate) {
+      if (off) return
+      var v = shown(el.value)
+      var n = Math.min(v.length, prev.length), a = 0, b = 0
+      while (a < n && v[a] === prev[a]) a++
+      while (b < n - a && v[v.length - 1 - b] === prev[prev.length - 1 - b]) b++
+      var kids = txt.childNodes
+      for (var i = prev.length - b - 1; i >= a; i--) if (kids[i]) txt.removeChild(kids[i])
+      var add = v.slice(a, v.length - b)
+      if (add) {
+        var frag = document.createDocumentFragment()
+        var anim = animate && add.length < 24 // вставку большого куска не анимируем
+        for (var j = 0; j < add.length; j++) {
+          var sp = document.createElement('span')
+          sp.textContent = add[j]
+          if (anim) sp.className = 'st-in'
+          frag.appendChild(sp)
+        }
+        txt.insertBefore(frag, kids[a] || null)
+      }
+      prev = v
+      place()
+    }
+    function place() {
+      txt.style.transform = el.scrollLeft || el.scrollTop ? 'translate(' + (-el.scrollLeft) + 'px,' + (-el.scrollTop) + 'px)' : ''
+      var pos = el.selectionStart, end = el.selectionEnd
+      var show = !off && document.activeElement === el && pos === end
+      mir.classList.toggle('is-caret', show)
+      if (!show) return
+      var kids = txt.childNodes, mr = mir.getBoundingClientRect(), x, y, r
+      if (pos > 0 && kids[pos - 1]) {
+        var rs = kids[pos - 1].getClientRects()
+        r = rs[rs.length - 1]
+        if (kids[pos - 1].textContent === '\n') { x = padL; y = r.bottom - mr.top + (lineH - carH) / 2 }
+        else { x = r.right - mr.left; y = r.top - mr.top + (r.height - carH) / 2 }
+      } else if (kids[0]) {
+        r = kids[0].getClientRects()[0]
+        x = r.left - mr.left; y = r.top - mr.top + (r.height - carH) / 2
+      } else {
+        x = padL
+        y = multi ? padT + (lineH - carH) / 2 : (mr.height - carH) / 2
+        if (mir.style.justifyContent === 'center') x = mr.width / 2
+      }
+      car.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)'
+      car.classList.remove('blink'); void car.offsetWidth; car.classList.add('blink')
+    }
+    function reset() { txt.textContent = ''; prev = ''; render(false) }
+    function setOff(v) {
+      off = v
+      el.classList.toggle('st-on', !v)
+      mir.hidden = v
+      if (!v) reset()
+    }
+
+    // Значение, выставленное кодом (очистка после отправки, подстановка после регистрации)
+    try {
+      var d = stValue[el.tagName]
+      Object.defineProperty(el, 'value', {
+        configurable: true,
+        get: function () { return d.get.call(el) },
+        set: function (v) { d.set.call(el, v); if (!off) render(false) }
+      })
+    } catch (e) {}
+    el.addEventListener('input', function () { if (off) setOff(false); else render(true) })
+    el.addEventListener('focus', function () { layout() })
+    el.addEventListener('blur', place)
+    ;['keydown', 'keyup', 'click', 'select', 'scroll', 'mouseup'].forEach(function (ev) {
+      el.addEventListener(ev, function () { requestAnimationFrame(place) })
+    })
+    el.addEventListener('animationstart', function (e) { if (e.animationName === 'st-autofill') setOff(true) })
+    new MutationObserver(function () { reset() }).observe(el, { attributes: true, attributeFilter: ['type'] })
+    if (stRO) stRO.observe(el)
+    el.__st = { layout: layout, place: place }
+    layout()
+    if (el.value) render(false)
+  }
+  document.addEventListener('selectionchange', function () {
+    var a = document.activeElement
+    if (a && a.__st) a.__st.place()
+  })
+  window.addEventListener('resize', function () { $$('.st-on', document).forEach(function (el) { if (el.__st) el.__st.layout() }) })
+
   /* ─────────────── 6. Сборка экранов ─────────────── */
 
   function decorateAuth(screen) {
@@ -386,6 +516,8 @@
     $$('.ctrl-btn', ctx).forEach(enhanceButton)
 
     $$('.auth-form-panel input, .lobby-card input, .vl-fld-host input', ctx).forEach(enhanceField)
+    $$(ST_SEL, ctx).forEach(softType)
+    if (ctx.matches && ctx.matches(ST_SEL)) softType(ctx)
     $$('.auth-error', ctx).forEach(watchErrorSlot)
 
     var auth = $('.auth-screen', document)

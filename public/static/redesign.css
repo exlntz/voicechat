@@ -1833,3 +1833,31 @@ html[data-theme] .vl-view--chat .vl-composer__attach { margin-top: 16px; margin-
 .g-sel { padding: 0 8px 0 20px; }
 .g-sel__btn.is-soft { background: transparent; color: var(--g-sub); }
 .g-sel__btn.is-soft:hover { background: var(--g-field); color: var(--g-ink); }
+
+/* Сообщения на входе и регистрации — строкой под полем (вариант A из канваса): мелкий приглушённый
+   текст без подложки и значков, плавно выезжает из-под поля */
+html[data-theme] .auth-form-panel .auth-error[style*="display: block"] { display: block !important; margin: -6px 0 0; padding: 0; background: none; animation: none; }
+html[data-theme] .auth-form-panel .auth-msg { min-height: 0; padding: 0 20px; border-radius: 0; background: none; font-size: 13px; font-weight: 500; line-height: 18px; color: #c98d8d; animation: auth-line-in .35s cubic-bezier(.22, 1, .36, 1) both; }
+html[data-theme] .auth-form-panel .auth-msg::before { display: none; }
+html[data-theme] .auth-form-panel .auth-error.success .auth-msg { background: none; color: #8fbf9f; }
+html[data-theme="light"] .auth-form-panel .auth-msg { color: #b4534a; }
+html[data-theme="light"] .auth-form-panel .auth-error.success .auth-msg { color: #3f8a5a; }
+@keyframes auth-line-in { from { opacity: 0; transform: translateY(-4px); } }
+
+/* Мягкий набор (anker.js): текст и курсор поля прозрачные, их рисует «зеркало» поверх */
+.st-on { color: transparent !important; -webkit-text-fill-color: transparent !important; caret-color: transparent !important; }
+.st-on::placeholder { -webkit-text-fill-color: currentcolor; }
+.st-on::selection { color: transparent; -webkit-text-fill-color: transparent; background: rgba(120, 160, 230, .35); }
+.st-mir { position: absolute; z-index: 1; box-sizing: border-box; display: flex; align-items: center; overflow: hidden; white-space: pre; pointer-events: none; border-style: solid; border-color: transparent; background: none; color: var(--g-ink, var(--text)); margin: 0; }
+.st-mir[hidden] { display: none; }
+.st-mir.is-multi { display: block; white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; }
+.st-txt { display: inline-block; white-space: inherit; }
+.st-mir.is-multi .st-txt { display: block; }
+.st-in { animation: st-in .08s ease-out both; }
+@keyframes st-in { from { opacity: 0; } }
+.st-car { position: absolute; left: 0; top: 0; width: 2px; border-radius: 1px; background: currentColor; opacity: 0; transition: transform .07s cubic-bezier(.22, 1, .36, 1); }
+.st-mir.is-caret .st-car { opacity: 1; }
+.st-mir.is-caret .st-car.blink { animation: st-blink 1.05s steps(1) .5s infinite; }
+@keyframes st-blink { 50% { opacity: 0; } }
+input:-webkit-autofill { animation: st-autofill 1ms; }
+@keyframes st-autofill { from { opacity: 1; } to { opacity: 1; } }

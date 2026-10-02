@@ -819,6 +819,11 @@ function renderAuthScreen(afterLoginRoomCode = '') {
     slot.__errInputs = inputs
     slot.classList.toggle('success', type === 'success')
     slot.replaceChildren(...list.map((m) => el('div', { class: 'auth-msg' }, m)))
+    // Сообщение — тихой строкой прямо под полем, к которому относится (без поля — под паролем)
+    const panel = slot.closest('.auth-form-panel')
+    const target = (inputs && inputs[0]) || (panel && panel.querySelector('input[type="password"]'))
+    const box = target && (target.closest('.password-field') || target.closest('.fld') || target)
+    if (box && box.parentNode && box.nextSibling !== slot) box.after(slot)
     slot.style.display = 'block'
   }
 
