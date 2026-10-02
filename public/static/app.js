@@ -870,7 +870,7 @@ function renderAuthScreen(afterLoginRoomCode = '') {
         setMode('login')
         loginUsername.value = username
         loginPassword.value = password
-        showMessage(loginErrorSlot, 'Аккаунт создан! Проверьте данные и нажмите «Войти»', 'success')
+        showMessage(loginErrorSlot, 'Аккаунт создан — нажмите «Войти»', 'success')
         showToast('Регистрация завершена', 'success')
         loginSubmit.focus()
         return
