@@ -495,9 +495,11 @@ export function closeMenu() {
   m.style.pointerEvents = 'none'
   setTimeout(() => m.remove(), 180)
 }
-// items: [{label, icon, danger, onClick}] | 'sep'
-export function showMenu(items, anchor) {
+// items: [{label, icon, danger, onClick}] | 'sep'; opts.onEsc — вызывается, если меню закрыли клавишей Esc
+let menuOnEsc = null
+export function showMenu(items, anchor, opts = {}) {
   closeMenu()
+  menuOnEsc = opts.onEsc || null
   const menu = h('div', { class: 'vl-menu', role: 'menu' })
   for (const item of items) {
     if (!item) continue
@@ -530,7 +532,13 @@ export function showMenu(items, anchor) {
 }
 document.addEventListener('mousedown', (e) => { if (openMenu && !openMenu.contains(e.target)) closeMenu() }, true)
 // Esc при открытом меню закрывает только меню: событие помечаем, чтобы чат не закрылся следом
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openMenu) { e.preventDefault(); e.stopPropagation(); closeMenu() } }, true)
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || !openMenu) return
+  e.preventDefault(); e.stopPropagation()
+  const cb = menuOnEsc
+  closeMenu()
+  if (cb) cb()
+}, true)
 window.addEventListener('blur', closeMenu)
 window.addEventListener('resize', closeMenu)
 
