@@ -1523,3 +1523,14 @@ html[data-theme] .room-screen .tile .g-tt.g-tt--fs:active { transform: scale(.92
 /* Участники: «Выгнать» видна сразу (не только при наведении); в своей строке — место той же ширины */
 .g-prow__kick { opacity: 1; }
 .g-prow__slot { width: 36px; height: 36px; flex-shrink: 0; }
+
+/* Громкость как в Пункте управления: зажали — капсула с пружиной набухает, шкала толстеет,
+   громкость сразу переходит под курсор и дальше идёт за ним; за краем — резинка (app.js) */
+.g-vol { transform-origin: 100% 50%; transition: transform .7s var(--g-spring), scale .5s var(--g-spring); }
+.room-screen .tile .g-vol[data-drag="1"] { z-index: 5; }
+.g-vol[data-drag="1"], html[data-theme] .room-screen .tile .g-vol.g-vol[data-drag="1"] { scale: 1.07; }
+.g-vol[data-drag="1"] .g-vol__tr { height: 14px; }
+.g-vol__spk { transition: scale .5s var(--g-spring); }
+.g-vol[data-drag="1"] .g-vol__spk { scale: 1.1; }
+.g-vol .g-vol__spk.is-bump { scale: 1.28; transition: scale .12s ease-out; }
+.g-vol[data-drag="1"][data-jump="1"] .g-vol__fl { transition: width .45s var(--g-spring); }
