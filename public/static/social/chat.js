@@ -920,6 +920,18 @@ export function createChatView({ convId, navigate, menuButton }) {
   })
 
   function messageMenu(m, e) {
+    // ПКМ по одному из выделенных — действия сразу для всех выделенных
+    if (selecting && selected.has(String(m.id)) && selected.size > 1) {
+      const n = selected.size
+      showMenu([
+        selFwd.hidden ? null : { label: `Переслать (${n})`, icon: 'share', onClick: () => selFwd.click() },
+        selCopy.hidden ? null : { label: 'Копировать текст', icon: 'copy', onClick: () => selCopy.click() },
+        { label: 'Отменить выбор', icon: 'xmark', onClick: () => stopSelect() },
+        'sep',
+        { label: `Удалить (${n})`, icon: 'trash', danger: true, onClick: () => selDel.click() }
+      ], e, { onEsc: () => {} })
+      return
+    }
     const mine = m.authorId === me.id
     const pinned = isPinned(m.id)
     showMenu([
@@ -973,7 +985,7 @@ export function createChatView({ convId, navigate, menuButton }) {
   // Аватар слева от сообщения, как в канвасе: виден у последнего в серии, у остальных — прозрачный
   function msgAvatar(authorId, shown) {
     const mine = authorId === me.id
-    const a = avatar(mine ? me : (userById(authorId) || (authorId === peer.id ? peer : { id: authorId, username: '' })), { size: 36, saved: saved && !mine })
+    const a = avatar(mine ? me : (userById(authorId) || (authorId === peer.id ? peer : { id: authorId, username: '' })), { size: 34, saved: saved && !mine })
     a.classList.add('g-mava', mine ? 'is-me' : 'is-peer')
     if (shown) a.classList.add('is-shown')
     return a

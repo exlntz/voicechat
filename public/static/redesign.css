@@ -1758,9 +1758,10 @@ html[data-theme] .vl-picker .vl-picker__row.is-first { background: transparent; 
 html[data-theme] .vl-picker .vl-picker__row:hover { background: var(--g-field); }
 html[data-theme] .vl-picker .vl-picker__row:active { transform: scale(.98); transition-duration: .1s; }
 
-/* Отступ в серии сообщений — ровно 2px у всех (текст, голосовые, фото): место под аватарку
-   (36px) больше не раздувает строку, поэтому у текста (пузырь 35px) зазор был на ~1px больше */
-.vl-view--chat .vl-msg .g-mava { margin-top: -12px; }
+/* Аватарка в ленте — 34px, ровно в высоту однострочного пузыря: строка не раздувается
+   (зазор в серии ровно 2px), и аватарку не нужно сдвигать вверх — раньше сдвиг на -12px
+   обрезался сверху (у строк content-visibility: auto, всё за их пределами не рисуется) */
+.vl-view--chat .vl-msg .g-mava.vl-avatar { --size: 34px !important; width: 34px; height: 34px; font-size: 13px; }
 /* Пока протягиваем выделение — текст не выделяется */
 .vl-view--chat.is-dragsel, .vl-view--chat.is-dragsel * { user-select: none !important; -webkit-user-select: none !important; }
 
