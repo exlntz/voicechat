@@ -228,9 +228,12 @@
         return
       }
       var ok = slot.classList.contains('success')
+      // app.js может назвать поля с ошибкой (slot.__errInputs) — подсвечиваем только их
+      var only = !ok && slot.__errInputs && slot.__errInputs.length ? slot.__errInputs : null
       if (panel) {
         $$('.fld', panel).forEach(function (f) {
-          f.classList.toggle('is-err', !ok)
+          var hit = only ? only.some(function (i) { return f.contains(i) }) : true
+          f.classList.toggle('is-err', !ok && hit)
           f.classList.toggle('is-ok', ok)
         })
       }

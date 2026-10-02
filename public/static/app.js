@@ -704,8 +704,7 @@ function renderAuthScreen(afterLoginRoomCode = '') {
 
   // ---- Форма входа ----
   const loginErrorSlot = el('div', { class: 'auth-error', style: 'display:none' })
-  const loginUsername = el('input', { type: 'text', placeholder: 'Юзернейм', maxlength: '25', autocomplete: 'username' })
-  atPrefixField(loginUsername)
+  const loginUsername = el('input', { type: 'text', placeholder: 'Юзернейм', maxlength: '25', autocomplete: 'username', autocapitalize: 'off', spellcheck: 'false' })
   const { wrapper: loginPasswordField, input: loginPassword } = makePasswordField('Пароль', '100', 'current-password')
   const loginSubmit = el('button', { type: 'button', class: 'auth-submit-btn' }, 'Войти')
 
@@ -729,8 +728,7 @@ function renderAuthScreen(afterLoginRoomCode = '') {
   // для добавления в друзья), поэтому строго ограничен латиницей/цифрами/_/- .
   const registerErrorSlot = el('div', { class: 'auth-error', style: 'display:none' })
   const registerDisplayName = el('input', { type: 'text', placeholder: 'Имя', maxlength: '40', autocomplete: 'name' })
-  const registerUsername = el('input', { type: 'text', placeholder: 'Юзернейм', maxlength: '25', autocomplete: 'username' })
-  atPrefixField(registerUsername)
+  const registerUsername = el('input', { type: 'text', placeholder: 'Юзернейм', maxlength: '24', autocomplete: 'username', autocapitalize: 'off', spellcheck: 'false' })
   const { wrapper: registerPasswordField, input: registerPassword } = makePasswordField('Пароль', '100', 'new-password')
   const registerSubmit = el('button', { type: 'button', class: 'auth-submit-btn' }, 'Создать аккаунт')
 
@@ -779,8 +777,7 @@ function renderAuthScreen(afterLoginRoomCode = '') {
   container.appendChild(loginPanel)
   container.appendChild(registerPanel)
   container.appendChild(overlayContainer)
-  // Карточка — с бегущим по рамке лучом; по форме за курсором идёт мягкая подсветка
-  container.classList.add('auth-beam')
+  // По форме за курсором идёт мягкая подсветка
   ;[loginPanel, registerPanel].forEach((panel) => panel.addEventListener('pointermove', (e) => {
     if (e.pointerType !== 'mouse') return
     const r = panel.getBoundingClientRect()
@@ -823,10 +820,34 @@ function renderAuthScreen(afterLoginRoomCode = '') {
   mobileToLogin.addEventListener('click', () => setMode('login'))
 
   // type: 'error' (красный, по умолчанию) | 'success' (зелёный, для сообщения после регистрации)
-  function showMessage(slot, message, type = 'error') {
-    slot.style.display = 'block'
-    slot.textContent = message
+  // Сообщения над формой: каждая ошибка — отдельной плашкой; inputs — какие поля подсветить
+  function showMessage(slot, message, type = 'error', inputs = null) {
+    const list = Array.isArray(message) ? message : [message]
+    slot.__errInputs = inputs
     slot.classList.toggle('success', type === 'success')
+    slot.replaceChildren(...list.map((m) => el('div', { class: 'auth-msg' }, m)))
+    slot.style.display = 'block'
+  }
+
+  // Проверка до отправки — те же правила, что на сервере, но по пунктам: на каждое поле одна
+  // ошибка (первая нарушенная), каждая — отдельной короткой строкой
+  function validate(kind, usernameInput, passwordInput, displayNameInput) {
+    const errs = []
+    const bad = []
+    const add = (msg, input) => { if (msg) { errs.push(msg); bad.push(input) } }
+    const u = usernameInput.value.trim().replace(/^@+/, '')
+    const pw = passwordInput.value
+    if (displayNameInput) {
+      const n = displayNameInput.value.trim()
+      add(!n ? 'Введите имя' : !/^[\p{L}\p{N}_\- ]{1,40}$/u.test(n) ? 'Имя: только буквы, цифры, пробел, _ и -' : '', displayNameInput)
+    }
+    add(!u ? 'Введите юзернейм'
+      : kind !== 'register' ? ''
+      : !/^[A-Za-z]/.test(u) ? 'Начните юзернейм с английской буквы'
+      : /[^A-Za-z0-9_-]/.test(u) ? 'Юзернейм: только a–z, цифры, _ и -'
+      : u.length < 3 ? 'Юзернейм — минимум 3 символа' : '', usernameInput)
+    add(!pw ? 'Введите пароль' : kind === 'register' && pw.length < 6 ? 'Пароль — минимум 6 символов' : '', passwordInput)
+    return { errs, bad }
   }
 
   async function submit(kind, usernameInput, passwordInput, errorSlot, submitBtn, defaultLabel, loadingLabel, displayNameInput) {
@@ -835,6 +856,9 @@ function renderAuthScreen(afterLoginRoomCode = '') {
     const username = usernameInput.value.trim()
     const password = passwordInput.value
     const displayName = displayNameInput ? displayNameInput.value.trim() : undefined
+
+    const check = validate(kind, usernameInput, passwordInput, displayNameInput)
+    if (check.errs.length) { showMessage(errorSlot, check.errs, 'error', check.bad); return }
 
     errorSlot.style.display = 'none'
     errorSlot.classList.remove('success')
@@ -852,7 +876,7 @@ function renderAuthScreen(afterLoginRoomCode = '') {
         body: JSON.stringify(payload)
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.message || 'Ошибка авторизации')
+      if (!res.ok) { const err = new Error(data.message || 'Ошибка авторизации'); err.code = data.error; throw err }
 
       submitBtn.disabled = false
       submitBtn.textContent = defaultLabel
@@ -880,7 +904,9 @@ function renderAuthScreen(afterLoginRoomCode = '') {
       if (typeof VL.onLogin === 'function') VL.onLogin(data.user, afterLoginRoomCode)
       else renderLobby(afterLoginRoomCode)
     } catch (e) {
-      showMessage(errorSlot, e.message || 'Ошибка авторизации', 'error')
+      // Подсвечиваем только поле, к которому относится ошибка сервера
+      const field = { username_taken: usernameInput, invalid_username: usernameInput, invalid_password: passwordInput, invalid_display_name: displayNameInput }[e.code]
+      showMessage(errorSlot, e.message || 'Ошибка авторизации', 'error', field ? [field] : null)
       submitBtn.disabled = false
       submitBtn.textContent = defaultLabel
     }
