@@ -1928,27 +1928,49 @@ async function enterRoom(joinData, opts = {}) {
     }
     wrap._set = paint
     paint(initial)
+    // Резина за краем как в Пункте управления: капсула тянется к курсору от противоположного края
+    // и чуть сплющивается; упёрлись в край — динамик коротко подпрыгивает
+    let atEdge = false
     function setFromX(x) {
       const r = track.getBoundingClientRect()
       const k = (x - r.left) / r.width
-      // За краем — капсула тянется (резина), значение упирается в край
       const over = k < 0 ? k * r.width : k > 1 ? (k - 1) * r.width : 0
-      wrap.style.transform = over ? `translateX(${Math.sign(over) * Math.min(14, Math.sqrt(Math.abs(over)) * 2)}px) scaleX(${1 + Math.min(0.06, Math.abs(over) / 900)})` : ''
+      if (over) {
+        // Точка опоры — правый край (как и у набухания); при растяжке вправо капсула
+        // сдвигается так, что левый край стоит на месте
+        const w = wrap.offsetWidth || 1
+        const d = Math.min(22, Math.sqrt(Math.abs(over)) * 2.4)
+        const sx = 1 + d / w * 1.6
+        const tx = over > 0 ? w * (sx - 1) + d * 0.35 : -d * 0.35
+        wrap.style.transform = `translateX(${tx.toFixed(2)}px) scale(${sx.toFixed(4)}, ${(1 - Math.min(0.16, d / 140)).toFixed(4)})`
+      } else wrap.style.transform = ''
+      const edge = k <= 0 || k >= 1
+      if (edge && !atEdge && dragging) { spk.classList.remove('is-bump'); void spk.getBoundingClientRect(); spk.classList.add('is-bump'); setTimeout(() => spk.classList.remove('is-bump'), 130) }
+      atEdge = edge
       paint(Math.max(0, Math.min(1, k)) * VOL_MAX)
       if (value > 0) beforeMute = value
       onChange(value)
     }
     let dragging = false
+    let downX = 0
     wrap.addEventListener('pointerdown', (e) => {
       if (e.target.closest('.g-vol__btn')) return
       e.stopPropagation()
       dragging = true
+      downX = e.clientX
       wrap.dataset.drag = '1'
+      // Нажатие сразу переносит громкость под курсор — шкала доезжает с пружиной, дальше идёт за курсором
+      wrap.dataset.jump = '1'
       try { wrap.setPointerCapture(e.pointerId) } catch {}
+      atEdge = true
       setFromX(e.clientX)
     })
-    wrap.addEventListener('pointermove', (e) => { if (dragging) setFromX(e.clientX) })
-    const end = () => { if (!dragging) return; dragging = false; wrap.dataset.drag = '0'; wrap.style.transform = '' }
+    wrap.addEventListener('pointermove', (e) => {
+      if (!dragging) return
+      if (wrap.dataset.jump === '1' && Math.abs(e.clientX - downX) > 3) wrap.dataset.jump = '0'
+      setFromX(e.clientX)
+    })
+    const end = () => { if (!dragging) return; dragging = false; wrap.dataset.drag = '0'; wrap.dataset.jump = '0'; wrap.style.transform = '' }
     wrap.addEventListener('pointerup', end)
     wrap.addEventListener('pointercancel', end)
     wrap.addEventListener('wheel', (e) => { e.preventDefault(); paint(value - Math.sign(e.deltaY) * 0.1); if (value > 0) beforeMute = value; onChange(value) }, { passive: false })
