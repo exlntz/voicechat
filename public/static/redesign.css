@@ -1862,3 +1862,35 @@ html[data-theme="light"] .auth-form-panel .auth-error.success .auth-msg { color:
 @keyframes st-blink { 50% { opacity: 0; } }
 input:-webkit-autofill { animation: st-autofill 1ms; }
 @keyframes st-autofill { from { opacity: 1; } to { opacity: 1; } }
+
+/* ─────────── Демонстрация + камера одновременно ───────────
+   Камера — окошко в правом верхнем углу демонстрации; клик по окошку меняет их местами
+   (экран уезжает в угол, камера разворачивается) — плавно, с пружиной */
+.room-screen .tile.screen-tile.has-pip { position: relative; overflow: hidden; isolation: isolate; }
+.room-screen .tile.screen-tile.has-pip > video,
+.room-screen .tile.screen-tile.has-pip > .tile.tile--pip {
+  position: absolute; margin: 0; box-sizing: border-box;
+  transition: left .55s var(--g-spring), top .55s var(--g-spring), width .55s var(--g-spring), height .55s var(--g-spring), border-radius .4s ease, box-shadow .3s;
+}
+/* большое место */
+.room-screen .tile.screen-tile.has-pip > video,
+.room-screen .tile.screen-tile.has-pip.is-swapped > .tile.tile--pip { left: 0; top: 0; width: 100%; height: 100%; border-radius: inherit; box-shadow: none; z-index: 1; }
+/* окошко в углу */
+.room-screen .tile.screen-tile.has-pip > .tile.tile--pip,
+.room-screen .tile.screen-tile.has-pip.is-swapped > video {
+  left: calc(100% - 26% - 14px); top: 14px; width: 26%; height: 26%; min-width: 120px; min-height: 68px;
+  border-radius: 16px; z-index: 4; cursor: pointer; overflow: hidden;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .08), 0 12px 30px -10px rgba(0, 0, 0, .7);
+}
+.room-screen .tile.screen-tile.has-pip > .tile.tile--pip:hover,
+.room-screen .tile.screen-tile.has-pip.is-swapped > video:hover { box-shadow: 0 0 0 2px rgba(255, 255, 255, .2), 0 14px 34px -10px rgba(0, 0, 0, .8); }
+.room-screen .tile.screen-tile.has-pip.is-swapped > video { object-fit: contain; background: #0d0c0d; }
+.room-screen .tile.screen-tile.has-pip.is-swapped > .tile.tile--pip { cursor: default; }
+/* В окошке камеры — только картинка: подпись, кнопки и громкость остаются у демонстрации */
+.room-screen .tile.tile--pip { aspect-ratio: auto !important; border: 0; animation: g-pip-in .5s var(--g-spring) both; }
+.room-screen .tile.tile--pip > :not(video) { display: none !important; }
+.room-screen .tile.tile--pip > video { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.room-screen .tile.tile--pip.speaking { box-shadow: 0 0 0 2.5px #22c55e, 0 12px 30px -10px rgba(0, 0, 0, .7); }
+@keyframes g-pip-in { from { opacity: 0; scale: .7; } }
+/* Подписи и кнопки демонстрации — поверх обоих видео */
+.room-screen .tile.screen-tile.has-pip > :not(video):not(.tile--pip) { z-index: 5; }

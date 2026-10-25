@@ -1548,8 +1548,9 @@ async function enterRoom(joinData, opts = {}) {
     // при попытке выставить больше 1 - из-за этого слайдер "залипал"/не реагировал на верхних значениях.
     // GainNode такого ограничения не имеет и позволяет усиливать сигнал выше 100% без ошибок.
     webAudioMix: true,
+    // Камера: просим до 1080p/30 (если вебка умеет меньше — браузер отдаст её максимум)
     videoCaptureDefaults: {
-      resolution: LK.VideoPresets.h720.resolution,
+      resolution: LK.VideoPresets.h1080.resolution,
       ...(state.selectedCamId ? { deviceId: state.selectedCamId } : {})
     },
     audioCaptureDefaults: {
@@ -1559,9 +1560,14 @@ async function enterRoom(joinData, opts = {}) {
       ...(state.selectedMicId ? { deviceId: state.selectedMicId } : {})
     },
     ...(state.selectedSpeakerId ? { audioOutput: { deviceId: state.selectedSpeakerId } } : {}),
+    // Главный слой камеры — до 3.5 Мбит/с (было ~1.7 у пресета 720p), запасные слои 360p и 720p
+    // вместо 180p/360p: на плохой сети картинка проседает не до «мыла», а до 720p. Демонстрацию
+    // это не трогает — у неё свои параметры (screenShareEncoding, media-quality.js)
     publishDefaults: {
       simulcast: true,
-      videoSimulcastLayers: [LK.VideoPresets.h180, LK.VideoPresets.h360]
+      videoEncoding: { maxBitrate: 3500000, maxFramerate: 30, priority: 'high' },
+      videoSimulcastLayers: [LK.VideoPresets.h360, LK.VideoPresets.h720],
+      degradationPreference: 'balanced'
     }
   })
   state.room = room
@@ -1776,6 +1782,11 @@ async function enterRoom(joinData, opts = {}) {
   // ---- Инкрементальная расстановка узлов в контейнере ----
   // Переставляет только то, что реально изменилось: узлы, которых быть не должно, убираются,
   // остальные двигаются в нужный порядок. Если изменений нет - DOM не трогается вообще.
+  // Камера участника сейчас показывает видео (а не аватарку)
+  function cameraShown(t) { return !!(t && t.video && t.video.srcObject && t.placeholder.style.display === 'none') }
+  let relayoutRaf = 0
+  function scheduleRelayout() { if (!relayoutRaf) relayoutRaf = requestAnimationFrame(() => { relayoutRaf = 0; relayout() }) }
+
   function placeTiles(container, nodes) {
     for (const child of Array.from(container.children)) {
       if (!nodes.includes(child)) child.remove()
@@ -1826,10 +1837,25 @@ async function enterRoom(joinData, opts = {}) {
       screensBy.get(who).push(t.tile)
     })
     const gridTiles = []
+    // Если у участника одновременно демонстрация и камера — камера маленьким окошком в углу его
+    // демонстрации (клик по окошку меняет их местами)
+    const pipTiles = new Set()
+    screenTilesMap.forEach((s) => s.tile.classList.remove('has-pip'))
     cameraTilesMap.forEach((t, identity) => {
       const own = screensBy.get(identity)
-      if (own) { gridTiles.push(...own); screensBy.delete(identity) } else gridTiles.push(t.tile)
+      if (own) {
+        gridTiles.push(...own); screensBy.delete(identity)
+        if (cameraShown(t)) {
+          const host = own[0]
+          host.classList.add('has-pip')
+          t.tile.classList.add('tile--pip')
+          if (t.tile.parentNode !== host) { host.appendChild(t.tile); t.video.play().catch(() => {}) }
+          pipTiles.add(t.tile)
+        }
+      } else gridTiles.push(t.tile)
+      if (!pipTiles.has(t.tile)) t.tile.classList.remove('tile--pip')
     })
+    screenTilesMap.forEach((s) => { if (!s.tile.classList.contains('has-pip')) s.tile.classList.remove('is-swapped') })
     screensBy.forEach((tiles) => gridTiles.push(...tiles)) // демонстрация без плитки камеры (на всякий случай)
     const cameraTiles = gridTiles
     const hasScreenShares = false
@@ -1857,7 +1883,7 @@ async function enterRoom(joinData, opts = {}) {
     for (let n = 1; n <= 5; n++) stage.classList.toggle(`cam-count-${n}`, camCount === n)
 
     // Плитки камер, уступившие место демонстрации, — вне сцены (звук идёт отдельными <audio>)
-    cameraTilesMap.forEach((t) => { if (!gridTiles.includes(t.tile) && t.tile.parentNode) t.tile.remove() })
+    cameraTilesMap.forEach((t) => { if (!gridTiles.includes(t.tile) && !pipTiles.has(t.tile) && t.tile.parentNode) t.tile.remove() })
     if (isSpotlight) {
       const mainId = pickSpotlight()
       const localId = room.localParticipant.identity
@@ -2084,7 +2110,16 @@ async function enterRoom(joinData, opts = {}) {
     tile.appendChild(fsBtn)
     const tools = el('div', { class: 'g-ttools' })
     tile.appendChild(tools)
-    tile.addEventListener('dblclick', () => toggleTileFullscreen(tile))
+    tile.addEventListener('dblclick', () => { if (!tile.classList.contains('tile--pip')) toggleTileFullscreen(tile) })
+    // Окошко камеры в углу демонстрации: клик — поменять местами с экраном
+    tile.addEventListener('click', (e) => {
+      if (!tile.classList.contains('tile--pip')) return
+      e.stopPropagation()
+      const host = tile.parentElement
+      if (host) host.classList.toggle('is-swapped')
+    })
+    // Камеру включили/выключили во время демонстрации — пересобрать раскладку (окошко появится/уйдёт)
+    new MutationObserver(() => { if (state.screenShares.size) scheduleRelayout() }).observe(placeholder, { attributes: true, attributeFilter: ['style'] })
 
     let volumeCtl = null
     let kickBtn = null
