@@ -2086,6 +2086,8 @@ async function enterRoom(joinData, opts = {}) {
     const tile = el('div', { class: `tile camera-tile${isLocal ? ' is-local' : ''}`, id: `tile-cam-${identity}` })
     const video = el('video', { autoplay: true, playsinline: true, 'webkit-playsinline': 'true', ...(isLocal ? { muted: true } : {}) })
     if (isLocal) watchLocalMirror(video) // передняя — зеркально, задняя — как есть
+    // Своё превью браузер не выносит в окно «картинка в картинке»: там оно было бы без зеркала
+    if (isLocal) video.disablePictureInPicture = true
     const placeholder = el('div', { class: 'no-video-placeholder' }, [avatarCircle(name, isLocal ? myAvatarUrl() : participantAvatarUrl(identity))])
     const micIcon = el('span', { class: 'g-tile-muted', style: 'display:none' }, [gIcon('micOff', 16)])
     // По умолчанию считаем камеру выключенной (большинство участников входят с выключенной камерой),
@@ -3637,6 +3639,13 @@ async function enterRoom(joinData, opts = {}) {
   // страхует от накопления тайлов-призраков в длительных звонках.
   screenTilesReconcileInterval = setInterval(() => { try { reconcileScreenTiles() } catch {} }, 15000)
 
+  // Автоматическое «картинка в картинке» при уходе со вкладки: Chrome сам выносил видео своей
+  // камеры в окошко — без нашего зеркала, и оно было отражено наоборот. Теперь вместо голого видео
+  // открывается наше окно звонка (там зеркало и весь интерфейс как на сайте)
+  if (canPipWindow) {
+    try { navigator.mediaSession.setActionHandler('enterpictureinpicture', () => { openCallPip() }) } catch {}
+  }
+
   function cleanupAndGoLobby() {
     // room.disconnect() ниже сам вызывает RoomEvent.Disconnected, который снова ведёт сюда
     if (callCleanedUp) return
@@ -3646,6 +3655,7 @@ async function enterRoom(joinData, opts = {}) {
     clearInterval(screenTilesReconcileInterval)
     clearTimeout(callTimerId)
     stopConnStats()
+    try { navigator.mediaSession.setActionHandler('enterpictureinpicture', null) } catch {}
     closeCallPip()
     if (miniWindow) setMiniWindow(false)
     setCallActive(false)
