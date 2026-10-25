@@ -2112,13 +2112,14 @@ async function enterRoom(joinData, opts = {}) {
     tile.appendChild(fsBtn)
     const tools = el('div', { class: 'g-ttools' })
     tile.appendChild(tools)
-    tile.addEventListener('dblclick', () => { if (!tile.classList.contains('tile--pip')) toggleTileFullscreen(tile) })
+    tile.addEventListener('dblclick', (e) => { if (tile.classList.contains('tile--pip')) e.stopPropagation(); else toggleTileFullscreen(tile) })
     // Окошко камеры в углу демонстрации: клик — поменять местами с экраном
     tile.addEventListener('click', (e) => {
-      if (!tile.classList.contains('tile--pip')) return
-      e.stopPropagation()
+      // Меняемся только кликом по окошку: когда камера большая, окошко — это экран (обработчик в makeScreenTile)
       const host = tile.parentElement
-      if (host) host.classList.toggle('is-swapped')
+      if (!tile.classList.contains('tile--pip') || !host || host.classList.contains('is-swapped')) return
+      e.stopPropagation()
+      host.classList.add('is-swapped')
     })
     // Камеру включили/выключили во время демонстрации — пересобрать раскладку (окошко появится/уйдёт)
     new MutationObserver(() => { if (state.screenShares.size) scheduleRelayout() }).observe(placeholder, { attributes: true, attributeFilter: ['style'] })
@@ -2325,6 +2326,13 @@ async function enterRoom(joinData, opts = {}) {
       tile.appendChild(volumeCtl)
     }
     tile.addEventListener('dblclick', () => toggleTileFullscreen(tile))
+    // Камера развёрнута, экран в окошке — клик по окошку возвращает экран на место
+    video.addEventListener('click', (e) => {
+      if (!tile.classList.contains('is-swapped')) return
+      e.stopPropagation()
+      tile.classList.remove('is-swapped')
+    })
+    video.addEventListener('dblclick', (e) => { if (tile.classList.contains('is-swapped')) e.stopPropagation() })
     // Кастомное контекстное меню (ПКМ) вместо стандартного браузерного.
     // Для своей демонстрации - действия над стримом (стоп/смена источника/звук/отдельное окно).
     // Для чужой демонстрации - просмотровые опции (отдельное окно + громкости).
