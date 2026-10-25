@@ -1866,7 +1866,8 @@ input:-webkit-autofill { animation: st-autofill 1ms; }
 /* ─────────── Демонстрация + камера одновременно ───────────
    Камера — окошко в правом верхнем углу демонстрации; клик по окошку меняет их местами
    (экран уезжает в угол, камера разворачивается) — плавно, с пружиной */
-.room-screen .tile.screen-tile.has-pip { position: relative; overflow: hidden; isolation: isolate; }
+.room-screen .tile.screen-tile.has-pip { overflow: hidden; isolation: isolate; }
+.room-screen .tile.screen-tile.has-pip:not(.in-app-fullscreen) { position: relative; }
 .room-screen .tile.screen-tile.has-pip > video,
 .room-screen .tile.screen-tile.has-pip > .tile.tile--pip {
   position: absolute; margin: 0; box-sizing: border-box;
@@ -1886,8 +1887,11 @@ input:-webkit-autofill { animation: st-autofill 1ms; }
 .room-screen .tile.screen-tile.has-pip.is-swapped > video:hover { box-shadow: 0 0 0 2px rgba(255, 255, 255, .2), 0 14px 34px -10px rgba(0, 0, 0, .8); }
 .room-screen .tile.screen-tile.has-pip.is-swapped > video { object-fit: contain; background: #0d0c0d; }
 .room-screen .tile.screen-tile.has-pip.is-swapped > .tile.tile--pip { cursor: default; }
+.room-screen .tile.screen-tile.has-pip.is-swapped > .tile.tile--pip > video { object-fit: contain; background: #0d0c0d; }
 /* В окошке камеры — только картинка: подпись, кнопки и громкость остаются у демонстрации */
-.room-screen .tile.tile--pip { aspect-ratio: auto !important; border: 0; animation: g-pip-in .5s var(--g-spring) both; }
+/* у плиток камеры потолок ширины 760px — внутри демонстрации он не нужен (иначе на весь экран камера
+   занимала только левую часть, справа — чёрная полоса) */
+.room-screen .tile.tile--pip { aspect-ratio: auto !important; max-width: none !important; max-height: none !important; flex: none !important; border: 0; animation: g-pip-in .5s var(--g-spring) both; }
 .room-screen .tile.tile--pip > :not(video) { display: none !important; }
 .room-screen .tile.tile--pip > video { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .room-screen .tile.tile--pip.speaking { box-shadow: 0 0 0 2.5px #22c55e, 0 12px 30px -10px rgba(0, 0, 0, .7); }
