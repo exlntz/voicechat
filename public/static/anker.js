@@ -597,7 +597,7 @@
     // Быстрый клик: круг сначала почти дорастает, потом мягко тает — без вспышки
     var left = Math.max(0, RIP_GROW * 0.7 - (performance.now() - st.t0))
     var fade = st.dot.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 560, delay: left, easing: 'cubic-bezier(.33, 0, .2, 1)', fill: 'forwards' })
-    fade.onfinish = function () { if (st.wrap.parentNode) st.wrap.parentNode.removeChild(st.wrap) }
+    fade.onfinish = function () { st.wrap.__gone = true; if (st.wrap.parentNode) st.wrap.parentNode.removeChild(st.wrap) }
   }
   if (!ripReduce && typeof Element.prototype.animate === 'function') {
     document.addEventListener('pointerdown', function (e) {
@@ -623,6 +623,14 @@
       dot.style.cssText = 'left:' + (x - rad).toFixed(1) + 'px;top:' + (y - rad).toFixed(1) + 'px;width:' + rad * 2 + 'px;height:' + rad * 2 + 'px'
       wrap.appendChild(dot)
       el.appendChild(wrap)
+      // Строка чата при выборе пересобирает своё содержимое — возвращаем слой на место,
+      // чтобы круг дорос и растаял, как в Telegram, а не пропал вместе со старыми детьми
+      ;(function keep() {
+        if (!wrap.__gone) {
+          if (wrap.parentNode !== el && el.isConnected) el.appendChild(wrap)
+          requestAnimationFrame(keep)
+        }
+      })()
       dot.animate([{ transform: 'scale(.04)', opacity: 0 }, { opacity: 1, offset: 0.15 }, { transform: 'scale(1)', opacity: 1 }], { duration: RIP_GROW, easing: 'cubic-bezier(.22, .61, .36, 1)', fill: 'forwards' })
       ripCur = { wrap: wrap, dot: dot, fading: false, t0: performance.now() }
     }, true)
