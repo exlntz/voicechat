@@ -138,12 +138,20 @@ function gHomeLink(subtitle) {
   const a = el('a', { href: '/friends', class: 'g-callhead__home', title: 'К чатам' }, [
     window.VLLogo ? window.VLLogo(40) : el('span', { class: 'g-callhead__logo' }, [gIcon('logo', 20)]),
     el('span', { class: 'g-callhead__name' }, 'Voice Lobby'),
-    el('span', { class: 'g-callhead__sub' }, '· ' + subtitle)
-  ])
+    subtitle ? el('span', { class: 'g-callhead__sub' }, '· ' + subtitle) : null
+  ].filter(Boolean))
   a.addEventListener('click', (e) => {
     if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return
     e.preventDefault()
     if (a.closest('.in-pip')) return
+    // Гость (без аккаунта): логотип ведёт на вход и регистрацию; во время звонка — никуда
+    if (!state.currentUser) {
+      if (state.room) return
+      if (typeof VL.teardownLobby === 'function') VL.teardownLobby()
+      const code = location.pathname.startsWith('/room/') ? location.pathname.split('/room/')[1] : ''
+      renderAuthScreen(code)
+      return
+    }
     if (typeof VL.goChats === 'function') VL.goChats()
     else location.assign('/')
   })
@@ -1105,10 +1113,10 @@ async function renderLobby(prefillRoomCode = '') {
   window.addEventListener('resize', () => { if (!setPanel.hidden) placeSet() })
   const col = el('div', { class: 'g-join__col' }, [preview, nameBlock, bar, errorSlot])
 
-  screen.appendChild(gCallHeader(creating ? 'Новый звонок' : 'Вход в звонок'))
+  screen.appendChild(gCallHeader(''))
   // Гостю — тихое «Войти» справа сверху: аккаунт нужен, чтобы звонить друзьям и писать в чаты
   if (guest) {
-    const login = el('button', { type: 'button', class: 'g-join__login' }, 'Войти')
+    const login = el('button', { type: 'button', class: 'g-join__login' }, 'Войти в аккаунт')
     login.addEventListener('click', () => { stopPreview(); renderAuthScreen(urlRoom) })
     screen.appendChild(login)
   }
@@ -1438,7 +1446,7 @@ async function enterRoom(joinData, opts = {}) {
   const participantsBtn = el('button', { type: 'button', class: 'room-people-btn g-ppl-btn', title: 'Участники', 'aria-label': 'Участники', 'aria-pressed': 'false' }, [gIcon('people', 20, 'g-ico-pop'), pplCount])
   topRight.appendChild(participantsBtn)
   // Слева — «Voice Lobby · Звонок»; по нажатию возвращаемся к чатам, звонок продолжается
-  const homeLink = gHomeLink('Звонок')
+  const homeLink = gHomeLink('')
   topbar.appendChild(homeLink)
   topbar.appendChild(el('span', { class: 'g-callhead__spacer' }))
   topbar.appendChild(topRight)
