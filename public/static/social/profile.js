@@ -323,15 +323,21 @@ export function openProfile({ logout }) {
       if (needsHomeScreen() || !pushSupported()) {
         rows.push(h('div', { class: 'g-urow' }, [h('span', { class: 'g-urow__t' }, [h('b', {}, 'Уведомления на этом устройстве'), h('span', {}, needsHomeScreen() ? 'На iPhone — только у сайта на экране «Домой»' : 'Браузер не поддерживает уведомления')])]))
       } else {
-        const r = toggleRow('Уведомления на этом устройстве', false, async (v) => {
-          if (!v) { await disablePush(); return true }
+        // Браузер отвечает, включены ли уведомления, не сразу — показываем последнее известное
+        // значение, чтобы галочка не переключалась на глазах при открытии раздела
+        const remember = (on) => { try { localStorage.setItem('vl:push-on', on ? '1' : '0') } catch (e) {} }
+        let known = false
+        try { known = localStorage.getItem('vl:push-on') === '1' } catch (e) {}
+        const r = toggleRow('Уведомления на этом устройстве', known, async (v) => {
+          if (!v) { await disablePush(); remember(false); return true }
           if (Notification.permission === 'denied') { toast('Уведомления запрещены в настройках браузера', 'error'); return false }
           const res = await requestNotificationPermission()
           if (res !== 'granted') return false
           await enablePush()
+          remember(true)
           return true
         })
-        pushEnabled().then((on) => r.set(on)).catch(() => {})
+        pushEnabled().then((on) => { remember(on); if (on !== known) r.set(on) }).catch(() => {})
         rows.push(r.row)
       }
     }
