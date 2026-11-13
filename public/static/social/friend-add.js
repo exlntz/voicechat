@@ -7,19 +7,21 @@ import { h, icon, avatar, displayName, toast } from './ui.js'
 
 let current = null
 
-export function openFriendAdd({ openDmWith } = {}) {
-  if (current) return
+// mount — встроенный режим (ПК): строка поиска плавно выезжает под кнопкой «Добавить друга»
+// внутри mount, без затемнения и окна по центру. onClosed — когда спряталась.
+export function openFriendAdd({ openDmWith, mount = null, onClosed } = {}) {
+  if (current) return null
   // Вариант B из канваса: окно — одна строка поиска (без заголовка и подписей), карточка
   // человека выезжает под ней. На телефоне — та же строка в шторке снизу.
   const input = h('input', { type: 'text', class: 'g-fadd__input', placeholder: 'Юзернейм друга', maxlength: '32', autocomplete: 'off', spellcheck: 'false', autocapitalize: 'off', enterkeyhint: 'search', 'aria-label': 'Юзернейм друга' })
   const close = h('button', { type: 'button', class: 'g-fadd__x', 'aria-label': 'Закрыть' }, [h('span', { class: 'g-fadd__esc' }, 'esc'), icon('xmark')])
   const result = h('div', { class: 'g-fadd__res', 'aria-live': 'polite' })
-  const card = h('div', { class: 'g-fadd', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Добавить друга' }, [
+  const card = h('div', mount ? { class: 'g-fadd g-fadd--inline', role: 'group', 'aria-label': 'Добавить друга' } : { class: 'g-fadd', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Добавить друга' }, [
     h('span', { class: 'g-fadd__grab', 'aria-hidden': 'true' }),
     h('label', { class: 'g-fadd__row' }, [icon('user-plus'), input, close]),
     h('div', { class: 'g-fadd__grow' }, [h('div', {}, [h('div', { class: 'g-fadd__sep' }), result])])
   ])
-  const overlay = h('div', { class: 'g-overlay g-fadd-ov' }, [card])
+  const overlay = mount ? h('div', { class: 'g-faddbox__in' }, [card]) : h('div', { class: 'g-overlay g-fadd-ov' }, [card])
   current = overlay
 
   let seq = 0
@@ -118,10 +120,20 @@ export function openFriendAdd({ openDmWith } = {}) {
     clearTimeout(timer)
     seq++
     document.removeEventListener('keydown', onKey, true)
+    if (mount) {
+      // Схлопываем по высоте той же пружиной, что и выезд; узел убираем, когда спрятался
+      mount.classList.remove('is-open')
+      if (current === overlay) current = null
+      if (card.contains(document.activeElement)) document.activeElement.blur()
+      if (onClosed) onClosed()
+      setTimeout(() => { if (current !== overlay && !mount.classList.contains('is-open')) overlay.remove() }, 520)
+      return
+    }
     setTimeout(() => { overlay.remove(); if (current === overlay) current = null }, 320)
   }
   function onKey(e) {
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done() }
+    // Встроенная строка закрывается по Esc, только когда фокус в ней — иначе Esc нужен чату
+    if (e.key === 'Escape' && (!mount || card.contains(document.activeElement))) { e.preventDefault(); e.stopPropagation(); done() }
     if (e.key === 'Enter' && e.target === input && found) {
       e.preventDefault()
       const a = actionFor(found)
@@ -130,9 +142,18 @@ export function openFriendAdd({ openDmWith } = {}) {
   }
   input.addEventListener('input', onInput)
   close.addEventListener('click', done)
-  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) done() })
+  if (!mount) overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) done() })
   document.addEventListener('keydown', onKey, true)
+  if (mount) {
+    mount.replaceChildren(overlay)
+    void mount.offsetHeight // стартуем с нулевой высоты, иначе выезд не анимируется
+    mount.classList.add('is-open')
+    // Фокус без прокрутки: строка ещё растёт по высоте
+    setTimeout(() => input.focus({ preventScroll: true }), 80)
+    return { close: done }
+  }
   document.body.appendChild(overlay)
   // На телефоне клавиатура выезжает вместе со шторкой — фокус после начала анимации
   setTimeout(() => input.focus(), 60)
+  return { close: done }
 }
