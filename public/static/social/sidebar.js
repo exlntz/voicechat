@@ -115,6 +115,8 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
   let lastTabIdx = 0
   function setTab(id, { silent = false } = {}) {
     if (!TABS.some((t) => t.id === id)) id = 'chats'
+    // Ушли с «Друзей» — выехавший поиск «Добавить друга» прячем
+    if (id !== 'friends' && addInline) addInline.close()
     const idx = TABS.findIndex((t) => t.id === id)
     // Плашка тянется в сторону движения: передний край быстрее, задний догоняет
     const dir = idx > lastTabIdx ? 1 : idx < lastTabIdx ? -1 : 0
