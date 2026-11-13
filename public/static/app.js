@@ -102,6 +102,7 @@ const G_ICONS = {
   chev: '<path stroke-width="2.4" d="M6 9l6 6 6-6"/>',
   check: '<path stroke-width="2.8" d="M5 12.5l4.5 4.5L19 7.5"/>',
   screen: '<rect x="3" y="4" width="18" height="13" rx="2.5"/><path d="M8 21h8M12 17v4"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
   sliders: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle class="i-kr" cx="16" cy="7" r="2"/><circle class="i-kl" cx="10" cy="17" r="2"/>',
   hang: '<path d="M3 15.2v-2a2.2 2.2 0 0 1 1.2-2C6.6 10 9.2 9.4 12 9.4s5.4.6 7.8 1.8a2.2 2.2 0 0 1 1.2 2v2a1.2 1.2 0 0 1-1.5 1.2l-2.9-.8a1.2 1.2 0 0 1-.9-1.1l-.1-1.7c-1.1-.4-2.3-.6-3.6-.6s-2.5.2-3.6.6l-.1 1.7a1.2 1.2 0 0 1-.9 1.1l-2.9.8A1.2 1.2 0 0 1 3 15.2z"/>',
   link: '<path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/>',
@@ -960,10 +961,8 @@ async function renderLobby(prefillRoomCode = '') {
   const screen = el('div', { class: 'lobby-screen g-join' })
   // Ошибки — тихой строкой под полем или кнопкой, к которой относятся (как на экране входа)
   const errorSlot = el('div', { class: 'auth-error g-join__msg', style: 'display:none' })
-  const showJoinError = (text, after) => {
+  const showJoinError = (text) => {
     errorSlot.replaceChildren(el('div', { class: 'auth-msg' }, text))
-    const anchor = after || joinBtn
-    if (anchor.parentNode && anchor.nextSibling !== errorSlot) anchor.after(errorSlot)
     errorSlot.style.display = 'block'
   }
 
@@ -1058,7 +1057,6 @@ async function renderLobby(prefillRoomCode = '') {
   }
   // Гость: имя, под которым его увидят в звонке, и вход в аккаунт для тех, у кого он есть
   const guestInput = guest ? el('input', { type: 'text', class: 'g-join__inp', placeholder: 'Гость', value: savedGuestName, maxlength: '40', autocomplete: 'name', spellcheck: 'false' }) : null
-  const loginLink = null // «Войти в аккаунт» убрано с экрана подключения — вход для гостя обсуждаем отдельно
   if (guest) {
     const ava = noCam.querySelector('.g-join__ava')
     const nm = namePill.querySelector('.g-join__nm')
@@ -1070,19 +1068,41 @@ async function renderLobby(prefillRoomCode = '') {
     })
     guestInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doJoin() })
   }
-  const card = el('div', { class: 'g-join__card' }, [
-    el('span', { class: 'g-join__title' }, creating ? 'Новый звонок' : 'Войти в звонок'),
-    guest ? field('Ваше имя · необязательно', guestInput) : null,
+  // Одна карточка, как в Телемосте: по центру аватар (или камера), под ним «Ваше имя на
+  // встрече», снизу — микрофон и камера, «Подключиться» и шестерёнка с выбором устройств
+  const nameBlock = el('div', { class: 'g-join__who' }, [
+    el('span', { class: 'g-join__who-l' }, 'Ваше имя на встрече'),
+    guest ? guestInput : el('span', { class: 'g-join__who-n' }, myName)
+  ])
+  if (guest) guestInput.classList.add('g-join__who-inp')
+  const setBtn = el('button', { type: 'button', class: 'g-cb g-join__setbtn', 'aria-label': 'Микрофон, динамики и камера', title: 'Устройства', 'aria-expanded': 'false' }, [gIcon('gear', 22)])
+  const setPanel = el('div', { class: 'g-join__set', hidden: true }, [
     field('Микрофон', makeDropdown(micSelect, 'mic')),
     spkField,
-    field('Камера', makeDropdown(camSelect, 'cam')),
-    errorSlot,
-    joinBtn,
-    loginLink
-  ].filter(Boolean))
+    field('Камера', makeDropdown(camSelect, 'cam'))
+  ])
+  const toggleSet = (on) => {
+    setPanel.hidden = !on
+    setBtn.classList.toggle('on', on)
+    setBtn.setAttribute('aria-expanded', on ? 'true' : 'false')
+  }
+  setBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleSet(setPanel.hidden) })
+  document.addEventListener('pointerdown', (e) => {
+    if (!setPanel.hidden && !setPanel.contains(e.target) && !setBtn.contains(e.target) && !(e.target.closest && e.target.closest('.dd-menu, .dd-list, [role="listbox"]'))) toggleSet(false)
+  }, true)
+  // Превью-прямоугольник остаётся как был (камера, индикатор микрофона, имя, кнопки);
+  // под ним — имя на встрече, «Войти в звонок» и шестерёнка с выбором устройств
+  const bar = el('div', { class: 'g-join__bar' }, [joinBtn, el('div', { class: 'g-join__setwrap' }, [setBtn, setPanel])])
+  const col = el('div', { class: 'g-join__col' }, [preview, nameBlock, bar, errorSlot])
 
   screen.appendChild(gCallHeader(creating ? 'Новый звонок' : 'Вход в звонок'))
-  screen.appendChild(el('div', { class: 'g-join__body' }, [preview, card]))
+  // Гостю — тихое «Войти» справа сверху: аккаунт нужен, чтобы звонить друзьям и писать в чаты
+  if (guest) {
+    const login = el('button', { type: 'button', class: 'g-join__login' }, 'Войти')
+    login.addEventListener('click', () => { stopPreview(); renderAuthScreen(urlRoom) })
+    screen.appendChild(login)
+  }
+  screen.appendChild(el('div', { class: 'g-join__body' }, [col]))
   // «Звонок по ссылке»: экран подключения не показываем — сразу собираем звонок,
   // на это время только тихий индикатор по центру
   if (autoCreate) {
