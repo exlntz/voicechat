@@ -632,7 +632,12 @@
       dot.className = 'g-rip__dot'
       dot.style.cssText = 'left:' + (e.clientX - r.left - size / 2).toFixed(1) + 'px;top:' + (e.clientY - r.top - size / 2).toFixed(1) + 'px;width:' + size + 'px;height:' + size + 'px'
       wrap.appendChild(dot)
-      var anim = dot.animate([{ transform: 'scale(0)', opacity: 1 }, { transform: 'scale(2)', opacity: 0 }], { duration: RIP_MS, easing: 'ease', fill: 'forwards' })
+      // Светлая тема: тёмная волна на светлом фоне тает заметнее — держим её плотной подольше
+      var light = document.documentElement.dataset.theme === 'light'
+      var frames = light
+        ? [{ transform: 'scale(0)', opacity: 1, easing: 'cubic-bezier(.25, .6, .4, 1)' }, { transform: 'scale(1.25)', opacity: .9, offset: .5, easing: 'ease-out' }, { transform: 'scale(2)', opacity: 0 }]
+        : [{ transform: 'scale(0)', opacity: 1 }, { transform: 'scale(2)', opacity: 0 }]
+      var anim = dot.animate(frames, { duration: light ? RIP_MS + 100 : RIP_MS, easing: light ? 'linear' : 'ease', fill: 'forwards' })
       anim.onfinish = function () {
         dot.remove()
         if (!wrap.children.length) wrap.remove()
