@@ -1966,3 +1966,6 @@ html[data-theme="light"] { --g-hit: rgba(255, 186, 48, .42); --g-hit-band: rgba(
 /* Зеркало мягкого набора (anker.js) считает позицию от ближайшего позиционированного предка,
    а у выезжающей карточки есть transform — держим зеркало внутри строки поля */
 .g-fadd__row { position: relative; }
+
+/* Светлая тема: иконка «Избранного» серая, как остальные аватары (на тёмной она тоже серая) */
+html[data-theme="light"] .g-ava.vl-avatar.is-saved { background: var(--g-ava) !important; color: var(--g-ink); }
