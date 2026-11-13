@@ -1907,10 +1907,9 @@ input:-webkit-autofill { animation: st-autofill 1ms; }
 html[data-theme="light"] .g-rip__dot { background: rgba(0, 0, 0, .08); }
 /* Нажатую строку выбрали (открылся чат): она перекрашивается целиком и сразу — аватар в ней
    создаётся заново и плавно не меняется, а фон, текст и круг каждый со своей скоростью давали
-   мерцание. Круг при этом просто растворяется */
+   мерцание. На выбранной строке круг светлый и доигрывает до конца, как в Telegram */
 .g-row:has(> .g-rip), .g-row:has(> .g-rip) * { transition-property: translate, box-shadow, transform, opacity !important; }
-.g-rip { transition: opacity .22s ease !important; }
-.is-on > .g-rip { opacity: 0; }
+.is-on > .g-rip > .g-rip__dot, html[data-theme="light"] .is-on > .g-rip > .g-rip__dot { background: rgba(255, 255, 255, .13); }
 
 /* ─────────── «Добавить друга» на ПК: строка поиска выезжает под кнопкой ───────────
    Высота растёт пружиной (grid 0fr → 1fr), сама строка опускается и проявляется */
@@ -1935,12 +1934,29 @@ html[data-theme="light"] .g-rip__dot { background: rgba(0, 0, 0, .08); }
 /* ─────────── Поиск по чату вырастает из кнопки-лупы ───────────
    Поле лежит поверх шапки ровно на месте кнопки (позицию и ширину ставит chat.js) и
    раскрывается справа налево; справа, где была лупа, — крестик */
-.g-chat__head .g-sfield { position: absolute; top: 50%; translate: 0 -50%; z-index: 6; animation: none; padding-right: 0; }
-.g-chat__head .g-sfield .g-sfield__x { width: var(--sx, 46px); height: var(--sx, 46px); --s: var(--sx, 46px); flex-shrink: 0; margin-left: 2px; }
-.g-chat__head .g-sfield .g-sfield__x .vl-ico { width: 17px; height: 17px; }
+.g-chat__head .g-sfield { position: absolute; top: 50%; translate: 0 -50%; z-index: 6; animation: none; gap: 2px; }
+/* Три кнопки справа — одного размера, ровно в ряд; крестик встаёт по центру бывшей лупы */
+html[data-theme] .g-chat__head .g-sfield { padding: 0 calc((var(--sx, 46px) - var(--sb, 36px)) / 2) 0 16px; }
+.g-chat__head .g-sfield .vl-round { width: var(--sb, 36px); height: var(--sb, 36px); --s: var(--sb, 36px); flex-shrink: 0; margin: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.g-chat__head .g-sfield .vl-round .vl-ico { width: 16px; height: 16px; }
+.g-chat__head .g-sfield .vl-round:disabled { opacity: .3; pointer-events: none; }
+.g-chat__head .g-sfield .vl-search__count { margin: 0 6px 0 4px; font-size: 13px; color: var(--g-sub); font-variant-numeric: tabular-nums; }
+.g-chat__head .g-sfield .vl-search__count:empty { display: none; }
 .g-chat__head .g-sfield .vl-search__results { width: min(380px, calc(100vw - 20px)); }
-html[data-theme] .g-chat__head .g-sfield { padding-right: 0; }
-@media (max-width: 860px) { .g-chat__head .g-sfield { --sx: 40px; } }
+@media (max-width: 860px) { .g-chat__head .g-sfield { --sx: 40px; --sb: 32px; } }
+.g-chat__head .g-sfield > .vl-ico { margin-right: 8px; }
+
+/* Найденное сообщение: мягкая полоса во всю ширину вспыхивает и гаснет, слово заливается
+   цветом слева направо (как в Telegram). Подсвечено слово только в текущем совпадении */
+:root { --g-hit: rgba(255, 206, 92, .3); --g-hit-band: rgba(255, 255, 255, .06); }
+html[data-theme="light"] { --g-hit: rgba(255, 186, 48, .42); --g-hit-band: rgba(0, 0, 0, .05); }
+.vl-view--chat .vl-msg.is-flash .vl-bubble { animation: none; box-shadow: none; }
+.vl-view--chat .vl-msg { isolation: isolate; }
+.vl-view--chat .vl-msg.is-flash::before { content: ''; position: absolute; inset: -1px 0; border-radius: 14px; background: var(--g-hit-band); z-index: -1; pointer-events: none; animation: g-hit-band 1.8s ease both; }
+@keyframes g-hit-band { 0% { opacity: 0; } 12% { opacity: 1; } 60% { opacity: 1; } 100% { opacity: 0; } }
+.vl-hit, .vl-view--chat mark.vl-hit { color: inherit; padding: 0 2px; margin: 0 -2px; border-radius: 5px; background: linear-gradient(var(--g-hit), var(--g-hit)) no-repeat 0 0 / 100% 100%; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.vl-view--chat .vl-msg.is-flash mark.vl-hit { animation: g-hit-sweep .5s cubic-bezier(.22, 1, .36, 1) .12s both; }
+@keyframes g-hit-sweep { from { background-size: 0% 100%; } }
 /* Зеркало мягкого набора (anker.js) считает позицию от ближайшего позиционированного предка,
    а у выезжающей карточки есть transform — держим зеркало внутри строки поля */
 .g-fadd__row { position: relative; }

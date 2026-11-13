@@ -187,8 +187,12 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
       // плавно перетекает (фон, подъём, тень), а не появляется новым узлом
       let item = rowCache.get(conv.id)
       if (item) {
-        if (item.className !== cls) item.className = cls
-        item.replaceChildren(...kids)
+        // Классы и слой заливки от нажатия (anker.js) не трогаем — иначе её анимация обрывалась бы
+        const keep = [...item.classList].filter((c) => c.startsWith('g-rip'))
+        const next = keep.length ? cls + ' ' + keep.join(' ') : cls
+        if (item.className !== next) item.className = next
+        for (const c of [...item.childNodes]) if (!(c.classList && c.classList.contains('g-rip'))) c.remove()
+        item.prepend(...kids.filter(Boolean))
         nodes.push(item)
         continue
       }
