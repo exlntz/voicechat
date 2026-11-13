@@ -583,8 +583,8 @@
   // только transform и opacity: их ведёт композитор, поэтому заливка идёт плавно, даже когда
   // клик тут же нагружает страницу (открытие чата, перерисовка списка). Обработчик один на документ.
   var RIP_SEL = 'button, a.g-row, a.g-btn, [role="button"], [role="menuitem"], [role="option"], .g-crow, .g-frow, .g-urow'
-  // Без заливки: переключатели-вкладки (Чаты / Звонки / Друзья — там свой бегунок) и шапка чата с профилем
-  var RIP_SKIP = 'input, textarea, select, [contenteditable="true"], .no-rip, .tile video, [role="tab"], [role="tablist"] button, .g-chat__who'
+  // Без заливки: переключатели с бегунком (вкладки Чаты / Звонки / Друзья, «Тема», «Размер текста») и шапка чата
+  var RIP_SKIP = 'input, textarea, select, [contenteditable="true"], .no-rip, .tile video, [role="tab"], [role="tablist"] button, [role="radio"], .g-seg button, .g-chat__who'
   var ripReduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches
   var ripCur = null
   var RIP_GROW = 360
