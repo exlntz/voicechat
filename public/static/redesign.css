@@ -303,7 +303,6 @@ body.vl-ready #vl-sidebar.g-side {
 .g-side__title { display: none; }
 .g-meb { width: 38px; height: 38px; border-radius: 19px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 0 var(--g-line); transition: box-shadow .3s var(--g-spring), transform .45s var(--g-spring); }
 .g-side .g-meb:hover { box-shadow: 0 0 0 4px var(--g-line); }
-.g-meb:active { transform: scale(.92); transition-duration: .1s; }
 .g-meb .vl-avatar:not(.has-img) { background: var(--g-field-h) !important; color: var(--g-ink); }
 .g-meb .vl-avatar { font-size: 16px; }
 .g-meb.is-offline { opacity: .6; }
@@ -1180,14 +1179,14 @@ html[data-theme="light"] { --g-on-bg: #8a847c; --g-on-fg: #ffffff; --g-on-bg-h: 
 .room-screen .room-copy-btn, .room-screen .room-copy-btn.is-copied { background: var(--g-field) !important; box-shadow: none !important; }
 .room-screen .room-copy-btn:hover { background: var(--g-field-h) !important; }
 
-/* Настройки и профиль открываются мягко: окно плавно выезжает без перелёта,
-   содержимое проявляется чуть позже, затемнение — медленнее */
-.settings-overlay.g-sov, .g-pf-overlay { animation: g-fade .35s ease both; }
-.settings-sheet.g-scard, .g-pf { transition: none; animation: g-soft-in .5s cubic-bezier(.22, 1, .36, 1) both; will-change: transform, opacity; }
-@keyframes g-soft-in { from { opacity: 0; transform: translateY(18px) scale(.97); } to { opacity: 1; transform: none; } }
-.settings-sheet.g-scard .g-scard__main, .settings-sheet.g-scard .g-scard__side, .g-pf .g-pf__main, .g-pf .g-pf__side { animation: g-fade-up .45s cubic-bezier(.22, 1, .36, 1) .08s both; }
+/* Настройки и профиль открываются быстро и мягко: окно и содержимое появляются одним
+   движением (без отдельной задержки содержимого), затемнение — вместе с окном */
+.settings-overlay.g-sov, .g-pf-overlay { animation: g-fade .2s ease both; }
+.settings-sheet.g-scard, .g-pf { transition: none; animation: g-soft-in .3s cubic-bezier(.22, 1, .36, 1) both; will-change: transform, opacity; }
+@keyframes g-soft-in { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
+.settings-sheet.g-scard .g-scard__main, .settings-sheet.g-scard .g-scard__side, .g-pf .g-pf__main, .g-pf .g-pf__side { animation: none; }
 @keyframes g-fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-.g-scard__sec, .g-pf__sec { animation: g-fade-up .35s cubic-bezier(.22, 1, .36, 1) both; }
+.g-scard__sec, .g-pf__sec { animation: g-fade-up .25s cubic-bezier(.22, 1, .36, 1) both; }
 .g-sov.is-closing .settings-sheet.g-scard, .g-pf-overlay.is-closing .g-pf { animation: g-soft-out .25s cubic-bezier(.4, 0, 1, 1) both; }
 @keyframes g-soft-out { to { opacity: 0; transform: translateY(10px) scale(.98); } }
 @media (prefers-reduced-motion: reduce) { .settings-sheet.g-scard, .g-pf, .g-scard__sec, .g-pf__sec { animation-duration: .01s; } }

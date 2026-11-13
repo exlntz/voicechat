@@ -42,7 +42,8 @@ export function openProfile({ logout }) {
     h('div', { class: 'g-pf__me' }, [meAva, h('span', { class: 'g-pf__me-text' }, [meName, meUser])]),
     ...NAV.map((n) => {
       const b = h('button', { type: 'button', class: 'g-pf__nav' }, [icon(n.icon), n.title])
-      b.addEventListener('click', () => show(n.id))
+      // Нажали на уже открытый раздел — ничего не перерисовываем
+      b.addEventListener('click', () => { if (n.id !== tab) show(n.id) })
       navBtns.set(n.id, b)
       return b
     })
