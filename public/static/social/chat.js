@@ -315,6 +315,7 @@ export function createChatView({ convId, navigate, menuButton }) {
   async function runSearch() {
     const q = searchInput.value.trim()
     search.q = q
+    if (q) searchCount.textContent = '…'
     if (!q) { search.hits = []; search.index = -1; searchResults.hidden = true; searchCount.textContent = ''; highlight = ''; renderList(); return }
     try {
       const r = await api.get(`/api/conversations/${convId}/search?q=${encodeURIComponent(q)}`)
@@ -322,11 +323,11 @@ export function createChatView({ convId, navigate, menuButton }) {
       search.hits = r.messages
       search.index = -1
       highlight = q
-      searchCount.textContent = r.messages.length ? '' : 'нет'
+      // Как в Telegram Web: пока печатаешь, чат не прыгает — показываем список найденного,
+      // переход по клику на результат (или Enter — к следующему совпадению)
+      searchCount.textContent = r.messages.length ? String(r.messages.length) + (r.messages.length >= 100 ? '+' : '') : 'нет'
       renderResults()
-      // Сразу к самому свежему совпадению, как в Telegram; список результатов — по фокусу/клику
-      if (r.messages.length) { goHit(0); return }
-      renderList()
+      syncHitMark()
     } catch (e) { searchCount.textContent = ''; toast(e.message, 'error') }
   }
   function renderResults() {
@@ -337,7 +338,8 @@ export function createChatView({ convId, navigate, menuButton }) {
         avatar(authorOf(m), { size: 32 }),
         h('span', { class: 'vl-search__text' }, [h('span', { class: 'vl-search__top' }, [h('b', {}, who), h('time', {}, `${dayLabel(m.createdAt).replace(/ \d{4} г\.$/, '')}, ${timeHM(m.createdAt)}`)]), h('span', { class: 'vl-search__snip' }, markMatch(m.body, search.q))])
       ])
-      row.addEventListener('click', () => goHit(i))
+      // После клика курсор остаётся в поле — Enter дальше листает совпадения
+      row.addEventListener('click', () => { goHit(i); searchInput.focus({ preventScroll: true }) })
       return row
     }))
   }
@@ -348,7 +350,7 @@ export function createChatView({ convId, navigate, menuButton }) {
     search.index = ((i % n) + n) % n
     searchCount.textContent = `${search.index + 1} из ${n}${n >= 100 ? '+' : ''}`
     searchResults.hidden = true
-    renderList() // подсветка слова переезжает в новое сообщение
+    syncHitMark() // подсветка слова переезжает в новое сообщение
     jumpTo(search.hits[search.index].id)
   }
   searchInput.addEventListener('input', () => { clearTimeout(search.timer); search.timer = setTimeout(runSearch, 300) })
@@ -723,57 +725,70 @@ export function createChatView({ convId, navigate, menuButton }) {
   let flashTimer = 0
   let jumpTimer = 0
   let jumpLockUntil = 0
+  let glide = 0
+  let measureTimer = 0
   // Перейти к сообщению и подсветить. Сообщения вне экрана рисуются лениво (content-visibility)
-  // и до отрисовки имеют условную высоту, поэтому плавно прокручивать через сотни таких сообщений
-  // нельзя — прокрутка промахивается и дёргается поправками. Как в Telegram: рядом — плавная
-  // прокрутка, далеко — лента на миг гаснет, встаёт точно на место и проявляется
+  // и до отрисовки имеют условную высоту: обычная плавная прокрутка ехала к неточной цели и
+  // потом доводилась второй раз. Поэтому: 1) разово рисуем все загруженные сообщения — высоты
+  // становятся точными (и запоминаются, contain-intrinsic-size: auto); 2) едем своей
+  // анимацией, которая на каждом кадре целится в реальное положение сообщения — без доводок.
+  // Издалека — сначала мгновенно оказываемся в полуэкране от цели, остаток проезжаем плавно
   function flash(entry) {
     const node = entry.node
+    cancelAnimationFrame(glide)
+    clearTimeout(jumpTimer)
+    clearTimeout(measureTimer)
+    // Пока едем, якорь прокрутки браузера выключен: иначе, когда высоты уточняются, он сам
+    // сдвигал ленту на кадр в сторону
+    scroller.style.overflowAnchor = 'none'
+    list.classList.add('is-measuring')
+    jumpLockUntil = performance.now() + 2000
     const box = scroller.getBoundingClientRect()
     const off = () => { const r = node.getBoundingClientRect(); return r.top + r.height / 2 - (box.top + box.height / 2) }
-    const land = () => { for (let k = 0; k < 5; k++) { const d = off(); if (Math.abs(d) < 2) break; scroller.scrollTop += d } }
-    const mark = () => {
-      document.querySelectorAll('.vl-msg.is-flash').forEach((n) => n.classList.remove('is-flash'))
-      void node.offsetWidth
-      node.classList.add('is-flash')
-      clearTimeout(flashTimer)
-      flashTimer = setTimeout(() => node.classList.remove('is-flash'), 1800)
-    }
-    clearTimeout(jumpTimer)
-    jumpLockUntil = performance.now() + 1200
-    if (scroller.classList.contains('is-jumping') || Math.abs(off()) > box.height * 1.5) {
-      scroller.classList.add('is-jumping')
-      jumpTimer = setTimeout(() => {
-        if (destroyed || !node.isConnected) { scroller.classList.remove('is-jumping'); return }
-        land()
-        requestAnimationFrame(() => { land(); jumpLockUntil = performance.now() + 900; scroller.classList.remove('is-jumping'); mark() })
-      }, 130)
-      return
-    }
+    const near = box.height * 0.55
+    const d0 = off()
+    if (Math.abs(d0) > near) scroller.scrollTop += d0 - Math.sign(d0) * near
     scroller.classList.remove('is-jumping')
-    scroller.scrollBy({ top: off(), behavior: 'smooth' })
-    // Одна мягкая поправка, когда прокрутка закончилась (если высоты рядом уточнились)
-    let fixed = false
-    const fix = () => { if (fixed || destroyed || !node.isConnected) return; fixed = true; const d = off(); if (Math.abs(d) > 3) scroller.scrollBy({ top: d, behavior: 'smooth' }) }
-    scroller.addEventListener('scrollend', fix, { once: true })
-    jumpTimer = setTimeout(fix, 700)
-    mark()
+    const from = scroller.scrollTop
+    const dist = Math.abs(off())
+    const dur = Math.min(520, 260 + dist * 0.6)
+    const t0 = performance.now()
+    const step = (t) => {
+      if (destroyed || !node.isConnected) return
+      const k = Math.min(1, (t - t0) / dur)
+      const e = 1 - Math.pow(1 - k, 3)
+      const dest = scroller.scrollTop + off()
+      scroller.scrollTop = from + (dest - from) * e
+      if (k < 1) glide = requestAnimationFrame(step)
+      else {
+        jumpLockUntil = performance.now() + 900
+        scroller.style.overflowAnchor = ''
+        measureTimer = setTimeout(() => list.classList.remove('is-measuring'), 1200)
+      }
+    }
+    glide = requestAnimationFrame(step)
+    document.querySelectorAll('.vl-msg.is-flash').forEach((n) => n.classList.remove('is-flash'))
+    void node.offsetWidth
+    node.classList.add('is-flash')
+    clearTimeout(flashTimer)
+    flashTimer = setTimeout(() => node.classList.remove('is-flash'), 1800)
   }
   // Перейти к сообщению: если его нет в памяти — загрузить страницу вокруг него
   async function jumpTo(id) {
     const entry = nodes.get('m' + id)
     if (entry) { flash(entry); return }
-    // Сообщения нет в памяти: лента гаснет сразу, пока грузится кусок вокруг него
-    scroller.classList.add('is-jumping')
+    // Сообщения нет в памяти: грузим кусок вокруг него. Подмена ленты и переход к сообщению —
+    // в одном кадре (renderList и flash синхронно), дальше плавно доезжаем
     jumpLockUntil = performance.now() + 10000
     try {
       const found = await loadAround(convId, id)
       if (destroyed) return
-      if (!found) { scroller.classList.remove('is-jumping'); jumpLockUntil = 0; toast('Сообщение удалено', 'info'); return }
+      if (!found) { jumpLockUntil = 0; toast('Сообщение удалено', 'info'); return }
       renderList()
-      requestAnimationFrame(() => { const e2 = nodes.get('m' + id); if (e2) flash(e2) })
+      const e2 = nodes.get('m' + id)
+      if (e2) flash(e2)
       jumpBtn.hidden = false
-    } catch (e) { scroller.classList.remove('is-jumping'); jumpLockUntil = 0; toast(e.message, 'error') }
+    } catch (e) { jumpLockUntil = 0; toast(e.message, 'error') }
   }
 
   function toolButton(iconName, title, onClick, danger = false) {
@@ -850,23 +865,40 @@ export function createChatView({ convId, navigate, menuButton }) {
     return quote
   }
 
-  // Текст с подсветкой найденного
-  function textWithHighlight(body, on) {
-    if (!highlight || !on) return richText(body)
-    const frag = document.createDocumentFragment()
-    const str = String(body || '')
-    const low = str.toLocaleLowerCase('ru')
-    const q = highlight.toLocaleLowerCase('ru')
-    let pos = 0
-    let i
-    while (q && (i = low.indexOf(q, pos)) >= 0) {
-      if (i > pos) frag.appendChild(richText(str.slice(pos, i)))
-      frag.appendChild(h('mark', { class: 'vl-hit' }, str.slice(i, i + q.length)))
-      pos = i + q.length
-    }
-    if (pos < str.length) frag.appendChild(richText(str.slice(pos)))
-    return frag
+  // Подсветка найденного слова — прямо в тексте уже нарисованного сообщения, без пересборки
+  // (новый узел сообщения терял запомненную высоту, и лента сдвигалась). Только в текущем совпадении
+  function unmark(root) {
+    root.querySelectorAll('mark.vl-hit').forEach((mk) => { const p = mk.parentNode; p.replaceChild(document.createTextNode(mk.textContent), mk); p.normalize() })
   }
+  function markText(root, q) {
+    const box = root.querySelector('.vl-bubble__text')
+    if (!box || !q) return
+    const low = q.toLocaleLowerCase('ru')
+    const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.parentNode.closest('.vl-bubble__meta, time, .vl-ticks') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) })
+    const texts = []
+    while (walker.nextNode()) texts.push(walker.currentNode)
+    for (const t of texts) {
+      let node = t
+      let i
+      while (node && (i = node.data.toLocaleLowerCase('ru').indexOf(low)) >= 0) {
+        const hit = node.splitText(i)
+        node = hit.splitText(q.length)
+        const mk = document.createElement('mark')
+        mk.className = 'vl-hit'
+        hit.parentNode.replaceChild(mk, hit)
+        mk.appendChild(hit)
+      }
+    }
+  }
+  function syncHitMark() {
+    const id = hitId()
+    const key = id ? 'm' + id : ''
+    list.querySelectorAll('mark.vl-hit').forEach((mk) => { const msg = mk.closest('.vl-msg'); if (!msg || msg.dataset.key !== key) unmark(msg || mk.parentNode) })
+    if (!key || !highlight) return
+    const entry = nodes.get(key)
+    if (entry && !entry.node.querySelector('mark.vl-hit')) markText(entry.node, highlight)
+  }
+
 
   // ---------- Выделение сообщений ----------
   function selectedMsgs() {
@@ -1108,7 +1140,7 @@ export function createChatView({ convId, navigate, menuButton }) {
           onOpen: (i) => openLightbox(visual, i, { caption: m.body })
         }))
       }
-      if (m.body || !mediaOnly) parts.push(h('div', { class: 'vl-bubble__text is-selectable' }, [m.body ? textWithHighlight(m.body, !!m.id && m.id === hitId()) : null, meta]))
+      if (m.body || !mediaOnly) parts.push(h('div', { class: 'vl-bubble__text is-selectable' }, [m.body ? richText(m.body) : null, meta]))
       else parts.push(h('span', { class: 'vl-bubble__meta is-over-media' }, [...meta.childNodes]))
       // Одно голосовое без текста: время отправки — в одной строке с длительностью, пузырь ниже
       const voiceOnly = files.length === 1 && files[0].kind === 'voice' && !m.body && !m.reply && !m.forward
@@ -1298,9 +1330,7 @@ export function createChatView({ convId, navigate, menuButton }) {
         const files = (m.attachments || []).map((f) => f.id || f.name).join(',')
         const prog = m.pending && m.upload ? Math.round(draftProgress(m) * 50) : ''
         const pinned = m.id && pinSig && isPinned(m.id) ? 1 : 0
-        // Слово подсвечено только в текущем найденном сообщении (как в Telegram)
-        const hl = highlight && m.id && m.id === hitId() ? highlight : ''
-        const sig = [m.id, m.body, m.editedAt, m.pending ? 1 : 0, m.failed || '', pos, editingKey === key ? 1 : 0, m.reply ? m.reply.id : '', files, prog, pinned, hl, m.forward ? m.forward.userId : ''].join('|')
+        const sig = [m.id, m.body, m.editedAt, m.pending ? 1 : 0, m.failed || '', pos, editingKey === key ? 1 : 0, m.reply ? m.reply.id : '', files, prog, pinned, m.forward ? m.forward.userId : ''].join('|')
         items.push({ key, sig, build: () => buildMessage(m, pos) })
       }
       prev = m
@@ -1329,6 +1359,7 @@ export function createChatView({ convId, navigate, menuButton }) {
     for (const [k, e] of nodes) if (!seen.has(k)) { e.node.remove(); nodes.delete(k) }
     updateTicks(c, msgs)
     if (selecting) applySelection()
+    syncHitMark()
   }
 
   // Галочки меняются на месте (узел сообщения не пересоздаётся) — так видна анимация
