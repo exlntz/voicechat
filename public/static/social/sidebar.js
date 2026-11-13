@@ -302,12 +302,18 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
 
   let recentCalls = null
   let callsLoading = false
+  let callsFailed = false
   async function loadCalls() {
     if (callsLoading) return
     callsLoading = true
-    try { recentCalls = (await api.get('/api/calls/recent')).calls || [] } catch { if (!recentCalls) recentCalls = [] }
+    // Не ответил за 10 с — не держим заглушки вечно: показываем «Повторить»
+    const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))
+    try {
+      recentCalls = (await Promise.race([api.get('/api/calls/recent'), timeout])).calls || []
+      callsFailed = false
+    } catch { callsFailed = !recentCalls }
     callsLoading = false
-    renderCalls()
+    try { renderCalls() } catch (e) { console.error('renderCalls', e); callsList.replaceChildren(h('div', { class: 'g-empty' }, 'Не получилось показать звонки')) }
   }
   function callLabel(m) {
     const mine = m.authorId === store.me.id
@@ -326,12 +332,21 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
       b.addEventListener('click', () => callFriend(u.id))
       return b
     }))
+    if (recentCalls == null && callsFailed) {
+      const retry = h('button', { type: 'button', class: 'g-empty g-empty--btn' }, 'Не загрузилось · Повторить')
+      retry.addEventListener('click', () => { callsFailed = false; renderCalls(); loadCalls() })
+      callsList.replaceChildren(retry)
+      return
+    }
     if (recentCalls == null) {
       callsList.replaceChildren(...Array.from({ length: 3 }, () => h('div', { class: 'g-crow is-skeleton' }, [h('span', { class: 'g-skel g-skel--ava is-sm' }), h('span', { class: 'g-skel g-skel--line' })])))
       return
     }
     if (!recentCalls.length) { callsList.replaceChildren(h('div', { class: 'g-empty' }, 'Звонков пока не было')); return }
-    callsList.replaceChildren(...recentCalls.map((m) => {
+    callsList.replaceChildren(...recentCalls.map((m) => { try { return callRow(m) } catch (e) { console.error('call row', e); return null } }).filter(Boolean))
+  }
+  function callRow(m) {
+    {
       const conv = store.conversations.get(m.conversationId)
       const peer = conv && conv.peer
       const who = peer || { id: 0, username: '?', displayName: 'Звонок' }
@@ -345,7 +360,7 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
       ])
       row.addEventListener('click', () => { if (conv) { setTab('chats'); navigate('/dm/' + conv.id) } })
       return row
-    }))
+    }
   }
 
   // ---------- Панель «Друзья» ----------
@@ -652,6 +667,7 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
   unsub.push(on('call-changed', () => { renderDms(); renderIsland(); if (tab === 'calls') loadCalls() }))
 
   setTab('chats', { silent: true })
+  loadCalls() // недавние звонки — заранее, чтобы вкладка открывалась уже заполненной
   renderDms(); renderBadges(); renderMe(); renderNotifBanner()
 
   return {
