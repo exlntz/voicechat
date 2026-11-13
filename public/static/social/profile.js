@@ -29,9 +29,12 @@ const NAV = [
   { id: 'account', title: 'Аккаунт', icon: 'right-from-bracket' }
 ]
 
+let lastSettings = null
+
 export function openProfile({ logout }) {
   if (current) { closeProfile(); return }
-  let settings = { showLastSeen: true }
+  // Последние настройки с сервера — чтобы переключатели сразу стояли как надо, а не прыгали
+  let settings = lastSettings || { showLastSeen: true }
   let tab = 'profile'
 
   const meAva = h('span', { class: 'g-pf__me-ava' })
@@ -85,6 +88,7 @@ export function openProfile({ logout }) {
     const userBefore = JSON.stringify(store.me)
     const setBefore = JSON.stringify(settings)
     settings = p.settings
+    lastSettings = settings
     if (p.user) updateUser(p.user)
     const userChanged = JSON.stringify(store.me) !== userBefore
     // Настройки нужны только разделам «Конфиденциальность» и «Аккаунт»
@@ -316,7 +320,7 @@ export function openProfile({ logout }) {
     const rows = []
     rows.push(toggleRow('Показывать, когда я был(а) в сети', settings.showLastSeen !== false, async (v) => {
       const p = await api.patch('/api/profile', { showLastSeen: v })
-      settings = p.settings
+      settings = lastSettings = p.settings
     }).row)
     // Уведомления: push на сайте (в .exe — свои системные уведомления, строки нет)
     if (!window.electronAPI) {
