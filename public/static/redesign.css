@@ -1987,3 +1987,9 @@ html[data-theme="light"] .g-ava.vl-avatar.is-saved { background: var(--g-ava) !i
 .vl-chat__scroll.is-jumping > .vl-chat__list { opacity: 0; transition-duration: .12s; }
 .g-empty.g-empty--btn { width: 100%; border: 0; background: none; cursor: pointer; font: inherit; color: var(--g-sub); }
 .g-empty.g-empty--btn:hover { color: var(--g-ink); }
+
+/* Переход к сообщению: на время прокрутки рисуем все загруженные сообщения (точные высоты) */
+.vl-chat__list.is-measuring > .vl-msg { content-visibility: visible; }
+
+.g-chat__head .g-sfield .vl-search__results:not([hidden]) { animation: g-results-in .28s cubic-bezier(.22, 1, .36, 1) both; transform-origin: 100% 0; }
+@keyframes g-results-in { from { opacity: 0; transform: translateY(-6px) scale(.98); } }
