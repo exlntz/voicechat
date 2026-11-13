@@ -946,6 +946,7 @@ async function renderLobby(prefillRoomCode = '') {
   const creating = !urlRoom
   const autoCreate = creating && !!VL.autoCreateCall
   VL.autoCreateCall = false
+  VL.pendingInviteCopied = false
   const idleLabel = creating ? 'Создать звонок' : 'Войти в звонок'
 
   // ---- Разметка как в канвасе «Вход в звонок»: слева превью, справа карточка ----
@@ -1231,8 +1232,11 @@ async function renderLobby(prefillRoomCode = '') {
           if (creating) {
             const link = `${location.origin}/room/${data.roomCode}`
             const ok = await copyToClipboard(link)
-            if (ok && VL.showLinkCopied) VL.showLinkCopied('Ссылка на звонок скопирована')
-            else if (!ok) showToast('Звонок создан — ссылку можно скопировать кнопкой сверху', 'info')
+            // Без уведомлений: «скопировано» показывает кнопка «Скопировать ссылку» в пустом звонке
+            if (ok) {
+              if (VL.soloInviteShown && VL.soloInviteShown()) setTimeout(() => VL.flashInviteCopied(), 650)
+              else VL.pendingInviteCopied = true
+            }
           }
         },
         onFail: fail
@@ -1758,6 +1762,8 @@ async function enterRoom(joinData, opts = {}) {
   // Как только подключается второй участник, карточка убирается и сетка становится обычной.
   let soloInviteCard = null
   let soloCopyTimer = null
+  // Карточка-приглашение уже на экране (её кнопка «Скопировать ссылку» живая)
+  VL.soloInviteShown = () => !!(soloInviteCard && soloInviteCard.isConnected && VL.flashInviteCopied)
 
   function getSoloInviteCard() {
     if (soloInviteCard) return soloInviteCard
@@ -1798,6 +1804,14 @@ async function enterRoom(joinData, opts = {}) {
       copyHovered = false
       if (copyBtn.classList.contains('is-copied')) scheduleCopyReset()
     })
+
+    // Автокопирование при входе в созданный звонок: та же анимация «скопировано» на этой кнопке
+    VL.flashInviteCopied = () => {
+      copyBtn.classList.add('is-copied')
+      btnLabel.textContent = 'Ссылка скопирована'
+      if (!copyHovered) scheduleCopyReset()
+    }
+    if (VL.pendingInviteCopied) { VL.pendingInviteCopied = false; setTimeout(() => VL.flashInviteCopied(), 650) }
 
     soloInviteCard = el('div', { class: 'solo-invite' }, [
       el('h2', { class: 'solo-invite__title' }, 'Чтобы пригласить других участников, отправьте им ссылку на звонок'),
