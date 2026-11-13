@@ -29,9 +29,12 @@ const NAV = [
   { id: 'account', title: 'Аккаунт', icon: 'right-from-bracket' }
 ]
 
+let lastSettings = null
+
 export function openProfile({ logout }) {
   if (current) { closeProfile(); return }
-  let settings = { showLastSeen: true }
+  // Последние настройки с сервера — чтобы переключатели сразу стояли как надо, а не прыгали
+  let settings = lastSettings || { showLastSeen: true }
   let tab = 'profile'
 
   const meAva = h('span', { class: 'g-pf__me-ava' })
@@ -85,6 +88,7 @@ export function openProfile({ logout }) {
     const userBefore = JSON.stringify(store.me)
     const setBefore = JSON.stringify(settings)
     settings = p.settings
+    lastSettings = settings
     if (p.user) updateUser(p.user)
     const userChanged = JSON.stringify(store.me) !== userBefore
     // Настройки нужны только разделам «Конфиденциальность» и «Аккаунт»
@@ -316,22 +320,28 @@ export function openProfile({ logout }) {
     const rows = []
     rows.push(toggleRow('Показывать, когда я был(а) в сети', settings.showLastSeen !== false, async (v) => {
       const p = await api.patch('/api/profile', { showLastSeen: v })
-      settings = p.settings
+      settings = lastSettings = p.settings
     }).row)
     // Уведомления: push на сайте (в .exe — свои системные уведомления, строки нет)
     if (!window.electronAPI) {
       if (needsHomeScreen() || !pushSupported()) {
         rows.push(h('div', { class: 'g-urow' }, [h('span', { class: 'g-urow__t' }, [h('b', {}, 'Уведомления на этом устройстве'), h('span', {}, needsHomeScreen() ? 'На iPhone — только у сайта на экране «Домой»' : 'Браузер не поддерживает уведомления')])]))
       } else {
-        const r = toggleRow('Уведомления на этом устройстве', false, async (v) => {
-          if (!v) { await disablePush(); return true }
+        // Браузер отвечает, включены ли уведомления, не сразу — показываем последнее известное
+        // значение, чтобы галочка не переключалась на глазах при открытии раздела
+        const remember = (on) => { try { localStorage.setItem('vl:push-on', on ? '1' : '0') } catch (e) {} }
+        let known = false
+        try { known = localStorage.getItem('vl:push-on') === '1' } catch (e) {}
+        const r = toggleRow('Уведомления на этом устройстве', known, async (v) => {
+          if (!v) { await disablePush(); remember(false); return true }
           if (Notification.permission === 'denied') { toast('Уведомления запрещены в настройках браузера', 'error'); return false }
           const res = await requestNotificationPermission()
           if (res !== 'granted') return false
           await enablePush()
+          remember(true)
           return true
         })
-        pushEnabled().then((on) => r.set(on)).catch(() => {})
+        pushEnabled().then((on) => { remember(on); if (on !== known) r.set(on) }).catch(() => {})
         rows.push(r.row)
       }
     }

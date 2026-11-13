@@ -1981,3 +1981,7 @@ html[data-theme="light"] .g-ava.vl-avatar.is-saved { background: var(--g-ava) !i
    на светлой теме при наведении он светлел и сливался с крестиком */
 .vl-round.is-glass.vl-ucard__close, html[data-theme] .vl-round.is-glass.vl-ucard__close { background: rgba(10, 12, 15, .45) !important; color: #fff !important; }
 .vl-round.is-glass.vl-ucard__close:hover, html[data-theme] .vl-round.is-glass.vl-ucard__close:hover { background: rgba(10, 12, 15, .65) !important; color: #fff !important; }
+
+/* Переход к далёкому сообщению (поиск, ответ): лента на миг гаснет, встаёт на место и проявляется */
+.vl-chat__scroll > .vl-chat__list { transition: opacity .18s ease; }
+.vl-chat__scroll.is-jumping > .vl-chat__list { opacity: 0; transition-duration: .12s; }

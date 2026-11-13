@@ -315,7 +315,6 @@ export function createChatView({ convId, navigate, menuButton }) {
   async function runSearch() {
     const q = searchInput.value.trim()
     search.q = q
-    searchUp.disabled = searchDown.disabled = false
     if (!q) { search.hits = []; search.index = -1; searchResults.hidden = true; searchCount.textContent = ''; highlight = ''; renderList(); return }
     try {
       const r = await api.get(`/api/conversations/${convId}/search?q=${encodeURIComponent(q)}`)
@@ -344,11 +343,11 @@ export function createChatView({ convId, navigate, menuButton }) {
   }
   function goHit(i) {
     if (!search.hits.length) return
-    search.index = Math.max(0, Math.min(i, search.hits.length - 1))
-    searchCount.textContent = `${search.index + 1} из ${search.hits.length}${search.hits.length >= 100 ? '+' : ''}`
+    // По кругу: после последнего совпадения — снова к первому, и наоборот
+    const n = search.hits.length
+    search.index = ((i % n) + n) % n
+    searchCount.textContent = `${search.index + 1} из ${n}${n >= 100 ? '+' : ''}`
     searchResults.hidden = true
-    searchUp.disabled = search.index >= search.hits.length - 1
-    searchDown.disabled = search.index <= 0
     renderList() // подсветка слова переезжает в новое сообщение
     jumpTo(search.hits[search.index].id)
   }
@@ -722,28 +721,41 @@ export function createChatView({ convId, navigate, menuButton }) {
   // и до отрисовки имеют условную высоту, поэтому плавная прокрутка издалека промахивалась.
   // Далеко — прыгаем почти к цели и докручиваем плавно; затем поправляем, пока цель не встанет.
   let flashTimer = 0
+  let jumpTimer = 0
+  // Перейти к сообщению и подсветить. Сообщения вне экрана рисуются лениво (content-visibility)
+  // и до отрисовки имеют условную высоту, поэтому плавно прокручивать через сотни таких сообщений
+  // нельзя — прокрутка промахивается и дёргается поправками. Как в Telegram: рядом — плавная
+  // прокрутка, далеко — лента на миг гаснет, встаёт точно на место и проявляется
   function flash(entry) {
     const node = entry.node
     const box = scroller.getBoundingClientRect()
     const off = () => { const r = node.getBoundingClientRect(); return r.top + r.height / 2 - (box.top + box.height / 2) }
-    if (Math.abs(off()) > box.height * 1.2) {
-      scroller.scrollTop += off() - Math.sign(off()) * box.height * 0.5
-      for (let k = 0; k < 3; k++) { const d = off(); if (Math.abs(d) < 1) break; scroller.scrollTop += d - Math.sign(d) * box.height * 0.5 }
+    const land = () => { for (let k = 0; k < 5; k++) { const d = off(); if (Math.abs(d) < 2) break; scroller.scrollTop += d } }
+    const mark = () => {
+      document.querySelectorAll('.vl-msg.is-flash').forEach((n) => n.classList.remove('is-flash'))
+      void node.offsetWidth
+      node.classList.add('is-flash')
+      clearTimeout(flashTimer)
+      flashTimer = setTimeout(() => node.classList.remove('is-flash'), 1800)
     }
+    clearTimeout(jumpTimer)
+    if (Math.abs(off()) > box.height * 1.5) {
+      scroller.classList.add('is-jumping')
+      jumpTimer = setTimeout(() => {
+        if (destroyed || !node.isConnected) { scroller.classList.remove('is-jumping'); return }
+        land()
+        requestAnimationFrame(() => { land(); scroller.classList.remove('is-jumping'); mark() })
+      }, 130)
+      return
+    }
+    scroller.classList.remove('is-jumping')
     scroller.scrollBy({ top: off(), behavior: 'smooth' })
-    let tries = 0
-    const settle = () => {
-      if (destroyed || !node.isConnected) return
-      const d = off()
-      if (Math.abs(d) > 24 && tries++ < 6) scroller.scrollBy({ top: d, behavior: 'smooth' })
-      if (tries < 6 && Math.abs(d) > 24) setTimeout(settle, 260)
-    }
-    setTimeout(settle, 420)
-    document.querySelectorAll('.vl-msg.is-flash').forEach((n) => n.classList.remove('is-flash'))
-    void node.offsetWidth
-    node.classList.add('is-flash')
-    clearTimeout(flashTimer)
-    flashTimer = setTimeout(() => node.classList.remove('is-flash'), 1800)
+    // Одна мягкая поправка, когда прокрутка закончилась (если высоты рядом уточнились)
+    let fixed = false
+    const fix = () => { if (fixed || destroyed || !node.isConnected) return; fixed = true; const d = off(); if (Math.abs(d) > 3) scroller.scrollBy({ top: d, behavior: 'smooth' }) }
+    scroller.addEventListener('scrollend', fix, { once: true })
+    jumpTimer = setTimeout(fix, 700)
+    mark()
   }
   // Перейти к сообщению: если его нет в памяти — загрузить страницу вокруг него
   async function jumpTo(id) {
