@@ -110,7 +110,7 @@ export function createChatView({ convId, navigate, menuButton }) {
   unsub.push(() => { window.removeEventListener('resize', fitCallBtn); clearTimeout(callTick) })
   // «Ещё» (обои, уведомления, удалить) — правой кнопкой по шапке и в меню чата слева
   const moreBtn = h('button', { type: 'button', class: 'g-hbtn g-chat__more', title: 'Ещё', 'aria-label': 'Ещё' }, [icon('ellipsis-vertical')])
-  searchBtn.addEventListener('click', () => (searchBar.hidden ? openSearch() : closeSearch()))
+  searchBtn.addEventListener('click', () => (searchBar.hidden || searchBar.classList.contains('is-closing') ? openSearch() : closeSearch()))
   callBtn.addEventListener('click', async () => {
     if (inCall() && callState.conversationId === convId) { navigate('/room/' + window.VL.state.roomCode); return }
     if (callBusy) return
@@ -257,17 +257,39 @@ export function createChatView({ convId, navigate, menuButton }) {
   const searchDown = h('button', { type: 'button', class: 'vl-round is-sm is-ghost', title: 'Позже', 'aria-label': 'Следующее совпадение' }, [icon('chevron-down')])
   const searchClose = h('button', { type: 'button', class: 'vl-round is-sm is-ghost', title: 'Закрыть поиск', 'aria-label': 'Закрыть поиск' }, [icon('xmark')])
   const searchResults = h('div', { class: 'vl-search__results', role: 'listbox', hidden: true })
-  const searchBar = h('div', { class: 'g-sfield', hidden: true }, [icon('magnifying-glass'), searchInput, searchCount, searchUp, searchDown, searchResults])
-  searchClose.hidden = true
+  searchClose.classList.add('g-sfield__x')
+  const searchBar = h('div', { class: 'g-sfield', hidden: true }, [icon('magnifying-glass'), searchInput, searchCount, searchUp, searchDown, searchClose, searchResults])
   const search = { hits: [], index: -1, timer: 0, q: '' }
+  // Поле вырастает из кнопки поиска справа налево и встаёт на её место (лупа → крестик);
+  // при закрытии сворачивается обратно в кнопку
+  let searchAnim = null
+  const SEARCH_EASE = 'cubic-bezier(.2, .9, .25, 1.06)'
+  function searchClip(px) { return `inset(0 0 0 calc(100% - ${px}px) round ${px / 2}px)` }
   function openSearch() {
+    if (searchAnim) searchAnim.cancel()
+    const hr = header.getBoundingClientRect()
+    const br = searchBtn.getBoundingClientRect()
+    const who = headWho.getBoundingClientRect()
+    searchBar.style.right = (hr.right - br.right).toFixed(1) + 'px'
+    searchBar.style.height = searchBar.style.minHeight = br.height + 'px'
+    // Шире 380 не нужно; на узком экране — до левого края шапки
+    searchBar.style.width = Math.min(380, br.right - Math.max(hr.left, who.left) - 4).toFixed(0) + 'px'
     searchBar.hidden = false
     searchBtn.classList.add('is-on')
-    searchInput.focus()
+    searchAnim = searchBar.animate([{ clipPath: searchClip(br.height) }, { clipPath: 'inset(0 0 0 0 round ' + br.height / 2 + 'px)' }], { duration: 480, easing: SEARCH_EASE })
+    searchBar.classList.remove('is-closing')
+    searchInput.focus({ preventScroll: true })
     searchInput.select()
   }
   function closeSearch() {
-    searchBar.hidden = true
+    if (!searchBar.hidden && !searchBar.classList.contains('is-closing')) {
+      if (searchAnim) searchAnim.cancel()
+      const hgt = searchBar.getBoundingClientRect().height || 46
+      searchBar.classList.add('is-closing')
+      searchResults.hidden = true
+      searchAnim = searchBar.animate([{ clipPath: 'inset(0 0 0 0 round ' + hgt / 2 + 'px)' }, { clipPath: searchClip(hgt) }], { duration: 300, easing: 'cubic-bezier(.4, 0, .2, 1)', fill: 'forwards' })
+      searchAnim.onfinish = () => { searchBar.hidden = true; searchBar.classList.remove('is-closing'); searchAnim.cancel(); searchAnim = null }
+    }
     searchBtn.classList.remove('is-on')
     searchInput.value = ''
     search.hits = []
@@ -407,7 +429,7 @@ export function createChatView({ convId, navigate, menuButton }) {
   const selBar = h('div', { class: 'g-sel', hidden: true }, [selCount, h('span', { class: 'g-sel__sp' }), selFwd, selCopy, selDel, selClose])
   const composer = h('div', { class: 'vl-composer' }, [replyBar, tray, composerBox, selBar, blockedNote, typingLine])
 
-  const node = h('section', { class: `vl-view vl-view--chat${saved ? ' is-saved' : ''}` }, [header, pinBar, searchBar, chatMain, composer])
+  const node = h('section', { class: `vl-view vl-view--chat${saved ? ' is-saved' : ''}` }, [header, pinBar, chatMain, composer])
 
   // Черновик переживает переход между чатами и перезагрузку вкладки
   const draftKey = `vl:draft:${convId}`
@@ -1070,12 +1092,11 @@ export function createChatView({ convId, navigate, menuButton }) {
 
   // Звонок в ленте — карточка как в канвасе: круглая трубка, «Исходящий звонок», время под ним
   function buildCallMessage(m) {
-    const author = authorOf(m)
     const mine = m.authorId === me.id
     const status = (m.meta && m.meta.status) || 'ringing'
     let title
     let sub
-    if (status === 'missed') { title = mine ? 'Без ответа' : 'Пропущенный звонок'; sub = mine ? `${displayName(peer)} не ответил(а)` : `от ${displayName(author)}` }
+    if (status === 'missed') { title = mine ? 'Без ответа' : 'Пропущенный звонок'; sub = '' }
     else if (status === 'declined') { title = mine ? 'Звонок отклонён' : 'Вы отклонили звонок'; sub = '' }
     else if (status === 'ringing') { title = mine ? 'Исходящий звонок' : 'Входящий звонок'; sub = 'вызов…' }
     else { title = mine ? 'Исходящий звонок' : 'Входящий звонок'; sub = '' }

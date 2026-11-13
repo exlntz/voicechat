@@ -1077,7 +1077,6 @@ html:not([data-theme="light"]) .room-screen .controls-pill .ctrl-btn.off { color
   .g-hbtn { width: 40px; height: 40px; }
   .g-chat__call { width: 40px; height: 40px; padding: 0; justify-content: center; }
   .g-chat__call-label { display: none; }
-  .g-sfield { position: absolute; left: 10px; right: 10px; top: 72px; width: auto; z-index: 5; box-shadow: var(--g-pop); }
   .vl-view--chat .vl-chat__list { padding: 16px 12px 8px; }
   .vl-view--chat .vl-composer { padding: 0 10px calc(env(safe-area-inset-bottom) + 10px); }
   /* Лента как в Телеграме: свои справа, собеседник слева, без аватарок, хвостик у края */
@@ -1906,6 +1905,9 @@ input:-webkit-autofill { animation: st-autofill 1ms; }
 .g-rip { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; z-index: 0; contain: strict; }
 .g-rip__dot { position: absolute; border-radius: 50%; background: rgba(255, 255, 255, .09); transform: scale(.04); will-change: transform, opacity; }
 html[data-theme="light"] .g-rip__dot { background: rgba(0, 0, 0, .08); }
+/* выбранная строка (тёмная в светлой теме) — круг светлый, чтобы он был виден до конца */
+.g-rip__dot { transition: background-color .3s ease; }
+.is-on > .g-rip > .g-rip__dot, html[data-theme="light"] .is-on > .g-rip > .g-rip__dot { background: rgba(255, 255, 255, .12); }
 
 /* ─────────── «Добавить друга» на ПК: строка поиска выезжает под кнопкой ───────────
    Высота растёт пружиной (grid 0fr → 1fr), сама строка опускается и проявляется */
@@ -1926,3 +1928,13 @@ html[data-theme="light"] .g-rip__dot { background: rgba(0, 0, 0, .08); }
 .g-fadd--inline .g-fadd__res { padding: 0 6px 6px; }
 .g-fadd--inline .g-fadd__card { background: var(--g-panel); border-radius: 20px; }
 .g-fadd--inline .g-fadd__hint { padding: 2px 12px 10px; }
+
+/* ─────────── Поиск по чату вырастает из кнопки-лупы ───────────
+   Поле лежит поверх шапки ровно на месте кнопки (позицию и ширину ставит chat.js) и
+   раскрывается справа налево; справа, где была лупа, — крестик */
+.g-chat__head .g-sfield { position: absolute; top: 50%; translate: 0 -50%; z-index: 6; animation: none; padding-right: 0; }
+.g-chat__head .g-sfield .g-sfield__x { width: var(--sx, 46px); height: var(--sx, 46px); --s: var(--sx, 46px); flex-shrink: 0; margin-left: 2px; }
+.g-chat__head .g-sfield .g-sfield__x .vl-ico { width: 17px; height: 17px; }
+.g-chat__head .g-sfield .vl-search__results { width: min(380px, calc(100vw - 20px)); }
+html[data-theme] .g-chat__head .g-sfield { padding-right: 0; }
+@media (max-width: 860px) { .g-chat__head .g-sfield { --sx: 40px; } }
