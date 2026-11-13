@@ -671,9 +671,15 @@ function makePasswordField(placeholder, maxlength, autocomplete) {
   const input = el('input', { type: 'password', placeholder, maxlength, autocomplete })
   const eyeIcon = el('i', { class: 'fas fa-eye' })
   const toggleBtn = el('button', { type: 'button', class: 'password-toggle-btn', tabindex: '-1', 'aria-label': 'Показать пароль' }, [eyeIcon])
+  // Глазик не забирает фокус: нажатие не уводит курсор из поля, позиция курсора сохраняется
+  toggleBtn.addEventListener('pointerdown', (e) => e.preventDefault())
+  toggleBtn.addEventListener('mousedown', (e) => e.preventDefault())
   toggleBtn.addEventListener('click', () => {
     const shown = input.type === 'text'
+    const focused = document.activeElement === input
+    const a = input.selectionStart, b = input.selectionEnd
     input.type = shown ? 'password' : 'text'
+    if (focused) { input.focus({ preventScroll: true }); try { input.setSelectionRange(a, b) } catch (e) {} }
     eyeIcon.className = shown ? 'fas fa-eye' : 'fas fa-eye-slash'
     toggleBtn.setAttribute('aria-label', shown ? 'Показать пароль' : 'Скрыть пароль')
   })
