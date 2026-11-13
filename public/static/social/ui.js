@@ -219,17 +219,18 @@ export function setPresenceDot(avatarNode, presence) {
   dot.dataset.call = presence && presence.inCall ? '1' : ''
 }
 
-// Не в сети: «был(а) в сети 14:05», а если человек скрыл это в профиле — «был(а) недавно»
+// Не в сети, как в Telegram: «был(а) 11 минут назад», «был(а) вчера в 14:05», «был(а) 11.11.2026»;
+// если человек скрыл это в профиле — «был(а) недавно»
 export function presenceText(p) {
   if (!p || p.status === 'offline') {
-    if (p && p.hidden) return 'Был(а) недавно'
-    if (p && p.lastSeen) return 'Был(а) в сети ' + lastSeenWhen(p.lastSeen)
-    return 'Не в сети'
+    if (p && p.hidden) return 'был(а) недавно'
+    if (p && p.lastSeen) return 'был(а) ' + lastSeenWhen(p.lastSeen)
+    return 'не в сети'
   }
-  if (p.inCall) return 'В звонке'
-  if (p.status === 'idle') return 'Отошёл'
-  if (p.status === 'dnd') return 'Не беспокоить'
-  return 'В сети'
+  if (p.inCall) return 'в звонке'
+  if (p.status === 'idle') return 'отошёл'
+  if (p.status === 'dnd') return 'не беспокоить'
+  return 'в сети'
 }
 
 // ---- Время ----
@@ -241,10 +242,15 @@ export function timeHM(ts) {
   const d = new Date(ts)
   return `${d.getHours()}:${pad(d.getMinutes())}`
 }
+function plural(n, one, few, many) {
+  const a = n % 10, b = n % 100
+  return a === 1 && b !== 11 ? one : a >= 2 && a <= 4 && (b < 12 || b > 14) ? few : many
+}
 function lastSeenWhen(ts) {
   const diff = Date.now() - ts
   if (diff < 60 * 1000) return 'только что'
-  if (diff < 60 * 60 * 1000) return `${Math.floor(diff / 60000)} мин. назад`
+  if (diff < 60 * 60 * 1000) { const n = Math.floor(diff / 60000); return `${n} ${plural(n, 'минуту', 'минуты', 'минут')} назад` }
+  if (diff < 12 * 60 * 60 * 1000) { const n = Math.floor(diff / 3600000); return `${n} ${plural(n, 'час', 'часа', 'часов')} назад` }
   const d = new Date(ts)
   const now = new Date()
   const y = new Date(now); y.setDate(now.getDate() - 1)
