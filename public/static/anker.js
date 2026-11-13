@@ -587,7 +587,7 @@
   var RIP_SKIP = 'input, textarea, select, [contenteditable="true"], .no-rip, .tile video, [role="tab"], [role="tablist"] button, [role="radio"], .g-seg button, .g-chat__who'
   var ripReduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches
   var ripCur = null
-  var RIP_GROW = 360
+  var RIP_GROW = 220
   function ripRelease() {
     var st = ripCur
     ripCur = null
@@ -595,7 +595,7 @@
     st.fading = true
     // Быстрый клик: круг сначала почти дорастает, потом мягко тает — без вспышки
     var left = Math.max(0, RIP_GROW * 0.6 - (performance.now() - st.t0))
-    var fade = st.dot.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 360, delay: left, easing: 'cubic-bezier(.33, 0, .2, 1)', fill: 'forwards' })
+    var fade = st.dot.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, delay: left, easing: 'cubic-bezier(.33, 0, .2, 1)', fill: 'forwards' })
     fade.onfinish = function () { st.wrap.__gone = true; if (st.wrap.parentNode) st.wrap.parentNode.removeChild(st.wrap) }
   }
   if (!ripReduce && typeof Element.prototype.animate === 'function') {
