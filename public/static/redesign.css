@@ -2023,3 +2023,37 @@ html[data-theme] .g-join .g-join__msg .auth-msg::before { display: none; }
 html[data-theme="light"] .g-join .g-join__msg .auth-msg { color: #b4534a; }
 /* Мягкий набор (anker.js) считает позицию от поля — держим зеркало внутри его блока */
 .g-join__f { position: relative; }
+
+/* ─────────── Экран подключения: прямоугольник превью как был, под ним имя и вход ───────────
+   Ниже превью — «Ваше имя на встрече» крупно, «Войти в звонок» и шестерёнка устройств */
+.lobby-screen.g-join { position: relative; }
+.g-join .g-join__body { flex-grow: 1; display: flex; align-items: center; justify-content: center; min-height: 0; }
+.g-join__col { width: min(800px, 100%); display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.g-join__col > .device-preview.g-join__prev { width: 100%; max-height: calc(100dvh - 330px); }
+.g-join__who { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: 6px; max-width: 100%; }
+.g-join__who-l { font-size: 14px; font-weight: 500; color: var(--g-sub); }
+.g-join__who-n { font: 700 34px / 1.2 var(--font); letter-spacing: -.02em; color: var(--g-ink); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-theme] .g-join .g-join__who input.g-join__who-inp { width: min(480px, 90vw); font: 700 34px / 1.2 var(--font) !important; letter-spacing: -.02em; height: auto !important; min-height: 0 !important; padding: 2px 12px !important; border: 0; border-radius: 16px; text-align: center; color: var(--g-ink); background: transparent !important; box-shadow: none; transition: background-color .2s; }
+html[data-theme] .g-join .g-join__who input.g-join__who-inp:hover, html[data-theme] .g-join .g-join__who input.g-join__who-inp:focus { background: var(--g-field) !important; }
+.g-join__who .g-join__who-inp::placeholder { color: var(--g-ink); opacity: .85; }
+.g-join__bar { display: flex; align-items: center; gap: 10px; }
+.g-join__bar .g-join__btn { width: 320px; max-width: calc(100vw - 110px); height: 56px; margin: 0; border-radius: 28px; }
+.g-join__setwrap { position: relative; }
+html[data-theme] .g-join .g-join__setbtn { width: 56px; height: 56px; border-radius: 28px; background: var(--g-field) !important; color: var(--g-ink) !important; }
+html[data-theme] .g-join .g-join__setbtn:hover, html[data-theme] .g-join .g-join__setbtn.on { background: var(--g-field-h) !important; }
+.g-join__setbtn .g-svg { transition: transform .6s var(--g-spring); }
+.g-join__setbtn.on .g-svg, .g-join__setbtn:hover .g-svg { transform: rotate(45deg); }
+.g-join__set { position: absolute; right: 0; bottom: calc(100% + 12px); z-index: 6; width: 360px; max-width: calc(100vw - 32px); box-sizing: border-box; border-radius: 28px; background: var(--g-panel); box-shadow: var(--g-pop), 0 0 0 1px var(--g-line); padding: 18px; display: flex; flex-direction: column; gap: 14px; transform-origin: 100% 100%; animation: g-set-in .35s var(--g-spring) both; }
+.g-join__set[hidden] { display: none; }
+@keyframes g-set-in { from { opacity: 0; transform: translateY(8px) scale(.96); } }
+.g-join__set .dd, .g-join__set .dd-btn { width: 100%; }
+html[data-theme] .g-join .g-join__col > .auth-error.g-join__msg[style*="display: block"] { margin: -8px 0 0; text-align: center; }
+html[data-theme] .g-join .g-join__col > .g-join__msg .auth-msg { justify-content: center; text-align: center; }
+/* «Войти» для гостя — тихо справа сверху */
+.g-join .g-join__login { position: absolute; top: 18px; right: 26px; z-index: 5; height: 40px; padding: 0 18px; border-radius: 20px; margin: 0; background: var(--g-field) !important; color: var(--g-ink) !important; font: 600 14px var(--font); }
+.g-join .g-join__login:hover { background: var(--g-field-h) !important; }
+@media (max-width: 860px) {
+  .g-join__col { gap: 14px; }
+  .g-join__who-n, html[data-theme] .g-join .g-join__who input.g-join__who-inp { font-size: 28px !important; }
+  .g-join .g-join__login { top: calc(env(safe-area-inset-top) + 10px); right: 14px; }
+}
