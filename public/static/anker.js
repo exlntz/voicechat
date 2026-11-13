@@ -600,7 +600,7 @@
   // клик тут же нагружает страницу (открытие чата, перерисовка списка). Обработчик один на документ.
   var RIP_SEL = 'button, a.g-row, a.g-btn, [role="button"], [role="menuitem"], [role="option"], .g-crow, .g-frow, .g-urow'
   // Без заливки: переключатели с бегунком (вкладки Чаты / Звонки / Друзья, «Тема», «Размер текста»), шапка чата и аватар-кнопка профиля
-  var RIP_SKIP = 'input, textarea, select, [contenteditable="true"], .no-rip, .tile video, .g-tabs__btn, .g-bar__btn, [role="radio"], .g-seg button, .g-chat__who, .g-meb, .g-pf__nav.is-on'
+  var RIP_SKIP = 'input, textarea, select, [contenteditable="true"], .no-rip, .tile video, .g-tabs__btn, .g-bar__btn, [role="radio"], .g-seg button, .g-chat__who, .g-meb'
   var ripReduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches
   // Как в Telegram Web: волна запускается нажатием и сама доигрывает 0.7 с — растёт из точки
   // нажатия до двойного размера и одновременно тает. От отпускания она не зависит, поэтому
