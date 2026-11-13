@@ -267,15 +267,17 @@ export function createChatView({ convId, navigate, menuButton }) {
   function searchClip(px) { return `inset(0 0 0 calc(100% - ${px}px) round ${px / 2}px)` }
   function openSearch() {
     if (searchAnim) searchAnim.cancel()
-    const hr = header.getBoundingClientRect()
-    const br = searchBtn.getBoundingClientRect()
-    const who = headWho.getBoundingClientRect()
-    searchBar.style.right = (hr.right - br.right).toFixed(1) + 'px'
-    searchBar.style.height = searchBar.style.minHeight = br.height + 'px'
+    // Размеры кнопки — без учёта transform: в момент клика она сжата нажатием (scale .96),
+    // и поле выходило меньше кнопки — её края выглядывали из-под поля
+    const bw = searchBtn.offsetWidth, bh = searchBtn.offsetHeight
+    const bRight = searchBtn.offsetLeft + bw
+    const br = { height: bh }
+    searchBar.style.right = (header.clientWidth - bRight) + 'px'
+    searchBar.style.height = searchBar.style.minHeight = bh + 'px'
     // Шире 380 не нужно; на узком экране — до левого края шапки
-    searchBar.style.width = Math.min(380, br.right - Math.max(hr.left, who.left) - 4).toFixed(0) + 'px'
+    searchBar.style.width = Math.min(380, bRight - Math.max(0, headWho.offsetLeft) - 4) + 'px'
     searchBar.hidden = false
-    searchBtn.classList.add('is-on')
+    searchBtn.classList.add('is-on', 'is-under')
     searchAnim = searchBar.animate([{ clipPath: searchClip(br.height) }, { clipPath: 'inset(0 0 0 0 round ' + br.height / 2 + 'px)' }], { duration: 480, easing: SEARCH_EASE })
     searchBar.classList.remove('is-closing')
     searchInput.focus({ preventScroll: true })
@@ -290,7 +292,7 @@ export function createChatView({ convId, navigate, menuButton }) {
       searchAnim = searchBar.animate([{ clipPath: 'inset(0 0 0 0 round ' + hgt / 2 + 'px)' }, { clipPath: searchClip(hgt) }], { duration: 300, easing: 'cubic-bezier(.4, 0, .2, 1)', fill: 'forwards' })
       searchAnim.onfinish = () => { searchBar.hidden = true; searchBar.classList.remove('is-closing'); searchAnim.cancel(); searchAnim = null }
     }
-    searchBtn.classList.remove('is-on')
+    searchBtn.classList.remove('is-on', 'is-under')
     searchInput.value = ''
     search.hits = []
     search.index = -1

@@ -67,21 +67,29 @@ export function openProfile({ logout }) {
     meName.textContent = displayName(u)
     meUser.textContent = '@' + u.username
   }
-  function show(id) {
+  // quiet — пересобрать без анимации появления (подъехали данные с сервера, пока окно открыто)
+  function show(id, { quiet = false } = {}) {
     tab = NAV.some((n) => n.id === id) ? id : 'profile'
     for (const [k, b] of navBtns) b.classList.toggle('is-on', k === tab)
     title.textContent = NAV.find((n) => n.id === tab).title
     const build = { profile: buildProfile, look: buildLook, privacy: buildPrivacy, account: buildAccount }[tab]
-    pane.replaceChildren(h('div', { class: 'g-pf__sec' }, build()))
+    pane.replaceChildren(h('div', { class: `g-pf__sec${quiet ? ' is-quiet' : ''}` }, build()))
   }
   paintMe()
   show('profile')
 
   api.get('/api/profile').then((p) => {
     if (!p) return
+    // Ответ приходит, пока окно ещё открывается: пересобираем содержимое, только если что-то
+    // реально поменялось, и без анимации — иначе всё дёргалось
+    const userBefore = JSON.stringify(store.me)
+    const setBefore = JSON.stringify(settings)
     settings = p.settings
     if (p.user) updateUser(p.user)
-    if (current && current.overlay === overlay) { paintMe(); show(tab) }
+    const userChanged = JSON.stringify(store.me) !== userBefore
+    // Настройки нужны только разделам «Конфиденциальность» и «Аккаунт»
+    if (!userChanged && (!['privacy', 'account'].includes(tab) || JSON.stringify(settings) === setBefore)) return
+    if (current && current.overlay === overlay) { paintMe(); show(tab, { quiet: true }) }
   }).catch(() => {})
 
   // ---------- Профиль: обложка, аватар, имя, юзернейм ----------
