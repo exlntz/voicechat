@@ -338,7 +338,8 @@ app.post('/api/join', async (c) => {
   const displayName = sanitizeName(authUser?.displayName || authUser?.username || '', 'Гость')
   const providedHostSecret = typeof body.hostSecret === 'string' && body.hostSecret ? body.hostSecret : null
 
-  if (!roomCode) roomCode = randomId(6)
+  // Новая комната по ссылке: код подлиннее — его больше не вводят руками, только открывают ссылку
+  if (!roomCode) roomCode = randomId(10)
 
   let currentCount = 0
   try {
