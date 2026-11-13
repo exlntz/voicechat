@@ -599,10 +599,11 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
     const forCall = mode === 'call'
     const input = h('input', { type: 'text', class: 'g-field__input', placeholder: 'Имя или юзернейм друга', autocomplete: 'off', spellcheck: 'false' })
     const codeLink = h('button', { type: 'button', class: 'g-frow' }, [
-      h('span', { class: 'g-ava g-ava--ico' }, [icon('hashtag')]),
-      h('span', { class: 'g-frow__text' }, [h('span', { class: 'g-frow__name' }, 'Комната по коду'), h('span', { class: 'g-frow__sub' }, 'создать или войти')])
+      h('span', { class: 'g-ava g-ava--ico' }, [icon('link')]),
+      h('span', { class: 'g-frow__text' }, [h('span', { class: 'g-frow__name' }, 'Звонок по ссылке'), h('span', { class: 'g-frow__sub' }, 'создать и скопировать ссылку')])
     ])
-    codeLink.addEventListener('click', () => { done(); navigate('/lobby') })
+    // Сразу создаём комнату и входим в неё; ссылка для собеседников копируется сама
+    codeLink.addEventListener('click', () => { done(); window.VL.autoCreateCall = true; navigate('/lobby') })
     const pick = (u) => { done(); if (forCall) callFriend(u.id); else openDmWith(u.id) }
     const list = h('div', { class: 'g-picker__list' })
     const close = h('button', { type: 'button', class: 'g-close', 'aria-label': 'Закрыть' }, [icon('xmark')])

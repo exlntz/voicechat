@@ -939,7 +939,14 @@ async function renderLobby(prefillRoomCode = '') {
 
   root.innerHTML = ''
   const params = new URLSearchParams(location.search)
-  const urlRoom = prefillRoomCode || (location.pathname.startsWith('/room/') ? location.pathname.split('/room/')[1] : '') || params.get('room') || ''
+  const urlRoom = (prefillRoomCode || (location.pathname.startsWith('/room/') ? location.pathname.split('/room/')[1] : '') || params.get('room') || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+  // Звонок по ссылке: кода вводить не нужно. Пришли по ссылке /room/<код> — входим в эту
+  // комнату (старые ссылки вроде /room/111 тоже работают); без кода — создаём новую
+  // комнату, сразу заходим в неё и копируем ссылку для собеседников
+  const creating = !urlRoom
+  const autoCreate = creating && !!VL.autoCreateCall
+  VL.autoCreateCall = false
+  const idleLabel = creating ? 'Создать звонок' : 'Войти в звонок'
 
   // ---- Разметка как в канвасе «Вход в звонок»: слева превью, справа карточка ----
   const me = state.currentUser
@@ -1003,13 +1010,12 @@ async function renderLobby(prefillRoomCode = '') {
   })
   meterPill.classList.toggle('is-off', !state.micEnabled)
 
-  // Карточка: код комнаты, устройства, «Войти в звонок»
+  // Карточка: устройства и «Войти в звонок» / «Создать звонок» (кода больше нет — входят по ссылке)
   const micSelect = el('select', { 'aria-label': 'Микрофон' })
   const spkSelect = el('select', { 'aria-label': 'Динамики' })
   const camSelect = el('select', { 'aria-label': 'Камера' })
   const devices = { micSelect, spkSelect, camSelect, micDots }
   const field = (label, control) => el('div', { class: 'g-join__f' }, [el('span', { class: 'g-join__label' }, label), control])
-  const roomInput = el('input', { type: 'text', class: 'g-join__inp', placeholder: 'Код комнаты', value: urlRoom, autocomplete: 'off', spellcheck: 'false' })
   const spkField = field('Динамики', makeDropdown(spkSelect, 'spk'))
   if (!speakerSelectionSupported()) spkField.style.display = 'none'
   // Кнопка входа — «шаги подключения»: слева загрузка, текст шага перелистывается
@@ -1017,7 +1023,7 @@ async function renderLobby(prefillRoomCode = '') {
   // заливается зелёным и рисуется галочка. Звонок в это время собирается скрытым за
   // экраном входа и показывается уже готовым.
   const joinOk = svgIcon('<svg class="g-jb__ok" viewBox="0 0 36 36" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18.5l6 6 12-13"/></svg>')
-  let joinTxt = el('span', { class: 'g-jb__txt' }, 'Войти в звонок')
+  let joinTxt = el('span', { class: 'g-jb__txt' }, idleLabel)
   const joinDots = [el('i'), el('i'), el('i')]
   const joinBtn = el('button', { type: 'button', class: 'g-join__btn g-jbc', 'data-st': 'idle' }, [
     el('span', { class: 'g-jb__ico', 'aria-hidden': 'true' }, [el('span', { class: 'g-jb__spin' }), joinOk]),
@@ -1027,7 +1033,7 @@ async function renderLobby(prefillRoomCode = '') {
   function setJoinState(st, text = '', step = 0) {
     joinBtn.dataset.st = st
     joinBtn.disabled = st !== 'idle'
-    const label = st === 'idle' ? 'Войти в звонок' : text
+    const label = st === 'idle' ? idleLabel : text
     joinBtn.setAttribute('aria-label', label)
     if (joinTxt.textContent !== label) {
       // Новый текст шага въезжает снизу
@@ -1038,8 +1044,7 @@ async function renderLobby(prefillRoomCode = '') {
     joinDots.forEach((d, i) => { d.dataset.on = i < step ? '1' : '0' })
   }
   const card = el('div', { class: 'g-join__card' }, [
-    el('span', { class: 'g-join__title' }, 'Войти в звонок'),
-    field('Код комнаты', roomInput),
+    el('span', { class: 'g-join__title' }, creating ? 'Новый звонок' : 'Войти в звонок'),
     field('Микрофон', makeDropdown(micSelect, 'mic')),
     spkField,
     field('Камера', makeDropdown(camSelect, 'cam')),
@@ -1047,7 +1052,7 @@ async function renderLobby(prefillRoomCode = '') {
     joinBtn
   ])
 
-  screen.appendChild(gCallHeader('Вход в звонок'))
+  screen.appendChild(gCallHeader(creating ? 'Новый звонок' : 'Вход в звонок'))
   screen.appendChild(el('div', { class: 'g-join__body' }, [preview, card]))
   root.appendChild(screen)
 
@@ -1160,12 +1165,12 @@ async function renderLobby(prefillRoomCode = '') {
   VL.teardownLobby = stopPreview
 
   async function doJoin() {
-    const roomCode = roomInput.value.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+    const roomCode = urlRoom
     // Если ранее этот же браузер создал комнату с таким кодом - подтягиваем сохранённый секрет создателя,
     // чтобы при повторном входе (например, обновление страницы) права хоста восстановились
     const savedHostSecret = roomCode ? localStorage.getItem(`hostSecret:${roomCode}`) : null
 
-    setJoinState('load', 'Соединяемся…', 1)
+    setJoinState('load', creating ? 'Создаём звонок…' : 'Соединяемся…', 1)
     errorSlot.style.display = 'none'
     const startedAt = Date.now()
     let mediaAt = 0
@@ -1212,6 +1217,12 @@ async function renderLobby(prefillRoomCode = '') {
           await new Promise((r) => setTimeout(r, 620))
           stopPreview()
           vlNavigate(`/room/${data.roomCode}`)
+          // Создали звонок — ссылка для собеседников сразу в буфере обмена
+          if (creating) {
+            const link = `${location.origin}/room/${data.roomCode}`
+            const ok = await copyToClipboard(link)
+            showToast(ok ? 'Ссылка на звонок скопирована — отправьте её собеседнику' : 'Звонок создан — ссылку можно скопировать кнопкой сверху', ok ? 'success' : 'info')
+          }
         },
         onFail: fail
       })
@@ -1221,7 +1232,8 @@ async function renderLobby(prefillRoomCode = '') {
   }
 
   joinBtn.addEventListener('click', doJoin)
-  roomInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doJoin() })
+  // «Звонок по ссылке» из меню «Новый звонок»: не ждём нажатия — сразу создаём и входим
+  if (autoCreate) doJoin()
 }
 
 // ===================== КОМНАТА (звонок) =====================
