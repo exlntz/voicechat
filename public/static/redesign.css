@@ -1906,3 +1906,23 @@ input:-webkit-autofill { animation: st-autofill 1ms; }
 .g-rip { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; z-index: 0; contain: strict; }
 .g-rip__dot { position: absolute; border-radius: 50%; background: rgba(255, 255, 255, .09); transform: scale(.04); will-change: transform, opacity; }
 html[data-theme="light"] .g-rip__dot { background: rgba(0, 0, 0, .08); }
+
+/* ─────────── «Добавить друга» на ПК: строка поиска выезжает под кнопкой ───────────
+   Высота растёт пружиной (grid 0fr → 1fr), сама строка опускается и проявляется */
+.g-faddbox { display: grid; grid-template-rows: 0fr; margin-top: -6px; transition: grid-template-rows .5s var(--g-spring), margin-top .5s var(--g-spring); }
+.g-faddbox.is-open { grid-template-rows: 1fr; margin-top: 0; }
+.g-faddbox__in { min-height: 0; overflow: hidden; }
+.g-fadd.g-fadd--inline { width: 100%; padding: 0; border-radius: 26px; background: var(--g-field); box-shadow: none; animation: none;
+  opacity: 0; transform: translateY(-10px) scale(.98); transform-origin: 50% 0; transition: opacity .3s ease, transform .5s var(--g-spring); }
+.g-faddbox.is-open .g-fadd--inline { opacity: 1; transform: none; }
+.g-fadd--inline .g-fadd__row { height: 52px; padding: 0 8px 0 18px; gap: 10px; }
+.g-fadd--inline .g-fadd__row > .vl-ico { width: 18px; height: 18px; }
+.g-fadd--inline .g-fadd__input { font-size: 15px; }
+.g-fadd--inline .g-fadd__esc { display: none; }
+.g-fadd--inline .g-fadd__x { width: 36px; height: 36px; border-radius: 18px; transition: background-color .2s; }
+.g-fadd--inline .g-fadd__x > .vl-ico { display: block; color: var(--g-sub); }
+.g-fadd--inline .g-fadd__x:hover { background: var(--g-field-h); }
+.g-fadd--inline .g-fadd__sep { display: none; }
+.g-fadd--inline .g-fadd__res { padding: 0 6px 6px; }
+.g-fadd--inline .g-fadd__card { background: var(--g-panel); border-radius: 20px; }
+.g-fadd--inline .g-fadd__hint { padding: 2px 12px 10px; }

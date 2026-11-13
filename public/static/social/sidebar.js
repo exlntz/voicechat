@@ -345,9 +345,16 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
   // ---------- Панель «Друзья» ----------
   // «Добавить друга» — кнопка во всю ширину (как «Новый звонок»); на телефоне — круглая в шапке
   const addFriendBtn = h('button', { type: 'button', class: 'g-btn g-btn--acc g-btn--wide g-addfriend' }, [icon('user-plus'), 'Добавить друга'])
-  addFriendBtn.addEventListener('click', () => openFriendAdd({ openDmWith }))
+  // Строка поиска выезжает прямо под кнопкой; повторное нажатие — прячет
+  const addBox = h('div', { class: 'g-faddbox' })
+  let addInline = null
+  addFriendBtn.addEventListener('click', () => {
+    if (addInline) { addInline.close(); return }
+    addInline = openFriendAdd({ openDmWith, mount: addBox, onClosed: () => { addInline = null; addFriendBtn.classList.remove('is-open') } })
+    if (addInline) addFriendBtn.classList.add('is-open')
+  })
   const friendsList = h('div', { class: 'g-list g-list--friends' })
-  const friendsPane = h('div', { class: 'g-pane g-pane--friends' }, [addFriendBtn, friendsList])
+  const friendsPane = h('div', { class: 'g-pane g-pane--friends' }, [addFriendBtn, addBox, friendsList])
 
   async function run(fn, okText) {
     try { await fn(); if (okText) toast(okText, 'success') } catch (e) { toast(e.message, 'error') }
@@ -423,7 +430,8 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
         roundBtn('message', 'Написать', () => openDmWith(u.id), 'g-only-phone'),
         roundBtn('phone', 'Позвонить', () => callFriend(u.id), 'g-only-phone')
       ])
-      row.addEventListener('click', () => { setTab('chats'); openDmWith(u.id) })
+      // Клик по другу — его профиль (написать и позвонить — из профиля или кнопками на телефоне)
+      row.addEventListener('click', () => openProfileOf(u))
       row.addEventListener('contextmenu', (e) => { e.preventDefault(); friendMenu(f, e) })
       onLongPress(row, (e) => friendMenu(f, e))
       nodes.push(row)

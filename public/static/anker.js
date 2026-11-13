@@ -336,7 +336,8 @@
     : null
 
   function softType(el) {
-    if (el.__st || calm() || !stValue[el.tagName] || el.readOnly) return
+    // Юзернейм в «Добавить друга» печатается обычным текстом (как юзернеймы на входе и в профиле)
+    if (el.__st || calm() || !stValue[el.tagName] || el.readOnly || el.classList.contains('g-fadd__input')) return
     var multi = el.tagName === 'TEXTAREA'
     var mir = make('span', 'st-mir' + (multi ? ' is-multi' : ''))
     mir.setAttribute('aria-hidden', 'true')
@@ -583,7 +584,8 @@
   // только transform и opacity: их ведёт композитор, поэтому заливка идёт плавно, даже когда
   // клик тут же нагружает страницу (открытие чата, перерисовка списка). Обработчик один на документ.
   var RIP_SEL = 'button, a.g-row, a.g-btn, [role="button"], [role="menuitem"], [role="option"], .g-crow, .g-frow, .g-urow'
-  var RIP_SKIP = 'input, textarea, select, [contenteditable="true"], .no-rip, .tile video'
+  // Без заливки: переключатели-вкладки (Чаты / Звонки / Друзья — там свой бегунок) и шапка чата с профилем
+  var RIP_SKIP = 'input, textarea, select, [contenteditable="true"], .no-rip, .tile video, [role="tab"], [role="tablist"] button, .g-chat__who'
   var ripReduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches
   var ripCur = null
   var RIP_GROW = 640
