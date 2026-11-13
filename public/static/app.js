@@ -1081,7 +1081,14 @@ async function renderLobby(prefillRoomCode = '') {
     spkField,
     field('Камера', makeDropdown(camSelect, 'cam'))
   ])
+  // Окно устройств — поверх экрана, над шестерёнкой (превью обрезает всё, что выходит за рамку)
+  const placeSet = () => {
+    const r = setBtn.getBoundingClientRect()
+    setPanel.style.right = Math.max(16, window.innerWidth - r.right) + 'px'
+    setPanel.style.bottom = Math.max(16, window.innerHeight - r.top + 12) + 'px'
+  }
   const toggleSet = (on) => {
+    if (on) placeSet()
     setPanel.hidden = !on
     setBtn.classList.toggle('on', on)
     setBtn.setAttribute('aria-expanded', on ? 'true' : 'false')
@@ -1092,7 +1099,10 @@ async function renderLobby(prefillRoomCode = '') {
   }, true)
   // Превью-прямоугольник остаётся как был (камера, индикатор микрофона, имя, кнопки);
   // под ним — имя на встрече, «Войти в звонок» и шестерёнка с выбором устройств
-  const bar = el('div', { class: 'g-join__bar' }, [joinBtn, el('div', { class: 'g-join__setwrap' }, [setBtn, setPanel])])
+  const bar = el('div', { class: 'g-join__bar' }, [joinBtn])
+  // Шестерёнка — в правом нижнем углу превью, рядом с кнопками микрофона и камеры
+  preview.appendChild(el('div', { class: 'g-join__setcorner' }, [setBtn]))
+  window.addEventListener('resize', () => { if (!setPanel.hidden) placeSet() })
   const col = el('div', { class: 'g-join__col' }, [preview, nameBlock, bar, errorSlot])
 
   screen.appendChild(gCallHeader(creating ? 'Новый звонок' : 'Вход в звонок'))
@@ -1103,6 +1113,7 @@ async function renderLobby(prefillRoomCode = '') {
     screen.appendChild(login)
   }
   screen.appendChild(el('div', { class: 'g-join__body' }, [col]))
+  screen.appendChild(setPanel)
   // «Звонок по ссылке»: экран подключения не показываем — сразу собираем звонок,
   // на это время только тихий индикатор по центру
   if (autoCreate) {
