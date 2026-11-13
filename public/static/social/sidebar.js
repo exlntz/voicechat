@@ -600,7 +600,7 @@ export function createSidebar({ root, navigate, openDmWith, openProfile }) {
     const input = h('input', { type: 'text', class: 'g-field__input', placeholder: 'Имя или юзернейм друга', autocomplete: 'off', spellcheck: 'false' })
     const codeLink = h('button', { type: 'button', class: 'g-frow' }, [
       h('span', { class: 'g-ava g-ava--ico' }, [icon('link')]),
-      h('span', { class: 'g-frow__text' }, [h('span', { class: 'g-frow__name' }, 'Звонок по ссылке'), h('span', { class: 'g-frow__sub' }, 'создать и скопировать ссылку')])
+      h('span', { class: 'g-frow__text' }, [h('span', { class: 'g-frow__name' }, 'Звонок по ссылке')])
     ])
     // Сразу создаём комнату и входим в неё; ссылка для собеседников копируется сама
     codeLink.addEventListener('click', () => { done(); window.VL.autoCreateCall = true; navigate('/lobby') })

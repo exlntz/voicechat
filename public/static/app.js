@@ -1054,6 +1054,12 @@ async function renderLobby(prefillRoomCode = '') {
 
   screen.appendChild(gCallHeader(creating ? 'Новый звонок' : 'Вход в звонок'))
   screen.appendChild(el('div', { class: 'g-join__body' }, [preview, card]))
+  // «Звонок по ссылке»: экран подключения не показываем — сразу собираем звонок,
+  // на это время только тихий индикатор по центру
+  if (autoCreate) {
+    screen.classList.add('g-join--ghost')
+    screen.appendChild(el('div', { class: 'g-join__auto', role: 'status' }, [el('span', { class: 'g-jb__spin' }), el('span', {}, 'Создаём звонок…')]))
+  }
   root.appendChild(screen)
 
   // ---- Управление превью камеры ----
@@ -1175,6 +1181,7 @@ async function renderLobby(prefillRoomCode = '') {
     const startedAt = Date.now()
     let mediaAt = 0
     const fail = (e) => {
+      screen.classList.remove('g-join--ghost')
       errorSlot.style.display = 'block'
       errorSlot.className = 'error-box g-join__err'
       errorSlot.textContent = (e && e.message) || 'Ошибка подключения. Проверьте интернет-соединение.'
@@ -1210,11 +1217,14 @@ async function renderLobby(prefillRoomCode = '') {
         // Всё подключено и отрисовано: загрузка превращается в галочку, затем открывается звонок
         onReady: async () => {
           // Каждый шаг успевает прочитаться: всего не меньше секунды, «Микрофон и камера» — 450 мс
-          const now = Date.now()
-          const wait = Math.max(1000 - (now - startedAt), mediaAt ? 450 - (now - mediaAt) : 0)
-          if (wait > 0) await new Promise((r) => setTimeout(r, wait))
-          setJoinState('ok', 'Вы в звонке', 3)
-          await new Promise((r) => setTimeout(r, 620))
+          // (при «Звонке по ссылке» экран подключения скрыт — не ждём, сразу в звонок)
+          if (!autoCreate) {
+            const now = Date.now()
+            const wait = Math.max(1000 - (now - startedAt), mediaAt ? 450 - (now - mediaAt) : 0)
+            if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+            setJoinState('ok', 'Вы в звонке', 3)
+            await new Promise((r) => setTimeout(r, 620))
+          }
           stopPreview()
           vlNavigate(`/room/${data.roomCode}`)
           // Создали звонок — ссылка для собеседников сразу в буфере обмена
