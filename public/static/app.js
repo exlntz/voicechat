@@ -1231,7 +1231,8 @@ async function renderLobby(prefillRoomCode = '') {
           if (creating) {
             const link = `${location.origin}/room/${data.roomCode}`
             const ok = await copyToClipboard(link)
-            showToast(ok ? 'Ссылка на звонок скопирована' : 'Звонок создан — ссылку можно скопировать кнопкой сверху', ok ? 'success' : 'info')
+            if (ok && VL.showLinkCopied) VL.showLinkCopied('Ссылка на звонок скопирована')
+            else if (!ok) showToast('Звонок создан — ссылку можно скопировать кнопкой сверху', 'info')
           }
         },
         onFail: fail
@@ -1339,13 +1340,19 @@ async function enterRoom(joinData, opts = {}) {
     copyLinkHovered = false
     if (copyLinkBtn.classList.contains('is-copied')) resetCopyLinkSoon()
   })
+  // Кнопка сверху сама показывает «Ссылка на звонок скопирована» — без уведомления снизу,
+  // которое закрывало кнопки звонка (так же — при автокопировании после «Звонка по ссылке»)
+  const showLinkCopied = (text = 'Ссылка скопирована') => {
+    copyLinkBtn.classList.add('is-copied')
+    copyLinkLabel.textContent = text
+    clearTimeout(copyLinkTimer)
+    if (!copyLinkHovered) resetCopyLinkSoon()
+  }
+  VL.showLinkCopied = showLinkCopied
   copyLinkBtn.addEventListener('click', async () => {
     const ok = await copyToClipboard(location.href)
     if (!ok) { showToast('Не удалось скопировать ссылку', 'error'); return }
-    copyLinkBtn.classList.add('is-copied')
-    copyLinkLabel.textContent = 'Ссылка скопирована'
-    clearTimeout(copyLinkTimer)
-    if (!copyLinkHovered) resetCopyLinkSoon()
+    showLinkCopied()
   })
   topRight.appendChild(copyLinkBtn)
   // «Звонок в отдельном окне»: в браузере — Document Picture-in-Picture (окно поверх всех
