@@ -391,27 +391,36 @@
       prev = v
       place()
     }
-    function place() {
+    var carShown = false
+    // jump — поставить курсор сразу, без «езды»: при появлении (фокус, открытие окна) он должен
+    // стоять на месте, а не приезжать с левого края
+    function place(jump) {
       txt.style.transform = el.scrollLeft || el.scrollTop ? 'translate(' + (-el.scrollLeft) + 'px,' + (-el.scrollTop) + 'px)' : ''
       var pos = el.selectionStart, end = el.selectionEnd
       var show = !off && document.activeElement === el && pos === end
       mir.classList.toggle('is-caret', show)
-      if (!show) return
+      if (!show) { carShown = false; return }
+      if (!carShown) jump = true
+      carShown = true
+      // Окно может ещё раскрываться (scale) — переводим экранные координаты в свои
       var kids = txt.childNodes, mr = mir.getBoundingClientRect(), x, y, r
+      var sc = mir.offsetWidth ? mr.width / mir.offsetWidth || 1 : 1
       if (pos > 0 && kids[pos - 1]) {
         var rs = kids[pos - 1].getClientRects()
         r = rs[rs.length - 1]
-        if (kids[pos - 1].textContent === '\n') { x = padL; y = r.bottom - mr.top + (lineH - carH) / 2 }
-        else { x = r.right - mr.left; y = r.top - mr.top + (r.height - carH) / 2 }
+        if (kids[pos - 1].textContent === '\n') { x = padL; y = (r.bottom - mr.top) / sc + (lineH - carH) / 2 }
+        else { x = (r.right - mr.left) / sc; y = (r.top - mr.top) / sc + (r.height / sc - carH) / 2 }
       } else if (kids[0]) {
         r = kids[0].getClientRects()[0]
-        x = r.left - mr.left; y = r.top - mr.top + (r.height - carH) / 2
+        x = (r.left - mr.left) / sc; y = (r.top - mr.top) / sc + (r.height / sc - carH) / 2
       } else {
         x = padL
-        y = multi ? padT + (lineH - carH) / 2 : (mr.height - carH) / 2
-        if (mir.style.justifyContent === 'center') x = mr.width / 2
+        y = multi ? padT + (lineH - carH) / 2 : (mir.offsetHeight - carH) / 2
+        if (mir.style.justifyContent === 'center') x = mir.offsetWidth / 2
       }
+      if (jump) car.style.transition = 'none'
       car.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)'
+      if (jump) { void car.offsetWidth; car.style.transition = '' }
       car.classList.remove('blink'); void car.offsetWidth; car.classList.add('blink')
     }
     function reset() { txt.textContent = ''; prev = ''; render(false) }
@@ -432,10 +441,10 @@
       })
     } catch (e) {}
     el.addEventListener('input', function () { if (off) setOff(false); else render(true) })
-    el.addEventListener('focus', function () { layout() })
-    el.addEventListener('blur', place)
+    el.addEventListener('focus', function () { carShown = false; layout() })
+    el.addEventListener('blur', function () { place() })
     ;['keydown', 'keyup', 'click', 'select', 'scroll', 'mouseup'].forEach(function (ev) {
-      el.addEventListener(ev, function () { requestAnimationFrame(place) })
+      el.addEventListener(ev, function () { requestAnimationFrame(function () { place() }) })
     })
     el.addEventListener('animationstart', function (e) { if (e.animationName === 'st-autofill') setOff(true) })
     new MutationObserver(function () { reset() }).observe(el, { attributes: true, attributeFilter: ['type'] })
@@ -444,6 +453,13 @@
     layout()
     if (el.value) render(false)
   }
+  // Окно с полем доиграло анимацию появления — уточняем курсор (без «езды»)
+  ;['animationend', 'transitionend'].forEach(function (ev) {
+    document.addEventListener(ev, function (e) {
+      var a = document.activeElement
+      if (a && a.__st && e.target && e.target.contains && e.target.contains(a)) a.__st.place(true)
+    }, true)
+  })
   document.addEventListener('selectionchange', function () {
     var a = document.activeElement
     if (a && a.__st) a.__st.place()
@@ -584,7 +600,7 @@
   // клик тут же нагружает страницу (открытие чата, перерисовка списка). Обработчик один на документ.
   var RIP_SEL = 'button, a.g-row, a.g-btn, [role="button"], [role="menuitem"], [role="option"], .g-crow, .g-frow, .g-urow'
   // Без заливки: переключатели с бегунком (вкладки Чаты / Звонки / Друзья, «Тема», «Размер текста») и шапка чата
-  var RIP_SKIP = 'input, textarea, select, [contenteditable="true"], .no-rip, .tile video, [role="tab"], [role="tablist"] button, [role="radio"], .g-seg button, .g-chat__who'
+  var RIP_SKIP = 'input, textarea, select, [contenteditable="true"], .no-rip, .tile video, .g-tabs__btn, .g-bar__btn, [role="radio"], .g-seg button, .g-chat__who'
   var ripReduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches
   var ripCur = null
   var RIP_GROW = 300

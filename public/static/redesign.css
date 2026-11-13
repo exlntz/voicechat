@@ -1905,11 +1905,12 @@ input:-webkit-autofill { animation: st-autofill 1ms; }
 .g-rip { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; z-index: 0; contain: strict; }
 .g-rip__dot { position: absolute; border-radius: 50%; background: rgba(255, 255, 255, .09); transform: scale(.04); will-change: transform, opacity; }
 html[data-theme="light"] .g-rip__dot { background: rgba(0, 0, 0, .08); }
-/* выбранная строка (тёмная в светлой теме) — круг светлый, чтобы он был виден до конца.
-   Нажатая строка перекрашивается сразу, как в Telegram: если фон, текст и круг меняют цвет
-   каждый со своей скоростью, при отпускании получается мерцание */
-.g-row:has(> .g-rip), .g-row:has(> .g-rip) span, .g-row:has(> .g-rip) .vl-avatar { transition-property: translate, box-shadow, transform, opacity !important; }
-.is-on > .g-rip > .g-rip__dot, html[data-theme="light"] .is-on > .g-rip > .g-rip__dot { background: rgba(255, 255, 255, .12); }
+/* Нажатую строку выбрали (открылся чат): она перекрашивается целиком и сразу — аватар в ней
+   создаётся заново и плавно не меняется, а фон, текст и круг каждый со своей скоростью давали
+   мерцание. Круг при этом просто растворяется */
+.g-row:has(> .g-rip), .g-row:has(> .g-rip) * { transition-property: translate, box-shadow, transform, opacity !important; }
+.g-rip { transition: opacity .22s ease !important; }
+.is-on > .g-rip { opacity: 0; }
 
 /* ─────────── «Добавить друга» на ПК: строка поиска выезжает под кнопкой ───────────
    Высота растёт пружиной (grid 0fr → 1fr), сама строка опускается и проявляется */
