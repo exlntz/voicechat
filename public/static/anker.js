@@ -587,7 +587,7 @@
   var RIP_SKIP = 'input, textarea, select, [contenteditable="true"], .no-rip, .tile video, [role="tab"], [role="tablist"] button, [role="radio"], .g-seg button, .g-chat__who'
   var ripReduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches
   var ripCur = null
-  var RIP_GROW = 220
+  var RIP_GROW = 300
   function ripRelease() {
     var st = ripCur
     ripCur = null
@@ -595,8 +595,8 @@
     st.fading = true
     // Быстрый клик: круг сначала почти дорастает, потом мягко тает — без вспышки
     var left = Math.max(0, RIP_GROW * 0.6 - (performance.now() - st.t0))
-    var fade = st.dot.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, delay: left, easing: 'cubic-bezier(.33, 0, .2, 1)', fill: 'forwards' })
-    fade.onfinish = function () { st.wrap.__gone = true; if (st.wrap.parentNode) st.wrap.parentNode.removeChild(st.wrap) }
+    var fade = st.dot.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 320, delay: left, easing: 'cubic-bezier(.33, 0, .2, 1)', fill: 'forwards' })
+    fade.onfinish = function () { st.wrap.__gone = true; if (st.wrap.__mo) st.wrap.__mo.disconnect(); if (st.wrap.parentNode) st.wrap.parentNode.removeChild(st.wrap) }
   }
   if (!ripReduce && typeof Element.prototype.animate === 'function') {
     document.addEventListener('pointerdown', function (e) {
@@ -624,12 +624,11 @@
       el.appendChild(wrap)
       // Строка чата при выборе пересобирает своё содержимое — возвращаем слой на место,
       // чтобы круг дорос и растаял, как в Telegram, а не пропал вместе со старыми детьми
-      ;(function keep() {
-        if (!wrap.__gone) {
-          if (wrap.parentNode !== el && el.isConnected) el.appendChild(wrap)
-          requestAnimationFrame(keep)
-        }
-      })()
+      // (наблюдатель срабатывает до отрисовки кадра — круг не мигает)
+      if (typeof MutationObserver === 'function') {
+        wrap.__mo = new MutationObserver(function () { if (!wrap.__gone && wrap.parentNode !== el) el.appendChild(wrap) })
+        wrap.__mo.observe(el, { childList: true })
+      }
       dot.animate([{ transform: 'scale(.04)', opacity: 0 }, { opacity: 1, offset: 0.15 }, { transform: 'scale(1)', opacity: 1 }], { duration: RIP_GROW, easing: 'cubic-bezier(.22, .61, .36, 1)', fill: 'forwards' })
       ripCur = { wrap: wrap, dot: dot, fading: false, t0: performance.now() }
     }, true)
