@@ -1854,9 +1854,9 @@ html[data-theme="light"] .auth-form-panel .auth-error.success .auth-msg { color:
 .st-mir.is-multi { display: block; white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word; }
 .st-txt { display: inline-block; white-space: inherit; }
 .st-mir.is-multi .st-txt { display: block; }
-.st-in { animation: st-in .08s ease-out both; }
+.st-in { animation: st-in .2s ease-out both; }
 @keyframes st-in { from { opacity: 0; } }
-.st-car { position: absolute; left: 0; top: 0; width: 2px; border-radius: 1px; background: currentColor; opacity: 0; transition: transform .07s cubic-bezier(.22, 1, .36, 1); }
+.st-car { position: absolute; left: 0; top: 0; width: 2px; border-radius: 1px; background: currentColor; opacity: 0; transition: transform .11s cubic-bezier(.22, 1, .36, 1); }
 .st-mir.is-caret .st-car { opacity: 1; }
 .st-mir.is-caret .st-car.blink { animation: st-blink 1.05s steps(1) .5s infinite; }
 @keyframes st-blink { 50% { opacity: 0; } }
