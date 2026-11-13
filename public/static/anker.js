@@ -336,8 +336,7 @@
     : null
 
   function softType(el) {
-    // Юзернейм в «Добавить друга» печатается обычным текстом (как юзернеймы на входе и в профиле)
-    if (el.__st || calm() || !stValue[el.tagName] || el.readOnly || el.classList.contains('g-fadd__input')) return
+    if (el.__st || calm() || !stValue[el.tagName] || el.readOnly) return
     var multi = el.tagName === 'TEXTAREA'
     var mir = make('span', 'st-mir' + (multi ? ' is-multi' : ''))
     mir.setAttribute('aria-hidden', 'true')
@@ -588,15 +587,15 @@
   var RIP_SKIP = 'input, textarea, select, [contenteditable="true"], .no-rip, .tile video, [role="tab"], [role="tablist"] button, .g-chat__who'
   var ripReduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches
   var ripCur = null
-  var RIP_GROW = 640
+  var RIP_GROW = 360
   function ripRelease() {
     var st = ripCur
     ripCur = null
     if (!st || st.fading) return
     st.fading = true
     // Быстрый клик: круг сначала почти дорастает, потом мягко тает — без вспышки
-    var left = Math.max(0, RIP_GROW * 0.7 - (performance.now() - st.t0))
-    var fade = st.dot.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 560, delay: left, easing: 'cubic-bezier(.33, 0, .2, 1)', fill: 'forwards' })
+    var left = Math.max(0, RIP_GROW * 0.6 - (performance.now() - st.t0))
+    var fade = st.dot.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 360, delay: left, easing: 'cubic-bezier(.33, 0, .2, 1)', fill: 'forwards' })
     fade.onfinish = function () { st.wrap.__gone = true; if (st.wrap.parentNode) st.wrap.parentNode.removeChild(st.wrap) }
   }
   if (!ripReduce && typeof Element.prototype.animate === 'function') {

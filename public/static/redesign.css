@@ -1938,3 +1938,6 @@ html[data-theme="light"] .g-rip__dot { background: rgba(0, 0, 0, .08); }
 .g-chat__head .g-sfield .vl-search__results { width: min(380px, calc(100vw - 20px)); }
 html[data-theme] .g-chat__head .g-sfield { padding-right: 0; }
 @media (max-width: 860px) { .g-chat__head .g-sfield { --sx: 40px; } }
+/* Зеркало мягкого набора (anker.js) считает позицию от ближайшего позиционированного предка,
+   а у выезжающей карточки есть transform — держим зеркало внутри строки поля */
+.g-fadd__row { position: relative; }
