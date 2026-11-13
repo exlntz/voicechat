@@ -1058,7 +1058,7 @@ async function renderLobby(prefillRoomCode = '') {
   }
   // Гость: имя, под которым его увидят в звонке, и вход в аккаунт для тех, у кого он есть
   const guestInput = guest ? el('input', { type: 'text', class: 'g-join__inp', placeholder: 'Гость', value: savedGuestName, maxlength: '40', autocomplete: 'name', spellcheck: 'false' }) : null
-  const loginLink = guest ? el('button', { type: 'button', class: 'g-join__login' }, 'У меня есть аккаунт — войти') : null
+  const loginLink = null // «Войти в аккаунт» убрано с экрана подключения — вход для гостя обсуждаем отдельно
   if (guest) {
     const ava = noCam.querySelector('.g-join__ava')
     const nm = namePill.querySelector('.g-join__nm')
@@ -1069,7 +1069,6 @@ async function renderLobby(prefillRoomCode = '') {
       errorSlot.style.display = 'none'
     })
     guestInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doJoin() })
-    loginLink.addEventListener('click', () => { stopPreview(); renderAuthScreen(urlRoom) })
   }
   const card = el('div', { class: 'g-join__card' }, [
     el('span', { class: 'g-join__title' }, creating ? 'Новый звонок' : 'Войти в звонок'),
