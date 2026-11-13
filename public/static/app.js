@@ -1231,7 +1231,7 @@ async function renderLobby(prefillRoomCode = '') {
           if (creating) {
             const link = `${location.origin}/room/${data.roomCode}`
             const ok = await copyToClipboard(link)
-            showToast(ok ? 'Ссылка на звонок скопирована — отправьте её собеседнику' : 'Звонок создан — ссылку можно скопировать кнопкой сверху', ok ? 'success' : 'info')
+            showToast(ok ? 'Ссылка на звонок скопирована' : 'Звонок создан — ссылку можно скопировать кнопкой сверху', ok ? 'success' : 'info')
           }
         },
         onFail: fail
