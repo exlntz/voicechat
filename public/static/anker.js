@@ -602,18 +602,10 @@
   // Без заливки: переключатели с бегунком (вкладки Чаты / Звонки / Друзья, «Тема», «Размер текста») и шапка чата
   var RIP_SKIP = 'input, textarea, select, [contenteditable="true"], .no-rip, .tile video, .g-tabs__btn, .g-bar__btn, [role="radio"], .g-seg button, .g-chat__who'
   var ripReduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches
-  var ripCur = null
-  var RIP_GROW = 300
-  function ripRelease() {
-    var st = ripCur
-    ripCur = null
-    if (!st || st.fading) return
-    st.fading = true
-    // Быстрый клик: круг сначала почти дорастает, потом мягко тает — без вспышки
-    var left = Math.max(0, RIP_GROW * 0.6 - (performance.now() - st.t0))
-    var fade = st.dot.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 320, delay: left, easing: 'cubic-bezier(.33, 0, .2, 1)', fill: 'forwards' })
-    fade.onfinish = function () { st.wrap.__gone = true; if (st.wrap.__mo) st.wrap.__mo.disconnect(); if (st.wrap.parentNode) st.wrap.parentNode.removeChild(st.wrap) }
-  }
+  // Как в Telegram Web: волна запускается нажатием и сама доигрывает 0.7 с — растёт из точки
+  // нажатия до двойного размера и одновременно тает. От отпускания она не зависит, поэтому
+  // открытие чата и перерисовка в этот момент её не дёргают
+  var RIP_MS = 700
   if (!ripReduce && typeof Element.prototype.animate === 'function') {
     document.addEventListener('pointerdown', function (e) {
       if (e.button !== 0 || !e.isPrimary) return
@@ -621,35 +613,30 @@
       if (!t || !t.closest || t.closest(RIP_SKIP)) return
       var el = t.closest(RIP_SEL)
       if (!el || el.disabled || el.getAttribute('aria-disabled') === 'true') return
-      ripRelease()
       var r = el.getBoundingClientRect()
       if (!r.width || !r.height) return
       var cs = getComputedStyle(el)
       if (cs.position === 'static') el.classList.add('g-rip-host')
-      var x = e.clientX - r.left, y = e.clientY - r.top
-      var rad = Math.ceil(Math.hypot(Math.max(x, r.width - x), Math.max(y, r.height - y)) + 2)
-      var wrap = document.createElement('span')
-      wrap.className = 'g-rip'
-      wrap.setAttribute('aria-hidden', 'true')
-      // У кнопки без скругления (вкладки «Чаты / Звонки / Друзья») заливка — капсулой, как бегунок
-      if (parseFloat(cs.borderTopLeftRadius) === 0 && parseFloat(cs.borderBottomRightRadius) === 0) wrap.style.borderRadius = (r.height / 2).toFixed(1) + 'px'
+      var wrap = null
+      for (var i = 0; i < el.children.length; i++) if (el.children[i].classList.contains('g-rip')) { wrap = el.children[i]; break }
+      if (!wrap) {
+        wrap = document.createElement('span')
+        wrap.className = 'g-rip'
+        wrap.setAttribute('aria-hidden', 'true')
+        // У кнопки без скругления (вкладки) заливка — капсулой
+        if (parseFloat(cs.borderTopLeftRadius) === 0 && parseFloat(cs.borderBottomRightRadius) === 0) wrap.style.borderRadius = (r.height / 2).toFixed(1) + 'px'
+        el.appendChild(wrap)
+      }
+      var size = Math.max(r.width, r.height)
       var dot = document.createElement('span')
       dot.className = 'g-rip__dot'
-      dot.style.cssText = 'left:' + (x - rad).toFixed(1) + 'px;top:' + (y - rad).toFixed(1) + 'px;width:' + rad * 2 + 'px;height:' + rad * 2 + 'px'
+      dot.style.cssText = 'left:' + (e.clientX - r.left - size / 2).toFixed(1) + 'px;top:' + (e.clientY - r.top - size / 2).toFixed(1) + 'px;width:' + size + 'px;height:' + size + 'px'
       wrap.appendChild(dot)
-      el.appendChild(wrap)
-      // Строка чата при выборе пересобирает своё содержимое — возвращаем слой на место,
-      // чтобы круг дорос и растаял, как в Telegram, а не пропал вместе со старыми детьми
-      // (наблюдатель срабатывает до отрисовки кадра — круг не мигает)
-      if (typeof MutationObserver === 'function') {
-        wrap.__mo = new MutationObserver(function () { if (!wrap.__gone && wrap.parentNode !== el) el.appendChild(wrap) })
-        wrap.__mo.observe(el, { childList: true })
+      var anim = dot.animate([{ transform: 'scale(0)', opacity: 1 }, { transform: 'scale(2)', opacity: 0 }], { duration: RIP_MS, easing: 'ease', fill: 'forwards' })
+      anim.onfinish = function () {
+        dot.remove()
+        if (!wrap.children.length) wrap.remove()
       }
-      dot.animate([{ transform: 'scale(.04)', opacity: 0 }, { opacity: 1, offset: 0.15 }, { transform: 'scale(1)', opacity: 1 }], { duration: RIP_GROW, easing: 'cubic-bezier(.22, .61, .36, 1)', fill: 'forwards' })
-      ripCur = { wrap: wrap, dot: dot, fading: false, t0: performance.now() }
     }, true)
-    document.addEventListener('pointerup', ripRelease, true)
-    document.addEventListener('pointercancel', ripRelease, true)
-    window.addEventListener('blur', ripRelease)
   }
 })()
