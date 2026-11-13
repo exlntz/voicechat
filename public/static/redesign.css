@@ -346,7 +346,7 @@ body.vl-ready #vl-sidebar.g-side {
   background-color: transparent; color: var(--g-ink); box-shadow: 0 0 0 rgba(0, 0, 0, 0); translate: 0 0;
   transition: background-color .34s var(--g-ease), color .34s var(--g-ease), box-shadow .5s var(--g-spring), translate .5s var(--g-spring), transform .45s var(--g-spring); }
 .g-row:not(.is-on):not(.is-skeleton):hover { background-color: var(--g-field); }
-.g-row:active { transform: scale(.96); transition-duration: .1s; }
+/* нажатие показывает заливка из точки клика (anker.js) — без «прыжка» масштаба */
 .g-row.is-on { background-color: var(--g-acc); color: var(--g-on-acc); box-shadow: var(--g-lift); translate: 0 -2px; }
 .g-row span { transition: background-color .34s var(--g-ease), color .34s var(--g-ease), opacity .34s, box-shadow .34s; }
 .g-ava.vl-avatar { font-size: calc(var(--size) * 0.375); font-weight: 600; }
