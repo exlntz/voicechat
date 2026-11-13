@@ -2002,3 +2002,9 @@ html[data-theme="light"] .g-ava.vl-avatar.is-saved { background: var(--g-ava) !i
 html[data-theme="light"] .g-tabs__knob, html[data-theme="light"] .g-seg__k, html[data-theme="light"] .g-bar__knob { background: #ffffff; box-shadow: 0 1px 3px rgba(17, 17, 19, .12), 0 0 0 .5px rgba(17, 17, 19, .04); }
 html[data-theme="light"] .g-tabs__btn.is-on, html[data-theme="light"] .g-seg button[data-on="1"], html[data-theme="light"] .g-bar__btn.is-on { color: var(--g-ink) !important; }
 html[data-theme="light"] .g-tabs__btn.is-on .g-tabs__badge { background: var(--g-acc); color: var(--g-on-acc); }
+
+/* «Звонок по ссылке»: экран подключения скрыт, пока звонок собирается; по центру — тихий индикатор */
+.g-join.g-join--ghost > :not(.g-join__auto) { visibility: hidden; }
+.g-join__auto { display: none; }
+.g-join--ghost > .g-join__auto { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; gap: 12px; font: 600 15px var(--font); color: var(--g-sub); animation: g-fade .4s ease .25s both; }
+.g-join__auto .g-jb__spin { position: static; width: 18px; height: 18px; opacity: 1; }
