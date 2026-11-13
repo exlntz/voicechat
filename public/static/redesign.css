@@ -1187,6 +1187,7 @@ html[data-theme="light"] { --g-on-bg: #8a847c; --g-on-fg: #ffffff; --g-on-bg-h: 
 .settings-sheet.g-scard .g-scard__main, .settings-sheet.g-scard .g-scard__side, .g-pf .g-pf__main, .g-pf .g-pf__side { animation: none; }
 @keyframes g-fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .g-scard__sec, .g-pf__sec { animation: g-fade-up .25s cubic-bezier(.22, 1, .36, 1) both; }
+.g-pf__sec.is-quiet { animation: none; }
 .g-sov.is-closing .settings-sheet.g-scard, .g-pf-overlay.is-closing .g-pf { animation: g-soft-out .25s cubic-bezier(.4, 0, 1, 1) both; }
 @keyframes g-soft-out { to { opacity: 0; transform: translateY(10px) scale(.98); } }
 @media (prefers-reduced-motion: reduce) { .settings-sheet.g-scard, .g-pf, .g-scard__sec, .g-pf__sec { animation-duration: .01s; } }
