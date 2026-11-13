@@ -1898,3 +1898,12 @@ input:-webkit-autofill { animation: st-autofill 1ms; }
 @keyframes g-pip-in { from { opacity: 0; scale: .7; } }
 /* Подписи и кнопки демонстрации — поверх обоих видео */
 .room-screen .tile.screen-tile.has-pip > :not(video):not(.tile--pip) { z-index: 5; }
+
+/* ─────────── Заливка от нажатия, как в Telegram (anker.js) ───────────
+   Круг из точки нажатия растёт до краёв элемента, пока кнопка зажата, и тает после отпускания.
+   Рисуется верхним слоем фона самого элемента — скругления соблюдаются без лишней разметки */
+@property --rip-r { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --rip-a { syntax: '<number>'; inherits: false; initial-value: 0; }
+:root { --rip-c: 255 255 255; }
+html[data-theme="light"] { --rip-c: 0 0 0; }
+.g-rip { background-image: radial-gradient(circle at var(--rx, 50%) var(--ry, 50%), rgb(var(--rip-c) / var(--rip-a)) var(--rip-r), transparent calc(var(--rip-r) + .5px)) !important; }
