@@ -722,6 +722,7 @@ export function createChatView({ convId, navigate, menuButton }) {
   // Далеко — прыгаем почти к цели и докручиваем плавно; затем поправляем, пока цель не встанет.
   let flashTimer = 0
   let jumpTimer = 0
+  let jumpLockUntil = 0
   // Перейти к сообщению и подсветить. Сообщения вне экрана рисуются лениво (content-visibility)
   // и до отрисовки имеют условную высоту, поэтому плавно прокручивать через сотни таких сообщений
   // нельзя — прокрутка промахивается и дёргается поправками. Как в Telegram: рядом — плавная
@@ -739,12 +740,13 @@ export function createChatView({ convId, navigate, menuButton }) {
       flashTimer = setTimeout(() => node.classList.remove('is-flash'), 1800)
     }
     clearTimeout(jumpTimer)
-    if (Math.abs(off()) > box.height * 1.5) {
+    jumpLockUntil = performance.now() + 1200
+    if (scroller.classList.contains('is-jumping') || Math.abs(off()) > box.height * 1.5) {
       scroller.classList.add('is-jumping')
       jumpTimer = setTimeout(() => {
         if (destroyed || !node.isConnected) { scroller.classList.remove('is-jumping'); return }
         land()
-        requestAnimationFrame(() => { land(); scroller.classList.remove('is-jumping'); mark() })
+        requestAnimationFrame(() => { land(); jumpLockUntil = performance.now() + 900; scroller.classList.remove('is-jumping'); mark() })
       }, 130)
       return
     }
@@ -761,14 +763,17 @@ export function createChatView({ convId, navigate, menuButton }) {
   async function jumpTo(id) {
     const entry = nodes.get('m' + id)
     if (entry) { flash(entry); return }
+    // Сообщения нет в памяти: лента гаснет сразу, пока грузится кусок вокруг него
+    scroller.classList.add('is-jumping')
+    jumpLockUntil = performance.now() + 10000
     try {
       const found = await loadAround(convId, id)
       if (destroyed) return
-      if (!found) { toast('Сообщение удалено', 'info'); return }
+      if (!found) { scroller.classList.remove('is-jumping'); jumpLockUntil = 0; toast('Сообщение удалено', 'info'); return }
       renderList()
       requestAnimationFrame(() => { const e2 = nodes.get('m' + id); if (e2) flash(e2) })
       jumpBtn.hidden = false
-    } catch (e) { toast(e.message, 'error') }
+    } catch (e) { scroller.classList.remove('is-jumping'); jumpLockUntil = 0; toast(e.message, 'error') }
   }
 
   function toolButton(iconName, title, onClick, danger = false) {
@@ -1399,6 +1404,9 @@ export function createChatView({ convId, navigate, menuButton }) {
       if (canMarkRead()) markRead(convId)
       if (trimChat(convId)) scrollToBottom()
     }
+    // Пока идёт переход к сообщению (поиск, ответ), историю не догружаем: подгрузка сверху
+    // сдвигала ленту прямо во время прокрутки — переход сначала дёргался
+    if (performance.now() < jumpLockUntil) return
     maybeLoadOlder()
     maybeLoadNewer()
   }

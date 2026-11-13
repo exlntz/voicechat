@@ -1985,3 +1985,5 @@ html[data-theme="light"] .g-ava.vl-avatar.is-saved { background: var(--g-ava) !i
 /* Переход к далёкому сообщению (поиск, ответ): лента на миг гаснет, встаёт на место и проявляется */
 .vl-chat__scroll > .vl-chat__list { transition: opacity .18s ease; }
 .vl-chat__scroll.is-jumping > .vl-chat__list { opacity: 0; transition-duration: .12s; }
+.g-empty.g-empty--btn { width: 100%; border: 0; background: none; cursor: pointer; font: inherit; color: var(--g-sub); }
+.g-empty.g-empty--btn:hover { color: var(--g-ink); }
