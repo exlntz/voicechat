@@ -301,9 +301,11 @@ export function createChatView({ convId, navigate, menuButton }) {
     renderList()
   }
   let highlight = ''
+  function hitId() { const m = search.index >= 0 && search.hits[search.index]; return m ? m.id : 0 }
   async function runSearch() {
     const q = searchInput.value.trim()
     search.q = q
+    searchUp.disabled = searchDown.disabled = false
     if (!q) { search.hits = []; search.index = -1; searchResults.hidden = true; searchCount.textContent = ''; highlight = ''; renderList(); return }
     try {
       const r = await api.get(`/api/conversations/${convId}/search?q=${encodeURIComponent(q)}`)
@@ -311,8 +313,10 @@ export function createChatView({ convId, navigate, menuButton }) {
       search.hits = r.messages
       search.index = -1
       highlight = q
-      searchCount.textContent = r.messages.length ? `${r.messages.length}${r.messages.length >= 100 ? '+' : ''}` : 'нет'
+      searchCount.textContent = r.messages.length ? '' : 'нет'
       renderResults()
+      // Сразу к самому свежему совпадению, как в Telegram; список результатов — по фокусу/клику
+      if (r.messages.length) { goHit(0); return }
       renderList()
     } catch (e) { searchCount.textContent = ''; toast(e.message, 'error') }
   }
@@ -331,12 +335,17 @@ export function createChatView({ convId, navigate, menuButton }) {
   function goHit(i) {
     if (!search.hits.length) return
     search.index = Math.max(0, Math.min(i, search.hits.length - 1))
-    searchCount.textContent = `${search.index + 1} из ${search.hits.length}`
+    searchCount.textContent = `${search.index + 1} из ${search.hits.length}${search.hits.length >= 100 ? '+' : ''}`
     searchResults.hidden = true
+    searchUp.disabled = search.index >= search.hits.length - 1
+    searchDown.disabled = search.index <= 0
+    renderList() // подсветка слова переезжает в новое сообщение
     jumpTo(search.hits[search.index].id)
   }
   searchInput.addEventListener('input', () => { clearTimeout(search.timer); search.timer = setTimeout(runSearch, 300) })
-  searchInput.addEventListener('focus', () => { if (search.hits.length) { searchResults.hidden = false; renderResults() } })
+  const showResults = () => { if (search.hits.length) { searchResults.hidden = false; renderResults() } }
+  searchInput.addEventListener('focus', showResults)
+  searchInput.addEventListener('click', showResults)
   searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeSearch(); input.focus() }
     if (e.key === 'Enter') { e.preventDefault(); goHit(search.index + 1) }
@@ -699,11 +708,32 @@ export function createChatView({ convId, navigate, menuButton }) {
     return m.authorId === me.id ? me : (userById(m.authorId) || { id: m.authorId, username: '', displayName: 'Пользователь' })
   }
 
+  // Прокрутить к сообщению точно. Сообщения вне экрана рисуются лениво (content-visibility)
+  // и до отрисовки имеют условную высоту, поэтому плавная прокрутка издалека промахивалась.
+  // Далеко — прыгаем почти к цели и докручиваем плавно; затем поправляем, пока цель не встанет.
+  let flashTimer = 0
   function flash(entry) {
-    entry.node.scrollIntoView({ block: 'center', behavior: 'smooth' })
-    entry.node.classList.remove('is-flash')
-    void entry.node.offsetWidth
-    entry.node.classList.add('is-flash')
+    const node = entry.node
+    const box = scroller.getBoundingClientRect()
+    const off = () => { const r = node.getBoundingClientRect(); return r.top + r.height / 2 - (box.top + box.height / 2) }
+    if (Math.abs(off()) > box.height * 1.2) {
+      scroller.scrollTop += off() - Math.sign(off()) * box.height * 0.5
+      for (let k = 0; k < 3; k++) { const d = off(); if (Math.abs(d) < 1) break; scroller.scrollTop += d - Math.sign(d) * box.height * 0.5 }
+    }
+    scroller.scrollBy({ top: off(), behavior: 'smooth' })
+    let tries = 0
+    const settle = () => {
+      if (destroyed || !node.isConnected) return
+      const d = off()
+      if (Math.abs(d) > 24 && tries++ < 6) scroller.scrollBy({ top: d, behavior: 'smooth' })
+      if (tries < 6 && Math.abs(d) > 24) setTimeout(settle, 260)
+    }
+    setTimeout(settle, 420)
+    document.querySelectorAll('.vl-msg.is-flash').forEach((n) => n.classList.remove('is-flash'))
+    void node.offsetWidth
+    node.classList.add('is-flash')
+    clearTimeout(flashTimer)
+    flashTimer = setTimeout(() => node.classList.remove('is-flash'), 1800)
   }
   // Перейти к сообщению: если его нет в памяти — загрузить страницу вокруг него
   async function jumpTo(id) {
@@ -794,8 +824,8 @@ export function createChatView({ convId, navigate, menuButton }) {
   }
 
   // Текст с подсветкой найденного
-  function textWithHighlight(body) {
-    if (!highlight) return richText(body)
+  function textWithHighlight(body, on) {
+    if (!highlight || !on) return richText(body)
     const frag = document.createDocumentFragment()
     const str = String(body || '')
     const low = str.toLocaleLowerCase('ru')
@@ -1051,7 +1081,7 @@ export function createChatView({ convId, navigate, menuButton }) {
           onOpen: (i) => openLightbox(visual, i, { caption: m.body })
         }))
       }
-      if (m.body || !mediaOnly) parts.push(h('div', { class: 'vl-bubble__text is-selectable' }, [m.body ? textWithHighlight(m.body) : null, meta]))
+      if (m.body || !mediaOnly) parts.push(h('div', { class: 'vl-bubble__text is-selectable' }, [m.body ? textWithHighlight(m.body, !!m.id && m.id === hitId()) : null, meta]))
       else parts.push(h('span', { class: 'vl-bubble__meta is-over-media' }, [...meta.childNodes]))
       // Одно голосовое без текста: время отправки — в одной строке с длительностью, пузырь ниже
       const voiceOnly = files.length === 1 && files[0].kind === 'voice' && !m.body && !m.reply && !m.forward
@@ -1241,7 +1271,8 @@ export function createChatView({ convId, navigate, menuButton }) {
         const files = (m.attachments || []).map((f) => f.id || f.name).join(',')
         const prog = m.pending && m.upload ? Math.round(draftProgress(m) * 50) : ''
         const pinned = m.id && pinSig && isPinned(m.id) ? 1 : 0
-        const hl = highlight && m.body && m.body.toLocaleLowerCase('ru').includes(highlight.toLocaleLowerCase('ru')) ? highlight : ''
+        // Слово подсвечено только в текущем найденном сообщении (как в Telegram)
+        const hl = highlight && m.id && m.id === hitId() ? highlight : ''
         const sig = [m.id, m.body, m.editedAt, m.pending ? 1 : 0, m.failed || '', pos, editingKey === key ? 1 : 0, m.reply ? m.reply.id : '', files, prog, pinned, hl, m.forward ? m.forward.userId : ''].join('|')
         items.push({ key, sig, build: () => buildMessage(m, pos) })
       }
