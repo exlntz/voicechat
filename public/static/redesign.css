@@ -1901,9 +1901,8 @@ input:-webkit-autofill { animation: st-autofill 1ms; }
 
 /* ─────────── Заливка от нажатия, как в Telegram (anker.js) ───────────
    Круг из точки нажатия растёт до краёв элемента, пока кнопка зажата, и тает после отпускания.
-   Рисуется верхним слоем фона самого элемента — скругления соблюдаются без лишней разметки */
-@property --rip-r { syntax: '<length>'; inherits: false; initial-value: 0px; }
-@property --rip-a { syntax: '<number>'; inherits: false; initial-value: 0; }
-:root { --rip-c: 255 255 255; }
-html[data-theme="light"] { --rip-c: 0 0 0; }
-.g-rip { background-image: radial-gradient(circle at var(--rx, 50%) var(--ry, 50%), rgb(var(--rip-c) / var(--rip-a)) var(--rip-r), transparent calc(var(--rip-r) + .5px)) !important; }
+   Отдельный слой: анимируются только transform/opacity — плавно даже при нагрузке на страницу */
+.g-rip-host { position: relative; }
+.g-rip { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; z-index: 0; contain: strict; }
+.g-rip__dot { position: absolute; border-radius: 50%; background: rgba(255, 255, 255, .09); transform: scale(.04); will-change: transform, opacity; }
+html[data-theme="light"] .g-rip__dot { background: rgba(0, 0, 0, .08); }

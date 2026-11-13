@@ -577,54 +577,45 @@
 
   /* ─────────────── Заливка от нажатия, как в Telegram ─────────────── */
   // Нажал на строку чата, кнопку или пункт меню — из точки нажатия вырастает прозрачный круг,
-  // держится, пока кнопка зажата, и тает после отпускания. Рисуется фоном самого элемента
-  // (radial-gradient + @property в redesign.css), поэтому в разметку ничего не вставляется и
-  // скругления элемента соблюдаются сами. Один делегированный обработчик на весь документ.
+  // держится, пока кнопка зажата, и тает после отпускания. Круг — отдельный слой, анимируются
+  // только transform и opacity: их ведёт композитор, поэтому заливка идёт плавно, даже когда
+  // клик тут же нагружает страницу (открытие чата, перерисовка списка). Обработчик один на документ.
   var RIP_SEL = 'button, a.g-row, a.g-btn, [role="button"], [role="menuitem"], [role="option"], .g-crow, .g-frow, .g-urow'
   var RIP_SKIP = 'input, textarea, select, [contenteditable="true"], .no-rip, .tile video'
-  var ripOn = !!(window.CSS && CSS.registerProperty) // без @property круг не анимируется — тогда без заливки
   var ripReduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches
-  var ripEl = null
-  var ripState = typeof WeakMap === 'function' ? new WeakMap() : null
-  function ripPeak() { return document.documentElement.dataset.theme === 'light' ? 0.08 : 0.09 }
-  function ripClear(el) {
-    el.classList.remove('g-rip')
-    el.style.removeProperty('--rx'); el.style.removeProperty('--ry')
-  }
+  var ripCur = null
   function ripRelease() {
-    var el = ripEl
-    ripEl = null
-    var st = el && ripState.get(el)
-    if (!st || st.fade) return
+    var st = ripCur
+    ripCur = null
+    if (!st || st.fading) return
+    st.fading = true
     // Отпустили раньше, чем круг дорос, — он дорастает и одновременно тает
-    st.fade = el.animate([{ '--rip-a': ripPeak() }, { '--rip-a': 0 }], { duration: 380, delay: 80, easing: 'ease-out', fill: 'forwards' })
-    st.fade.onfinish = function () {
-      if (ripState.get(el) !== st) return
-      st.grow.cancel(); st.fade.cancel(); ripState.delete(el); ripClear(el)
-    }
+    var fade = st.dot.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 420, delay: 60, easing: 'cubic-bezier(.4, 0, .6, 1)', fill: 'forwards' })
+    fade.onfinish = function () { if (st.wrap.parentNode) st.wrap.parentNode.removeChild(st.wrap) }
   }
-  if (ripOn && ripState && !ripReduce && typeof Element.prototype.animate === 'function') {
+  if (!ripReduce && typeof Element.prototype.animate === 'function') {
     document.addEventListener('pointerdown', function (e) {
       if (e.button !== 0 || !e.isPrimary) return
       var t = e.target
       if (!t || !t.closest || t.closest(RIP_SKIP)) return
       var el = t.closest(RIP_SEL)
       if (!el || el.disabled || el.getAttribute('aria-disabled') === 'true') return
-      var old = ripState.get(el)
-      if (old) { old.grow.cancel(); if (old.fade) old.fade.cancel(); ripState.delete(el) }
-      // Свой фон-картинку (аватар, градиент) не перетираем
-      else if (getComputedStyle(el).backgroundImage !== 'none') return
+      ripRelease()
       var r = el.getBoundingClientRect()
       if (!r.width || !r.height) return
+      if (getComputedStyle(el).position === 'static') el.classList.add('g-rip-host')
       var x = e.clientX - r.left, y = e.clientY - r.top
-      var max = Math.ceil(Math.hypot(Math.max(x, r.width - x), Math.max(y, r.height - y)) + 2)
-      el.style.setProperty('--rx', x.toFixed(1) + 'px')
-      el.style.setProperty('--ry', y.toFixed(1) + 'px')
-      el.classList.add('g-rip')
-      var peak = ripPeak()
-      var st = { grow: el.animate([{ '--rip-r': '0px', '--rip-a': peak }, { '--rip-r': max + 'px', '--rip-a': peak }], { duration: 450, easing: 'cubic-bezier(.25, .8, .3, 1)', fill: 'forwards' }), fade: null }
-      ripState.set(el, st)
-      ripEl = el
+      var rad = Math.ceil(Math.hypot(Math.max(x, r.width - x), Math.max(y, r.height - y)) + 2)
+      var wrap = document.createElement('span')
+      wrap.className = 'g-rip'
+      wrap.setAttribute('aria-hidden', 'true')
+      var dot = document.createElement('span')
+      dot.className = 'g-rip__dot'
+      dot.style.cssText = 'left:' + (x - rad).toFixed(1) + 'px;top:' + (y - rad).toFixed(1) + 'px;width:' + rad * 2 + 'px;height:' + rad * 2 + 'px'
+      wrap.appendChild(dot)
+      el.appendChild(wrap)
+      dot.animate([{ transform: 'scale(.04)' }, { transform: 'scale(1)' }], { duration: 520, easing: 'cubic-bezier(.2, .7, .25, 1)', fill: 'forwards' })
+      ripCur = { wrap: wrap, dot: dot, fading: false }
     }, true)
     document.addEventListener('pointerup', ripRelease, true)
     document.addEventListener('pointercancel', ripRelease, true)
