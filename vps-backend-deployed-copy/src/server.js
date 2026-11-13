@@ -143,8 +143,16 @@ const app = new Hono()
 
 app.use('/api/*', cors())
 // Все /api/* маршруты требуют авторизации, КРОМЕ /api/auth/* (иначе войти было бы невозможно)
+// Вход в звонок по ссылке — без регистрации: гостю открыт только сам звонок (вход в комнату
+// и её служебные запросы во время звонка), всё остальное по-прежнему требует аккаунт
+const GUEST_PATH = /^\/api\/(join|rooms\/[a-z0-9]+(\/kick|\/screen-shares(\/reconcile)?)?)$/i
+async function optionalAuth(c, next) {
+  c.set('user', getUserByToken(getCookie(c, SESSION_COOKIE)) || null)
+  await next()
+}
 app.use('/api/*', (c, next) => {
   if (c.req.path.startsWith('/api/auth/')) return next()
+  if (GUEST_PATH.test(c.req.path)) return optionalAuth(c, next)
   // Метрики: либо обычная сессия, либо служебный токен (мониторинг/curl с самого VPS)
   if (c.req.path === '/api/metrics' && METRICS_TOKEN && c.req.query('token') === METRICS_TOKEN) return next()
   return requireAuth(c, next)
@@ -327,6 +335,17 @@ app.post('/api/rooms', (c) => {
 // Создатель комнаты (первый, кто вошёл с этим кодом) получает роль хоста и секрет hostSecret,
 // которым может управлять участниками (выгонять). Секрет хранится в БД и возвращается только хосту;
 // при повторном входе с тем же hostSecret (например, после обновления страницы) права хоста подтверждаются.
+// Не больше 20 гостевых входов в минуту с одного адреса
+const guestJoins = new Map()
+function guestJoinAllowed(ip) {
+  const now = Date.now()
+  const list = (guestJoins.get(ip) || []).filter((t) => now - t < 60000)
+  if (list.length >= 20) { guestJoins.set(ip, list); return false }
+  list.push(now); guestJoins.set(ip, list)
+  if (guestJoins.size > 5000) guestJoins.clear()
+  return true
+}
+
 app.post('/api/join', async (c) => {
   const body = await c.req.json().catch(() => ({}))
   let roomCode = (body.roomCode || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -335,7 +354,14 @@ app.post('/api/join', async (c) => {
   // произвольным именем, теперь имя жёстко привязано к аккаунту. Показываем displayName
   // (может быть на любом языке), а не технический username.
   const authUser = c.get('user')
-  const displayName = sanitizeName(authUser?.displayName || authUser?.username || '', 'Гость')
+  // Гость (без аккаунта) заходит только по ссылке на уже названную комнату и под своим именем
+  if (!authUser) {
+    if (!roomCode) return c.json({ error: 'unauthenticated', message: 'Чтобы создать звонок, войдите в аккаунт' }, 401)
+    const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'ip'
+    if (!guestJoinAllowed(String(ip).split(',')[0].trim())) return c.json({ error: 'rate_limited', message: 'Слишком много попыток, попробуйте через минуту' }, 429)
+    if (!String(body.guestName || '').trim()) return c.json({ error: 'guest_name', message: 'Введите имя' }, 400)
+  }
+  const displayName = authUser ? sanitizeName(authUser.displayName || authUser.username || '', 'Гость') : sanitizeName(body.guestName, 'Гость')
   const providedHostSecret = typeof body.hostSecret === 'string' && body.hostSecret ? body.hostSecret : null
 
   // Новая комната по ссылке: код подлиннее — его больше не вводят руками, только открывают ссылку
@@ -379,7 +405,7 @@ app.post('/api/join', async (c) => {
     name: displayName,
     ttl: '12h',
     // Аватарка — чтобы в звонке у участника был кружок с его фото, а не только буквы
-    metadata: JSON.stringify({ isHost, avatar: (authUser && authUser.avatarUrl) || null })
+    metadata: JSON.stringify({ isHost, guest: !authUser, avatar: (authUser && authUser.avatarUrl) || null })
   })
 
   at.addGrant({

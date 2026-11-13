@@ -2008,3 +2008,11 @@ html[data-theme="light"] .g-tabs__btn.is-on .g-tabs__badge { background: var(--g
 .g-join__auto { display: none; }
 .g-join--ghost > .g-join__auto { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; gap: 12px; font: 600 15px var(--font); color: var(--g-sub); animation: g-fade .4s ease .25s both; }
 .g-join__auto .g-jb__spin { position: static; width: 18px; height: 18px; opacity: 1; }
+
+/* Статус своих сообщений, без цвета: одна галочка — доставлено, две — прочитано */
+html .vl-ticks[data-st="delivered"] .t2 { stroke-dashoffset: 11; }
+html .vl-ticks[data-st="read"] .t2 { stroke-dashoffset: 0; }
+html .vl-ticks[data-st="read"], html .vl-view--chat .vl-ticks[data-st="read"], html .g-row .vl-ticks[data-st="read"], html .vl-bubble__meta.is-over-media .vl-ticks[data-st="read"] { color: var(--tick); }
+/* Гость на экране подключения: «У меня есть аккаунт — войти» под кнопкой входа */
+.g-join__login { align-self: center; margin-top: 2px; border: 0; background: none !important; padding: 6px 10px; border-radius: 12px; font: 500 14px var(--font); color: var(--g-sub) !important; cursor: pointer; transition: color .2s, background-color .2s; }
+.g-join__login:hover { color: var(--g-ink) !important; background: var(--g-field) !important; }
