@@ -73,6 +73,8 @@
     if (!st) {
       var wrap = make('span', 'ank-fill')
       wrap.setAttribute('aria-hidden', 'true')
+      // У кнопки без скругления (вкладки «Чаты / Звонки / Друзья») заливка — капсулой, как бегунок
+      if (parseFloat(cs.borderTopLeftRadius) === 0 && parseFloat(cs.borderBottomRightRadius) === 0) wrap.style.borderRadius = (r.height / 2).toFixed(1) + 'px'
       var dot = make('span', 'ank-fill__dot')
       wrap.appendChild(dot)
       st = btn.__ankFill = { wrap: wrap, dot: dot, t0: 0 }
@@ -605,12 +607,15 @@
       ripRelease()
       var r = el.getBoundingClientRect()
       if (!r.width || !r.height) return
-      if (getComputedStyle(el).position === 'static') el.classList.add('g-rip-host')
+      var cs = getComputedStyle(el)
+      if (cs.position === 'static') el.classList.add('g-rip-host')
       var x = e.clientX - r.left, y = e.clientY - r.top
       var rad = Math.ceil(Math.hypot(Math.max(x, r.width - x), Math.max(y, r.height - y)) + 2)
       var wrap = document.createElement('span')
       wrap.className = 'g-rip'
       wrap.setAttribute('aria-hidden', 'true')
+      // У кнопки без скругления (вкладки «Чаты / Звонки / Друзья») заливка — капсулой, как бегунок
+      if (parseFloat(cs.borderTopLeftRadius) === 0 && parseFloat(cs.borderBottomRightRadius) === 0) wrap.style.borderRadius = (r.height / 2).toFixed(1) + 'px'
       var dot = document.createElement('span')
       dot.className = 'g-rip__dot'
       dot.style.cssText = 'left:' + (x - rad).toFixed(1) + 'px;top:' + (y - rad).toFixed(1) + 'px;width:' + rad * 2 + 'px;height:' + rad * 2 + 'px'
