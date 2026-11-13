@@ -263,7 +263,8 @@ export function createChatView({ convId, navigate, menuButton }) {
   // Поле вырастает из кнопки поиска справа налево и встаёт на её место (лупа → крестик);
   // при закрытии сворачивается обратно в кнопку
   let searchAnim = null
-  const SEARCH_EASE = 'cubic-bezier(.2, .9, .25, 1.06)'
+  let searchFill = 0
+  const SEARCH_EASE = 'cubic-bezier(.22, 1, .36, 1)'
   function searchClip(px) { return `inset(0 0 0 calc(100% - ${px}px) round ${px / 2}px)` }
   function openSearch() {
     if (searchAnim) searchAnim.cancel()
@@ -276,10 +277,16 @@ export function createChatView({ convId, navigate, menuButton }) {
     searchBar.style.height = searchBar.style.minHeight = bh + 'px'
     // Шире 380 не нужно; на узком экране — до левого края шапки
     searchBar.style.width = Math.min(380, bRight - Math.max(0, headWho.offsetLeft) - 4) + 'px'
+    // Цвет капсулы — ровно цвет кнопки-лупы, чтобы она росла из неё без смены цвета
+    searchBar.style.setProperty('--sbg', getComputedStyle(searchBtn).backgroundColor)
     searchBar.hidden = false
     searchBtn.classList.add('is-on', 'is-under')
-    searchAnim = searchBar.animate([{ clipPath: searchClip(br.height) }, { clipPath: 'inset(0 0 0 0 round ' + br.height / 2 + 'px)' }], { duration: 480, easing: SEARCH_EASE })
+    // Сначала растёт пустая капсула цвета кнопки, содержимое проявляется, когда она почти раскрылась
     searchBar.classList.remove('is-closing')
+    searchBar.classList.add('is-empty')
+    searchAnim = searchBar.animate([{ clipPath: searchClip(br.height) }, { clipPath: 'inset(0 0 0 0 round ' + br.height / 2 + 'px)' }], { duration: 420, easing: SEARCH_EASE })
+    clearTimeout(searchFill)
+    searchFill = setTimeout(() => searchBar.classList.remove('is-empty'), 170)
     searchInput.focus({ preventScroll: true })
     searchInput.select()
   }
@@ -287,9 +294,10 @@ export function createChatView({ convId, navigate, menuButton }) {
     if (!searchBar.hidden && !searchBar.classList.contains('is-closing')) {
       if (searchAnim) searchAnim.cancel()
       const hgt = searchBar.getBoundingClientRect().height || 46
-      searchBar.classList.add('is-closing')
+      searchBar.classList.add('is-closing', 'is-empty')
+      clearTimeout(searchFill)
       searchResults.hidden = true
-      searchAnim = searchBar.animate([{ clipPath: 'inset(0 0 0 0 round ' + hgt / 2 + 'px)' }, { clipPath: searchClip(hgt) }], { duration: 300, easing: 'cubic-bezier(.4, 0, .2, 1)', fill: 'forwards' })
+      searchAnim = searchBar.animate([{ clipPath: 'inset(0 0 0 0 round ' + hgt / 2 + 'px)' }, { clipPath: searchClip(hgt) }], { duration: 320, delay: 60, easing: 'cubic-bezier(.4, 0, .2, 1)', fill: 'forwards' })
       searchAnim.onfinish = () => { searchBar.hidden = true; searchBar.classList.remove('is-closing'); searchAnim.cancel(); searchAnim = null }
     }
     searchBtn.classList.remove('is-on', 'is-under')

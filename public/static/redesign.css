@@ -1949,6 +1949,11 @@ html[data-theme] .g-chat__head .g-sfield { padding: 0 calc((var(--sx, 46px) - va
 .g-chat__head .g-sfield .vl-search__count { margin: 0 6px 0 4px; font-size: 13px; color: var(--g-sub); font-variant-numeric: tabular-nums; }
 .g-chat__head .g-sfield .vl-search__count:empty { display: none; }
 .g-chat__head .g-sfield .vl-search__results { width: min(380px, calc(100vw - 20px)); }
+/* поле того же цвета, что и кнопка-лупа: растёт из неё без смены цвета; содержимое
+   проявляется, когда капсула почти раскрылась (is-empty), и гаснет перед сворачиванием */
+html[data-theme] .g-chat__head .g-sfield, html[data-theme] .g-chat__head .g-sfield:focus-within { background: var(--sbg, var(--g-field)); }
+.g-chat__head .g-sfield > :not(.vl-search__results) { transition: opacity .22s ease; }
+.g-chat__head .g-sfield.is-empty > :not(.vl-search__results) { opacity: 0; transition-duration: .1s; }
 /* пока поиск открыт, лупа под ним спрятана — края кнопки не выглядывают */
 .g-chat__head .g-hbtn.is-under { visibility: hidden; transition: visibility 0s; }
 @media (max-width: 860px) { .g-chat__head .g-sfield { --sx: 40px; --sb: 32px; } }
