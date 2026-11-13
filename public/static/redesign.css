@@ -2016,3 +2016,10 @@ html .vl-ticks[data-st="read"], html .vl-view--chat .vl-ticks[data-st="read"], h
 /* Гость на экране подключения: «У меня есть аккаунт — войти» под кнопкой входа */
 .g-join__login { align-self: center; margin-top: 2px; border: 0; background: none !important; padding: 6px 10px; border-radius: 12px; font: 500 14px var(--font); color: var(--g-sub) !important; cursor: pointer; transition: color .2s, background-color .2s; }
 .g-join__login:hover { color: var(--g-ink) !important; background: var(--g-field) !important; }
+/* Экран подключения: ошибки — тихой строкой под полем/кнопкой, как на экране входа */
+html[data-theme] .g-join .auth-error.g-join__msg[style*="display: block"] { display: block !important; margin: -4px 0 0; padding: 0; background: none; animation: none; }
+html[data-theme] .g-join .g-join__msg .auth-msg { min-height: 0; padding: 0 20px; border-radius: 0; background: none; font-size: 13px; font-weight: 500; line-height: 18px; color: #c98d8d; animation: auth-line-in .35s cubic-bezier(.22, 1, .36, 1) both; }
+html[data-theme] .g-join .g-join__msg .auth-msg::before { display: none; }
+html[data-theme="light"] .g-join .g-join__msg .auth-msg { color: #b4534a; }
+/* Мягкий набор (anker.js) считает позицию от поля — держим зеркало внутри его блока */
+.g-join__f { position: relative; }

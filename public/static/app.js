@@ -958,7 +958,14 @@ async function renderLobby(prefillRoomCode = '') {
   const me = state.currentUser || { displayName: savedGuestName, username: '' }
   const myName = me.displayName || me.username || 'Гость'
   const screen = el('div', { class: 'lobby-screen g-join' })
-  const errorSlot = el('div', { class: 'g-join__err', style: 'display:none' })
+  // Ошибки — тихой строкой под полем или кнопкой, к которой относятся (как на экране входа)
+  const errorSlot = el('div', { class: 'auth-error g-join__msg', style: 'display:none' })
+  const showJoinError = (text, after) => {
+    errorSlot.replaceChildren(el('div', { class: 'auth-msg' }, text))
+    const anchor = after || joinBtn
+    if (anchor.parentNode && anchor.nextSibling !== errorSlot) anchor.after(errorSlot)
+    errorSlot.style.display = 'block'
+  }
 
   // Превью: камера или крупная буква; сверху — индикатор микрофона, снизу — имя и кнопки
   const preview = el('div', { class: 'device-preview g-join__prev' })
@@ -1197,9 +1204,7 @@ async function renderLobby(prefillRoomCode = '') {
     const roomCode = urlRoom
     const guestName = guest ? guestInput.value.trim() : ''
     if (guest && !guestName) {
-      errorSlot.style.display = 'block'
-      errorSlot.className = 'error-box g-join__err'
-      errorSlot.textContent = 'Введите имя — так вас увидят в звонке'
+      showJoinError('Введите имя — так вас увидят в звонке', guestInput)
       guestInput.focus()
       return
     }
@@ -1214,9 +1219,7 @@ async function renderLobby(prefillRoomCode = '') {
     let mediaAt = 0
     const fail = (e) => {
       screen.classList.remove('g-join--ghost')
-      errorSlot.style.display = 'block'
-      errorSlot.className = 'error-box g-join__err'
-      errorSlot.textContent = (e && e.message) || 'Ошибка подключения. Проверьте интернет-соединение.'
+      showJoinError((e && e.message) || 'Ошибка подключения. Проверьте интернет-соединение.')
       setJoinState('idle')
     }
 
@@ -3743,8 +3746,16 @@ async function enterRoom(joinData, opts = {}) {
     setCallActive(false)
     try { room.disconnect() } catch {}
     document.querySelectorAll('audio').forEach((a) => a.remove())
+    const leftCode = state.roomCode
     state.room = null
     state.roomCode = null
+    // Гость (без аккаунта) после выхода — снова на экран входа в этот же звонок:
+    // чатов и остального сайта у него нет (раньше оставался чёрный экран)
+    if (!state.currentUser && leftCode) {
+      history.replaceState({}, '', '/room/' + leftCode)
+      renderLobby(leftCode)
+      return
+    }
     if (typeof VL.onCallEnded === 'function') { VL.onCallEnded(); return }
     history.pushState({}, '', '/')
     renderLobby()
