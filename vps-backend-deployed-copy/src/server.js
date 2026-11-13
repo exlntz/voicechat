@@ -337,6 +337,7 @@ app.post('/api/rooms', (c) => {
 // при повторном входе с тем же hostSecret (например, после обновления страницы) права хоста подтверждаются.
 // Не больше 20 гостевых входов в минуту с одного адреса
 const guestJoins = new Map()
+const recentGuestNames = new Map() // комната → недавно выданные имена «Гость N»
 function guestJoinAllowed(ip) {
   const now = Date.now()
   const list = (guestJoins.get(ip) || []).filter((t) => now - t < 60000)
@@ -359,20 +360,36 @@ app.post('/api/join', async (c) => {
     if (!roomCode) return c.json({ error: 'unauthenticated', message: 'Чтобы создать звонок, войдите в аккаунт' }, 401)
     const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'ip'
     if (!guestJoinAllowed(String(ip).split(',')[0].trim())) return c.json({ error: 'rate_limited', message: 'Слишком много попыток, попробуйте через минуту' }, 429)
-    if (!String(body.guestName || '').trim()) return c.json({ error: 'guest_name', message: 'Введите имя' }, 400)
   }
-  const displayName = authUser ? sanitizeName(authUser.displayName || authUser.username || '', 'Гость') : sanitizeName(body.guestName, 'Гость')
+  let displayName = authUser ? sanitizeName(authUser.displayName || authUser.username || '', 'Гость') : ''
   const providedHostSecret = typeof body.hostSecret === 'string' && body.hostSecret ? body.hostSecret : null
 
   // Новая комната по ссылке: код подлиннее — его больше не вводят руками, только открывают ссылку
   if (!roomCode) roomCode = randomId(10)
 
   let currentCount = 0
+  let participants = []
   try {
-    const participants = await svc.listParticipants(roomCode)
+    participants = await svc.listParticipants(roomCode)
     currentCount = participants.length
   } catch {
     currentCount = 0
+  }
+  // Гость без имени: «Гость», следующий — «Гость 1», «Гость 2»… (не повторяясь в этой комнате)
+  if (!authUser) {
+    const asked = String(body.guestName || '').trim()
+    displayName = asked ? sanitizeName(asked, 'Гость') : ''
+    if (!displayName) {
+      // Учитываем и тех, кому имя только что выдали, но они ещё подключаются
+      const now = Date.now()
+      const recent = (recentGuestNames.get(roomCode) || []).filter((g) => now - g.t < 60000)
+      const taken = new Set([...participants.map((p) => p.name), ...recent.map((g) => g.name)])
+      displayName = 'Гость'
+      for (let n = 1; taken.has(displayName); n++) displayName = `Гость ${n}`
+      recent.push({ name: displayName, t: now })
+      recentGuestNames.set(roomCode, recent)
+      if (recentGuestNames.size > 2000) recentGuestNames.clear()
+    }
   }
 
   if (currentCount >= MAX_PARTICIPANTS) {
