@@ -1057,7 +1057,7 @@ async function renderLobby(prefillRoomCode = '') {
     joinDots.forEach((d, i) => { d.dataset.on = i < step ? '1' : '0' })
   }
   // Гость: имя, под которым его увидят в звонке, и вход в аккаунт для тех, у кого он есть
-  const guestInput = guest ? el('input', { type: 'text', class: 'g-join__inp', placeholder: 'Ваше имя', value: savedGuestName, maxlength: '40', autocomplete: 'name', spellcheck: 'false' }) : null
+  const guestInput = guest ? el('input', { type: 'text', class: 'g-join__inp', placeholder: 'Гость', value: savedGuestName, maxlength: '40', autocomplete: 'name', spellcheck: 'false' }) : null
   const loginLink = guest ? el('button', { type: 'button', class: 'g-join__login' }, 'У меня есть аккаунт — войти') : null
   if (guest) {
     const ava = noCam.querySelector('.g-join__ava')
@@ -1073,7 +1073,7 @@ async function renderLobby(prefillRoomCode = '') {
   }
   const card = el('div', { class: 'g-join__card' }, [
     el('span', { class: 'g-join__title' }, creating ? 'Новый звонок' : 'Войти в звонок'),
-    guest ? field('Ваше имя', guestInput) : null,
+    guest ? field('Ваше имя · необязательно', guestInput) : null,
     field('Микрофон', makeDropdown(micSelect, 'mic')),
     spkField,
     field('Камера', makeDropdown(camSelect, 'cam')),
@@ -1203,12 +1203,8 @@ async function renderLobby(prefillRoomCode = '') {
   async function doJoin() {
     const roomCode = urlRoom
     const guestName = guest ? guestInput.value.trim() : ''
-    if (guest && !guestName) {
-      showJoinError('Введите имя — так вас увидят в звонке', guestInput)
-      guestInput.focus()
-      return
-    }
-    if (guest) { try { localStorage.setItem('vl:guest-name', guestName) } catch (e) {} }
+    // Имя необязательно: без него сервер назовёт «Гость», «Гость 1», «Гость 2»…
+    if (guest) { try { if (guestName) localStorage.setItem('vl:guest-name', guestName); else localStorage.removeItem('vl:guest-name') } catch (e) {} }
     // Если ранее этот же браузер создал комнату с таким кодом - подтягиваем сохранённый секрет создателя,
     // чтобы при повторном входе (например, обновление страницы) права хоста восстановились
     const savedHostSecret = roomCode ? localStorage.getItem(`hostSecret:${roomCode}`) : null
