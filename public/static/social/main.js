@@ -555,7 +555,9 @@ async function boot() {
   if (!me) {
     body.classList.add('vl-auth')
     const r = parseRoute()
-    VL.renderAuthScreen(r.name === 'room' ? r.code : '')
+    // По ссылке на звонок без аккаунта — сразу экран подключения гостем (имя + устройства)
+    if (r.name === 'room') { VL.renderLobby(r.code); return }
+    VL.renderAuthScreen('')
     return
   }
   VL.state.currentUser = me

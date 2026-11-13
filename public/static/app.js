@@ -932,14 +932,17 @@ async function renderLobby(prefillRoomCode = '') {
   if (!state.currentUser) {
     state.currentUser = await fetchMe()
   }
-  if (!state.currentUser) {
+  const params = new URLSearchParams(location.search)
+  const urlRoom = (prefillRoomCode || (location.pathname.startsWith('/room/') ? location.pathname.split('/room/')[1] : '') || params.get('room') || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+  // По ссылке на звонок можно зайти без аккаунта — гостем, под своим именем.
+  // Создать новый звонок без аккаунта нельзя: тогда — экран входа
+  const guest = !state.currentUser
+  if (guest && !urlRoom) {
     renderAuthScreen(prefillRoomCode)
     return
   }
 
   root.innerHTML = ''
-  const params = new URLSearchParams(location.search)
-  const urlRoom = (prefillRoomCode || (location.pathname.startsWith('/room/') ? location.pathname.split('/room/')[1] : '') || params.get('room') || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')
   // Звонок по ссылке: кода вводить не нужно. Пришли по ссылке /room/<код> — входим в эту
   // комнату (старые ссылки вроде /room/111 тоже работают); без кода — создаём новую
   // комнату, сразу заходим в неё и копируем ссылку для собеседников
@@ -950,8 +953,10 @@ async function renderLobby(prefillRoomCode = '') {
   const idleLabel = creating ? 'Создать звонок' : 'Войти в звонок'
 
   // ---- Разметка как в канвасе «Вход в звонок»: слева превью, справа карточка ----
-  const me = state.currentUser
-  const myName = me.displayName || me.username
+  let savedGuestName = ''
+  try { savedGuestName = localStorage.getItem('vl:guest-name') || '' } catch (e) {}
+  const me = state.currentUser || { displayName: savedGuestName, username: '' }
+  const myName = me.displayName || me.username || 'Гость'
   const screen = el('div', { class: 'lobby-screen g-join' })
   const errorSlot = el('div', { class: 'g-join__err', style: 'display:none' })
 
@@ -1044,14 +1049,31 @@ async function renderLobby(prefillRoomCode = '') {
     }
     joinDots.forEach((d, i) => { d.dataset.on = i < step ? '1' : '0' })
   }
+  // Гость: имя, под которым его увидят в звонке, и вход в аккаунт для тех, у кого он есть
+  const guestInput = guest ? el('input', { type: 'text', class: 'g-join__inp', placeholder: 'Ваше имя', value: savedGuestName, maxlength: '40', autocomplete: 'name', spellcheck: 'false' }) : null
+  const loginLink = guest ? el('button', { type: 'button', class: 'g-join__login' }, 'У меня есть аккаунт — войти') : null
+  if (guest) {
+    const ava = noCam.querySelector('.g-join__ava')
+    const nm = namePill.querySelector('.g-join__nm')
+    guestInput.addEventListener('input', () => {
+      const v = guestInput.value.trim()
+      if (ava) ava.textContent = (Array.from(v)[0] || 'Г').toUpperCase()
+      if (nm) nm.textContent = v || 'Гость'
+      errorSlot.style.display = 'none'
+    })
+    guestInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doJoin() })
+    loginLink.addEventListener('click', () => { stopPreview(); renderAuthScreen(urlRoom) })
+  }
   const card = el('div', { class: 'g-join__card' }, [
     el('span', { class: 'g-join__title' }, creating ? 'Новый звонок' : 'Войти в звонок'),
+    guest ? field('Ваше имя', guestInput) : null,
     field('Микрофон', makeDropdown(micSelect, 'mic')),
     spkField,
     field('Камера', makeDropdown(camSelect, 'cam')),
     errorSlot,
-    joinBtn
-  ])
+    joinBtn,
+    loginLink
+  ].filter(Boolean))
 
   screen.appendChild(gCallHeader(creating ? 'Новый звонок' : 'Вход в звонок'))
   screen.appendChild(el('div', { class: 'g-join__body' }, [preview, card]))
@@ -1173,6 +1195,15 @@ async function renderLobby(prefillRoomCode = '') {
 
   async function doJoin() {
     const roomCode = urlRoom
+    const guestName = guest ? guestInput.value.trim() : ''
+    if (guest && !guestName) {
+      errorSlot.style.display = 'block'
+      errorSlot.className = 'error-box g-join__err'
+      errorSlot.textContent = 'Введите имя — так вас увидят в звонке'
+      guestInput.focus()
+      return
+    }
+    if (guest) { try { localStorage.setItem('vl:guest-name', guestName) } catch (e) {} }
     // Если ранее этот же браузер создал комнату с таким кодом - подтягиваем сохранённый секрет создателя,
     // чтобы при повторном входе (например, обновление страницы) права хоста восстановились
     const savedHostSecret = roomCode ? localStorage.getItem(`hostSecret:${roomCode}`) : null
@@ -1195,11 +1226,11 @@ async function renderLobby(prefillRoomCode = '') {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({ roomCode, hostSecret: savedHostSecret })
+        body: JSON.stringify({ roomCode, hostSecret: savedHostSecret, guestName: guest ? guestName : undefined })
       })
       const data = await res.json()
 
-      if (res.status === 401) {
+      if (res.status === 401 && !guest) {
         state.currentUser = null
         renderAuthScreen(roomCode)
         return
