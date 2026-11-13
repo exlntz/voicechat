@@ -1949,6 +1949,8 @@ html[data-theme] .g-chat__head .g-sfield { padding: 0 calc((var(--sx, 46px) - va
 .g-chat__head .g-sfield .vl-search__count { margin: 0 6px 0 4px; font-size: 13px; color: var(--g-sub); font-variant-numeric: tabular-nums; }
 .g-chat__head .g-sfield .vl-search__count:empty { display: none; }
 .g-chat__head .g-sfield .vl-search__results { width: min(380px, calc(100vw - 20px)); }
+/* пока поиск открыт, лупа под ним спрятана — края кнопки не выглядывают */
+.g-chat__head .g-hbtn.is-under { visibility: hidden; transition: visibility 0s; }
 @media (max-width: 860px) { .g-chat__head .g-sfield { --sx: 40px; --sb: 32px; } }
 .g-chat__head .g-sfield > .vl-ico { margin-right: 8px; }
 
@@ -1969,3 +1971,8 @@ html[data-theme="light"] { --g-hit: rgba(255, 186, 48, .42); --g-hit-band: rgba(
 
 /* Светлая тема: иконка «Избранного» серая, как остальные аватары (на тёмной она тоже серая) */
 html[data-theme="light"] .g-ava.vl-avatar.is-saved { background: var(--g-ava) !important; color: var(--g-ink); }
+
+/* Крестик карточки профиля лежит на обложке: всегда тёмное стекло с белым крестиком —
+   на светлой теме при наведении он светлел и сливался с крестиком */
+.vl-round.is-glass.vl-ucard__close, html[data-theme] .vl-round.is-glass.vl-ucard__close { background: rgba(10, 12, 15, .45) !important; color: #fff !important; }
+.vl-round.is-glass.vl-ucard__close:hover, html[data-theme] .vl-round.is-glass.vl-ucard__close:hover { background: rgba(10, 12, 15, .65) !important; color: #fff !important; }
