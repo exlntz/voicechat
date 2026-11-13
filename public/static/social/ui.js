@@ -567,7 +567,7 @@ export function applyTheme(choice = getThemeChoice()) {
   root.dataset.theme = t
   root.style.colorScheme = t
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.content = t === 'light' ? '#eceae6' : '#171617'
+  if (meta) meta.content = t === 'light' ? '#efeff2' : '#171617'
   window.dispatchEvent(new CustomEvent('vl-theme', { detail: t }))
 }
 export function setThemeChoice(choice) {
