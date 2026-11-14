@@ -2105,3 +2105,51 @@ html[data-theme] .room-screen .stage.is-portrait:not(.is-tight) .tile:not(.is-lo
 .room-screen .stage.is-tight .tile .g-vol { right: 54px; bottom: 10px; }
 .room-screen .stage.is-tight .tile .tile-fullscreen-btn { right: 10px; bottom: 10px; }
 .room-screen .stage.is-tight .g-share-badge { display: none; }
+
+/* ─────────── Вход в звонок на телефоне ─────────── */
+@media (max-width: 640px) and (orientation: portrait) {
+  .lobby-screen.g-join { padding: calc(env(safe-area-inset-top) + 8px) 16px calc(env(safe-area-inset-bottom) + 16px); }
+  .g-join .g-join__login { top: calc(env(safe-area-inset-top) + 12px); right: 16px; height: 36px; padding: 0 14px; font-size: 13px; }
+  .g-join .g-join__body { align-items: stretch; }
+  .g-join__col { width: 100%; gap: 12px; justify-content: center; }
+  /* Превью выше и крупнее: 4:5 вместо 16:9, но всегда остаётся место под имя и кнопку */
+  .g-join__col > .device-preview.g-join__prev { width: 100%; aspect-ratio: 4 / 5; height: auto; max-height: calc(100dvh - 300px); min-height: 220px; border-radius: 28px; }
+  .g-join__prev .g-join__ava { width: 104px; height: 104px; font-size: 40px; }
+  .g-join__meter { left: 14px; top: 14px; height: 32px; font-size: 13px; padding: 0 12px; gap: 8px; }
+  /* Имя видно ниже крупно — в превью не дублируем, чтобы оно не наезжало на кнопки */
+  .g-join__prev .g-join__name { display: none; }
+  .g-join__cbar { bottom: 16px; gap: 12px; }
+  .g-join__setcorner { right: 16px; bottom: 16px; }
+  .g-join__who { margin-top: 4px; }
+  .g-join__who-n, html[data-theme] .g-join .g-join__who input.g-join__who-inp { font-size: 28px !important; }
+  html[data-theme] .g-join .g-join__who input.g-join__who-inp { width: 100%; }
+  .g-join__bar { width: 100%; }
+  .g-join__bar .g-join__btn { width: 100%; max-width: none; height: 56px; }
+}
+@media (max-width: 380px) and (orientation: portrait) {
+  .g-join .g-callhead__name, .g-join .g-callhead .g-callhead__title { display: none; }
+}
+/* Настройки устройств на телефоне — шторкой снизу */
+@media (max-width: 640px), (max-height: 500px) {
+  .g-join__set { left: 8px !important; right: 8px !important; bottom: calc(env(safe-area-inset-bottom) + 8px) !important; top: auto !important; width: auto; max-width: none; max-height: calc(100dvh - 24px); overflow-y: auto; transform-origin: 50% 100%; }
+}
+/* Телефон горизонтально: превью слева, имя и кнопка справа */
+@media (max-height: 500px) and (orientation: landscape) {
+  .lobby-screen.g-join { padding: 8px calc(env(safe-area-inset-right) + 16px) 12px calc(env(safe-area-inset-left) + 16px); }
+  .g-join .g-callhead { height: 44px; }
+  .g-join .g-join__login { top: 10px; right: calc(env(safe-area-inset-right) + 16px); height: 34px; font-size: 13px; padding: 0 14px; }
+  .g-join .g-join__body { align-items: center; }
+  .g-join__col { width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 1fr auto auto 1fr; column-gap: 20px; row-gap: 12px; align-items: center; justify-items: center; }
+  .g-join__col > .device-preview.g-join__prev { grid-column: 1; grid-row: 1 / -1; width: auto; height: calc(100dvh - 100px); max-height: none; aspect-ratio: 4 / 3; border-radius: 24px; }
+  .g-join__col > :not(.g-join__prev) { grid-column: 2; }
+  .g-join__col > .g-join__who { grid-row: 2; margin: 0; }
+  .g-join__col > .g-join__bar { grid-row: 3; width: 100%; justify-content: center; }
+  .g-join__col > .g-join__msg { grid-row: 4; align-self: start; }
+  .g-join__bar .g-join__btn { width: 100%; max-width: 320px; height: 50px; }
+  .g-join__prev .g-join__ava { width: 84px; height: 84px; font-size: 32px; }
+  .g-join__prev .g-join__name { display: none; }
+  .g-join__meter { left: 12px; top: 12px; height: 30px; font-size: 12px; }
+  .g-join__cbar { bottom: 12px; }
+  .g-join__setcorner { right: 12px; bottom: 12px; }
+  .g-join__who-n, html[data-theme] .g-join .g-join__who input.g-join__who-inp { font-size: 24px !important; width: min(320px, 100%); }
+}
