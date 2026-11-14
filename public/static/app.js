@@ -1870,6 +1870,99 @@ async function enterRoom(joinData, opts = {}) {
     }
     tick()
   }
+  // Раз в 15 с отправляем на сервер техническую сводку звонка (без имён и содержимого): путь медиа,
+  // потери, провалы захвата микрофона, заглушённый звук, нагрузка от видео. По ней разбираемся
+  // с жалобами на качество — что именно рвёт звук: сеть, устройство говорящего или слушающего.
+  function startCallTelemetry() {
+    const sid = Math.random().toString(36).slice(2, 8)
+    let prev = null, prevAt = 0
+    const num = (v) => (typeof v === 'number' && isFinite(v) ? v : 0)
+    async function collect() {
+      const c = { aSent: 0, aSrcDur: 0, aDrop: 0, aDropEv: 0, aRemLost: 0, inLost: 0, inRecv: 0, inConc: 0, inTot: 0, inJbDelay: 0, inJbCount: 0, vLimCpu: 0, vLimBw: 0, vDur: 0, vNack: 0, vSent: 0, vBytes: 0, vEncMs: 0, vEnc: 0, vinDec: 0, vinDrop: 0, vinFreeze: 0, vinLost: 0, vinRecv: 0 }
+      const g = { path: null, rtt: null, pubs: 0, subs: 0, scr: '', cam: '', aRemFrac: null, enc: '' }
+      const lp = room.localParticipant
+      for (const pub of lp.trackPublications.values()) {
+        const sender = pub.track && pub.track.sender
+        if (!sender) continue
+        g.pubs++
+        const rep = await sender.getStats()
+        if (!g.path) g.path = pairPath(rep)
+        if (g.rtt === null) g.rtt = pairRtt(rep)
+        rep.forEach((r) => {
+          if (r.type === 'media-source' && r.kind === 'audio' && pub.source === LK.Track.Source.Microphone) {
+            c.aSrcDur += num(r.totalSamplesDuration); c.aDrop += num(r.droppedSamplesDuration); c.aDropEv += num(r.droppedSamplesEvents)
+          } else if (r.type === 'outbound-rtp' && r.kind === 'audio' && pub.source === LK.Track.Source.Microphone) {
+            c.aSent += num(r.packetsSent)
+          } else if (r.type === 'remote-inbound-rtp' && r.kind === 'audio' && pub.source === LK.Track.Source.Microphone) {
+            c.aRemLost += Math.max(0, num(r.packetsLost)); if (typeof r.fractionLost === 'number') g.aRemFrac = r.fractionLost
+          } else if (r.type === 'outbound-rtp' && r.kind === 'video') {
+            const d = r.qualityLimitationDurations || {}
+            c.vLimCpu += num(d.cpu); c.vLimBw += num(d.bandwidth); c.vDur += num(d.cpu) + num(d.bandwidth) + num(d.none) + num(d.other)
+            c.vNack += num(r.nackCount); c.vSent += num(r.packetsSent); c.vBytes += num(r.bytesSent); c.vEncMs += num(r.totalEncodeTime) * 1000; c.vEnc += num(r.framesEncoded)
+            if (r.frameHeight) {
+              const t = `${r.frameWidth}x${r.frameHeight}@${Math.round(num(r.framesPerSecond))}`
+              if (pub.source === LK.Track.Source.ScreenShare) { g.scr = t; g.enc = (r.encoderImplementation || '') + (r.powerEfficientEncoder ? '/hw' : '') } else if (!g.cam || r.frameHeight > parseInt(g.cam.split('x')[1], 10)) g.cam = t
+            }
+          }
+        })
+      }
+      for (const p of room.remoteParticipants.values()) {
+        for (const pub of p.trackPublications.values()) {
+          const receiver = pub.track && pub.track.receiver
+          if (!receiver) continue
+          g.subs++
+          const rep = await receiver.getStats()
+          if (!g.path) g.path = pairPath(rep)
+          if (g.rtt === null) g.rtt = pairRtt(rep)
+          rep.forEach((r) => {
+            if (r.type !== 'inbound-rtp') return
+            if (r.kind === 'audio') {
+              c.inLost += Math.max(0, num(r.packetsLost)); c.inRecv += num(r.packetsReceived); c.inConc += num(r.concealedSamples); c.inTot += num(r.totalSamplesReceived)
+              c.inJbDelay += num(r.jitterBufferDelay) * 1000; c.inJbCount += num(r.jitterBufferEmittedCount)
+            } else {
+              c.vinDec += num(r.framesDecoded); c.vinDrop += num(r.framesDropped); c.vinFreeze += num(r.totalFreezesDuration) * 1000
+              c.vinLost += Math.max(0, num(r.packetsLost)); c.vinRecv += num(r.packetsReceived)
+            }
+          })
+        }
+      }
+      return { c, g }
+    }
+    const tick = async () => {
+      if (callCleanedUp) return
+      try {
+        if (room.state === 'connected') {
+          const now = performance.now()
+          const { c, g } = await collect()
+          if (prev && g.pubs + g.subs > 0) {
+            const dt = (now - prevAt) / 1000
+            const d = {}
+            for (const k in c) d[k] = c[k] >= prev[k] ? c[k] - prev[k] : c[k]
+            const pct = (a, b) => (b > 0 ? Math.round(a / b * 1000) / 10 : null)
+            const mic = lp.isMicrophoneEnabled
+            const body = {
+              room: state.roomCode, sid, app: IS_ELECTRON ? 'exe' : 'web', ua: (navigator.userAgent.match(/(Edg|OPR|YaBrowser|Firefox|Chrome|Version)\/[\d]+/g) || []).slice(-2).join(' ') + (/Mobile|Android|iPhone/.test(navigator.userAgent) ? ' mob' : ''),
+              cores: navigator.hardwareConcurrency || 0, hidden: document.hidden ? 1 : 0, n: room.remoteParticipants.size + 1,
+              path: g.path, rtt: g.rtt === null ? null : Math.round(g.rtt * 1000), dt: Math.round(dt),
+              mic: mic ? 1 : 0,
+              // доля реального времени, которую микрофон реально отдал (≈100 — норма; меньше — провалы захвата)
+              micCap: mic ? pct(d.aSrcDur, dt) : null, micDropMs: Math.round(d.aDrop * 1000), micDropEv: d.aDropEv,
+              micPps: mic ? Math.round(d.aSent / dt) : null, micUpLoss: pct(d.aRemLost, d.aSent + d.aRemLost),
+              inLoss: pct(d.inLost, d.inLost + d.inRecv), inConc: pct(d.inConc, d.inTot), inJbMs: d.inJbCount > 0 ? Math.round(d.inJbDelay / d.inJbCount) : null,
+              cam: lp.isCameraEnabled ? g.cam : '', scr: lp.isScreenShareEnabled ? g.scr : '', enc: lp.isScreenShareEnabled ? g.enc : '',
+              vKbps: Math.round(d.vBytes * 8 / dt / 1000), vEncMs: d.vEnc > 0 ? Math.round(d.vEncMs / d.vEnc * 10) / 10 : null,
+              vLimCpu: pct(d.vLimCpu, d.vDur), vLimBw: pct(d.vLimBw, d.vDur), vNack: d.vNack,
+              vinFps: Math.round(d.vinDec / dt), vinDrop: d.vinDrop, vinFreezeMs: Math.round(d.vinFreeze), vinLoss: pct(d.vinLost, d.vinLost + d.vinRecv)
+            }
+            fetch('/api/call-stats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), keepalive: true }).catch(() => {})
+          }
+          prev = c; prevAt = now
+        }
+      } catch {}
+      if (!callCleanedUp) setTimeout(tick, 15000)
+    }
+    setTimeout(tick, 5000)
+  }
   roomStatus.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') startConnStats() })
   roomStatus.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && !roomStatus.classList.contains('is-open')) stopConnStats() })
   roomStatus.addEventListener('focus', startConnStats)
@@ -2980,6 +3073,7 @@ async function enterRoom(joinData, opts = {}) {
     setStatus('Подключено', '')
     setCallActive(true)
     startPingLoop()
+    startCallTelemetry()
     if (opts.onStage) opts.onStage('media')
 
     // Публикуем камеру/микрофон согласно выбору пользователя в лобби (можно войти с выключенными)

@@ -86,6 +86,26 @@ jobs:
             rm -f /tmp/lk.log
           fi
 
+          sec "livekit: статистика потоков за 24 часа (потери)"
+          if [ -n "$LK" ]; then
+            docker logs --since 24h "$LK" > /tmp/lk2.log 2>&1
+            echo "строк: $(wc -l < /tmp/lk2.log)"
+            echo "--- типы сообщений"
+            awk -F'\t' '{print $2" "$5}' /tmp/lk2.log | sort | uniq -c | sort -rn | head -40
+            echo "--- строки с loss/lost (последние 30, обрезаны)"
+            grep -Ei 'packetsLost|lossRate|packetLoss|"lost"' /tmp/lk2.log | tail -30 | cut -c1-3000 | maskip
+            echo "--- ICE: выбранные пары"
+            grep -Ei 'selected|candidate pair|ice connected|connectionType' /tmp/lk2.log | grep -oEi '(udp|tcp|tls|turn|relay|prflx|srflx|host)[a-z_/ :"]{0,30}' | tr 'A-Z' 'a-z' | sort | uniq -c | sort -rn | head -20
+            rm -f /tmp/lk2.log
+          fi
+          sec "статистика звонков с клиентов (последние 120 записей)"
+          tail -n 120 /opt/zvonki-backend/data/call-stats.log 2>/dev/null | maskip
+          wc -l /opt/zvonki-backend/data/call-stats.log 2>/dev/null
+
+          sec "TURN TLS сертификат"
+          echo | timeout 8 openssl s_client -connect 127.0.0.1:5349 -servername turn.voicelobby.online 2>/dev/null | openssl x509 -noout -subject -enddate -ext subjectAltName 2>&1 | head -8
+          getent hosts turn.voicelobby.online | maskip
+
           sec "порты"
           ss -lunp 2>/dev/null | grep -E ':(3478|7881|7882|443|5349)\b|livekit' | head -20
           echo "UDP сокетов livekit: $(ss -uanp 2>/dev/null | grep -c livekit)"

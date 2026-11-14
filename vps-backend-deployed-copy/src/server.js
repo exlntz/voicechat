@@ -11,7 +11,7 @@ import { randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve, sep } from 'node:path'
-import { readFile, stat } from 'node:fs/promises'
+import { readFile, stat, appendFile, rename } from 'node:fs/promises'
 import { totalmem, freemem, loadavg, cpus } from 'node:os'
 import { initSocialSchema, USERNAME_RE as SOCIAL_USERNAME_RE, USERNAME_HINT, publicUser } from './social/db.js'
 import { createHub } from './social/events.js'
@@ -145,7 +145,7 @@ app.use('/api/*', cors())
 // Все /api/* маршруты требуют авторизации, КРОМЕ /api/auth/* (иначе войти было бы невозможно)
 // Вход в звонок по ссылке — без регистрации: гостю открыт только сам звонок (вход в комнату
 // и её служебные запросы во время звонка), всё остальное по-прежнему требует аккаунт
-const GUEST_PATH = /^\/api\/(join|rooms\/[a-z0-9]+(\/kick|\/screen-shares(\/reconcile)?)?)$/i
+const GUEST_PATH = /^\/api\/(join|call-stats|rooms\/[a-z0-9]+(\/kick|\/screen-shares(\/reconcile)?)?)$/i
 async function optionalAuth(c, next) {
   c.set('user', getUserByToken(getCookie(c, SESSION_COOKIE)) || null)
   await next()
@@ -346,6 +346,35 @@ function guestJoinAllowed(ip) {
   if (guestJoins.size > 5000) guestJoins.clear()
   return true
 }
+
+// Техническая статистика звонка (потери, задержки, нагрузка) — без имён и содержимого.
+// Нужна, чтобы разбираться с жалобами на качество связи: пишется строками в data/call-stats.log,
+// файл сам обрезается (одна прошлая копия), читается ручной диагностикой.
+const CALL_STATS_LOG = join(dirname(DB_PATH), 'call-stats.log')
+let callStatsBytes = -1
+const callStatsRate = new Map()
+app.post('/api/call-stats', async (c) => {
+  const ip = c.req.header('x-real-ip') || c.req.header('x-forwarded-for') || 'x'
+  const now = Date.now()
+  const r = callStatsRate.get(ip)
+  if (r && now - r.t < 60000 && r.n >= 30) return c.body(null, 204)
+  if (!r || now - r.t >= 60000) callStatsRate.set(ip, { t: now, n: 1 }); else r.n++
+  if (callStatsRate.size > 5000) callStatsRate.clear()
+  let text = ''
+  try { text = await c.req.text() } catch { return c.body(null, 204) }
+  if (!text || text.length > 4000) return c.body(null, 204)
+  let obj
+  try { obj = JSON.parse(text) } catch { return c.body(null, 204) }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return c.body(null, 204)
+  const line = JSON.stringify({ at: new Date(now).toISOString(), ...obj }) + '\n'
+  try {
+    if (callStatsBytes < 0) callStatsBytes = await stat(CALL_STATS_LOG).then((x) => x.size, () => 0)
+    if (callStatsBytes > 4_000_000) { await rename(CALL_STATS_LOG, CALL_STATS_LOG + '.1').catch(() => {}); callStatsBytes = 0 }
+    await appendFile(CALL_STATS_LOG, line)
+    callStatsBytes += line.length
+  } catch {}
+  return c.body(null, 204)
+})
 
 app.post('/api/join', async (c) => {
   const body = await c.req.json().catch(() => ({}))
