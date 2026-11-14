@@ -98,6 +98,10 @@ jobs:
             grep -Ei 'selected|candidate pair|ice connected|connectionType' /tmp/lk2.log | grep -oEi '(udp|tcp|tls|turn|relay|prflx|srflx|host)[a-z_/ :"]{0,30}' | tr 'A-Z' 'a-z' | sort | uniq -c | sort -rn | head -20
             rm -f /tmp/lk2.log
           fi
+          sec "статистика звонков с клиентов (последние 120 записей)"
+          tail -n 120 /opt/zvonki-backend/data/call-stats.log 2>/dev/null | maskip
+          wc -l /opt/zvonki-backend/data/call-stats.log 2>/dev/null
+
           sec "TURN TLS сертификат"
           echo | timeout 8 openssl s_client -connect 127.0.0.1:5349 -servername turn.voicelobby.online 2>/dev/null | openssl x509 -noout -subject -enddate -ext subjectAltName 2>&1 | head -8
           getent hosts turn.voicelobby.online | maskip
