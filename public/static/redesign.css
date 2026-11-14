@@ -2060,3 +2060,48 @@ html[data-theme] .g-join .g-join__col > .g-join__msg .auth-msg { justify-content
 
 /* Карточка связи: плохие потери звука — красным */
 .conn-card__val[data-bad="1"] { color: #ff453a; }
+
+/* ─────────── Звонок на вертикальном экране: плитки делят всю сцену ─────────── */
+.room-screen .stage.g-grid.is-portrait { grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); grid-template-rows: repeat(var(--rows), minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); place-content: stretch; gap: 8px; }
+.room-screen .stage.g-grid.is-portrait > .tile.camera-tile, .room-screen .stage.g-grid.is-portrait > .tile.screen-tile { aspect-ratio: auto; width: auto; height: auto; min-width: 0; min-height: 0; }
+.room-screen .stage.g-grid.is-portrait.is-odd > .tile:last-child { grid-column: 1 / -1; }
+html[data-theme] .room-screen .stage.is-portrait .tile { border-radius: 22px; }
+
+/* Уведомления на телефоне: во всю ширину над панелью звонка, без переноса по слогам */
+@media (max-width: 640px) {
+  .toast-container { left: 12px; right: 12px; transform: none; align-items: center; max-width: none; }
+  .toast, .toast.success, .toast.error, .toast.warning, .toast.info { width: auto; max-width: 100%; min-height: 42px; padding: 8px 14px; font-size: 14px; line-height: 1.25; }
+  body:has(.room-screen) .toast-container { bottom: calc(env(safe-area-inset-bottom) + 104px); }
+}
+.room-screen .stage.g-grid.is-portrait { place-items: stretch; padding: 4px; }
+.room-screen .stage.g-grid.is-portrait > .tile { grid-column: auto; justify-self: stretch; align-self: stretch; max-width: none; max-height: none; }
+/* Узкие плитки (две колонки): громкость — только кнопка, имя не залезает под кнопки */
+.room-screen .stage.is-tight .g-vol__tr { display: none; }
+.room-screen .stage.is-tight .g-vol { width: auto; min-width: 0; padding-right: 0; }
+.room-screen .stage.is-portrait .g-tile-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+/* В звонке на телефоне уведомления — сверху под шапкой, не больше двух сразу */
+@media (max-width: 640px) {
+  body:has(.room-screen) .toast-container { bottom: auto; top: calc(env(safe-area-inset-top) + 68px); }
+  body:has(.room-screen) .toast-container .toast:nth-last-child(n+3) { display: none; }
+}
+
+/* Горизонтальная сцена: плитки рядами по центру (неполный последний ряд — тоже по центру) */
+.room-screen .stage.g-grid:not(.is-portrait), .room-screen .stage.g-grid.stage-solo:not(.is-portrait) { display: flex; flex-wrap: wrap; justify-content: center; align-content: center; align-items: center; }
+.room-screen .stage.g-grid:not(.is-portrait) > .tile.camera-tile, .room-screen .stage.g-grid.stage-solo:not(.is-portrait) > .tile.camera-tile, .room-screen .stage.g-grid.stage-solo:not(.is-portrait) > .solo-invite, .room-screen .stage.g-grid:not(.is-portrait) > .tile.screen-tile {
+  width: min(calc((100cqw - (var(--cols) - 1) * 12px) / var(--cols) - .5px), calc((100cqh - (var(--rows) - 1) * 12px) / var(--rows) * 16 / 9)); height: auto; aspect-ratio: 16 / 9;
+}
+/* В звонке уведомления не перекрывают панель управления */
+body:has(.room-screen) .toast-container { bottom: calc(env(safe-area-inset-bottom) + 108px); }
+body:has(.room-screen) .toast-container .toast:nth-last-child(n+4) { display: none; }
+@media (max-width: 640px) { body:has(.room-screen) .toast-container { bottom: auto; } }
+@media (max-height: 480px) { body:has(.room-screen) .toast-container { bottom: auto; top: calc(env(safe-area-inset-top) + 60px); } body:has(.room-screen) .toast-container .toast:nth-last-child(n+2) { display: none; } }
+/* Узкие плитки в любой раскладке */
+.room-screen .stage.is-tight .g-tile-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+/* Закрытая панель участников не отнимает высоту у сцены (колоночная раскладка телефона) */
+.room-screen:not(.people-open) .g-people-side { height: 0; min-height: 0; flex-basis: 0; }
+/* Узкие плитки: имя сверху, кнопки снизу — не мешают друг другу */
+html[data-theme] .room-screen .stage.is-tight .tile .tile-label { top: 10px; bottom: auto; left: 10px; max-width: calc(100% - 20px); height: 32px; font-size: 14px; }
+html[data-theme] .room-screen .stage.is-portrait:not(.is-tight) .tile:not(.is-local) .tile-label { max-width: calc(100% - 250px); }
+.room-screen .stage.is-tight .tile .g-vol { right: 54px; bottom: 10px; }
+.room-screen .stage.is-tight .tile .tile-fullscreen-btn { right: 10px; bottom: 10px; }
+.room-screen .stage.is-tight .g-share-badge { display: none; }
