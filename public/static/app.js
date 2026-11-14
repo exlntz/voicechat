@@ -2160,7 +2160,27 @@ async function enterRoom(joinData, opts = {}) {
       placeTiles(stage, isSolo ? cameraTiles.concat([getSoloInviteCard()]) : cameraTiles)
       const n = isSolo ? 2 : cameraTiles.length
       const wide = stageRatio >= 1.2
-      const cols = n <= 1 ? 1 : n <= 2 ? (wide ? 2 : 1) : n <= 4 ? 2 : n <= 6 ? (wide ? 3 : 2) : 3
+      // Вертикальная сцена (телефон, узкое окно): плитки не 16:9, а делят всю высоту —
+      // до трёх участников одной колонкой, дальше в две; нечётная последняя — на всю ширину
+      const portrait = !isSolo && stageRatio < 1
+      // Горизонтальная сцена: число колонок, при котором плитки 16:9 получаются самыми крупными
+      let cols = 1
+      let tileW = 0
+      if (portrait) { cols = n <= 3 ? 1 : 2; tileW = (stage.clientWidth - 16) / cols }
+      else {
+        const W = Math.max(1, stage.clientWidth - 16), H = Math.max(1, stageH - 16)
+        let best = 0
+        for (let c = 1; c <= n; c++) {
+          const r = Math.ceil(n / c)
+          const w = Math.min((W - (c - 1) * 12) / c, (H - (r - 1) * 12) / r * 16 / 9)
+          if (w > best + 0.5) { best = w; cols = c }
+        }
+        tileW = best
+      }
+      // Узкие плитки: громкость сворачивается в кнопку, чтобы не закрывать имя
+      stage.classList.toggle('is-tight', !isSolo && tileW > 0 && tileW < 300)
+      stage.classList.toggle('is-portrait', portrait)
+      stage.classList.toggle('is-odd', portrait && cols === 2 && n % 2 === 1)
       stage.style.setProperty('--cols', String(cols))
       stage.style.setProperty('--rows', String(Math.ceil(n / cols)))
       placeTiles(sidebar, [])
