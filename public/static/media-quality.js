@@ -202,7 +202,7 @@
         var encoding = Object.assign({}, opts.videoEncoding, {
           maxFramerate: Math.max(num(opts.videoEncoding && opts.videoEncoding.maxFramerate), fps),
           maxBitrate: Math.max(num(opts.videoEncoding && opts.videoEncoding.maxBitrate), bitrate),
-          priority: 'high'
+          priority: 'medium' // ниже голоса: при нехватке канала урезается картинка, а не звук
         })
         opts.simulcast = false // один слой в максимальном качестве
         opts.videoEncoding = encoding
