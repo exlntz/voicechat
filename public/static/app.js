@@ -1670,9 +1670,15 @@ async function enterRoom(joinData, opts = {}) {
     // Главный слой камеры — до 3.5 Мбит/с (было ~1.7 у пресета 720p), запасные слои 360p и 720p
     // вместо 180p/360p: на плохой сети картинка проседает не до «мыла», а до 720p. Демонстрацию
     // это не трогает — у неё свои параметры (screenShareEncoding, media-quality.js)
+    // Звук важнее картинки: голосу — высший приоритет в канале и избыточное кодирование (RED),
+    // чтобы при потерях пакетов он не рвался «как по рации»; камере — обычный приоритет:
+    // когда отдачи не хватает, браузер урезает сначала видео, а не голос
     publishDefaults: {
+      audioPreset: { maxBitrate: 48000, priority: 'high' },
+      red: true,
+      dtx: true,
       simulcast: true,
-      videoEncoding: { maxBitrate: 3500000, maxFramerate: 30, priority: 'high' },
+      videoEncoding: { maxBitrate: 3500000, maxFramerate: 30, priority: 'low' },
       videoSimulcastLayers: [LK.VideoPresets.h360, LK.VideoPresets.h720],
       degradationPreference: 'balanced'
     }
@@ -3104,8 +3110,9 @@ async function enterRoom(joinData, opts = {}) {
         enc.maxFramerate = fps
         enc.maxBitrate = bitrateForFps(fps)
         enc.scaleResolutionDownBy = 1
-        enc.priority = 'high'
-        enc.networkPriority = 'high'
+        // Демонстрации — средний приоритет: выше камеры, но ниже голоса
+        enc.priority = 'medium'
+        enc.networkPriority = 'medium'
       })
       Promise.resolve(sender.setParameters(params)).catch(() => {})
     } catch {}
@@ -3198,8 +3205,8 @@ async function enterRoom(joinData, opts = {}) {
       }, {
         // ВАЖНО: для демонстрации LiveKit берёт параметры ТОЛЬКО из screenShareEncoding,
         // videoEncoding для неё игнорируется. В .exe оба поля потом перезаписывает site-boost.js.
-        screenShareEncoding: { maxBitrate: capBitrate, maxFramerate: fps, priority: 'high' },
-        videoEncoding: { maxBitrate: capBitrate, maxFramerate: fps, priority: 'high' },
+        screenShareEncoding: { maxBitrate: capBitrate, maxFramerate: fps, priority: 'medium' },
+        videoEncoding: { maxBitrate: capBitrate, maxFramerate: fps, priority: 'medium' },
         // Плавность важнее: при нехватке ресурсов энкодер снижает разрешение, а не FPS
         // (в .exe то же самое выставляет site-boost.js)
         degradationPreference: 'maintain-framerate',
