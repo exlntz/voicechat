@@ -1385,9 +1385,14 @@ async function enterRoom(joinData, opts = {}) {
   const connScreenRow = el('div', { class: 'conn-card__row', hidden: '' }, [el('span', {}, 'Демонстрация'), connScreen])
   // Браузер сам урезал качество — только когда это правда происходит, с причиной
   const connLimitRow = el('div', { class: 'conn-card__warn', hidden: '' })
+  // Как идёт звук: UDP напрямую / TCP / через TURN — и сколько входящих пакетов звука теряется
+  const connPath = el('span', { class: 'conn-card__val' }, '—')
+  const connLoss = el('span', { class: 'conn-card__val' }, '—')
   const connCard = el('div', { class: 'conn-card', role: 'tooltip' }, [
     el('div', { class: 'conn-card__head' }, [el('span', { class: 'conn-card__dot' }), connTitle]),
     el('div', { class: 'conn-card__row' }, [el('span', {}, 'Пинг'), connPing]),
+    el('div', { class: 'conn-card__row' }, [el('span', {}, 'Путь'), connPath]),
+    el('div', { class: 'conn-card__row' }, [el('span', {}, 'Потери звука'), connLoss]),
     connVideoRow,
     connScreenRow,
     connLimitRow
@@ -1745,8 +1750,22 @@ async function enterRoom(joinData, opts = {}) {
   // qualityLimitationReason из outbound-rtp: браузер сам снизил разрешение/частоту кадров
   const LIMIT_REASON = { bandwidth: 'слабый интернет', cpu: 'не хватает процессора' }
   const fmtVideo = (v) => v ? `${v.h}p` + (v.fps ? ` · ${Math.round(v.fps)} к/с` : '') : '—'
+  // Выбранная пара ICE → чем на самом деле идут медиа
+  function pairPath(report) {
+    let pair = null
+    report.forEach((r) => { if (r.type === 'transport' && r.selectedCandidatePairId) pair = report.get(r.selectedCandidatePairId) || pair })
+    if (!pair) report.forEach((r) => { if (!pair && r.type === 'candidate-pair' && r.state === 'succeeded' && (r.nominated || r.selected)) pair = r })
+    const loc = pair && report.get(pair.localCandidateId)
+    if (!loc) return null
+    const proto = String(loc.protocol || '').toUpperCase()
+    if (loc.candidateType === 'relay') return `TURN (${String(loc.relayProtocol || proto || '?').toUpperCase()})`
+    return proto === 'TCP' ? 'TCP напрямую' : 'UDP напрямую'
+  }
+  let audioPrev = null // { lost, recv, conc, tot } — прошлый замер, чтобы считать потери за последние секунды
   async function readConnStats() {
     let rtt = null
+    let path = null
+    let aLost = 0, aRecv = 0, aConc = 0, aTot = 0
     let video = null
     let shareVid = null
     const limits = {} // camera / screen → причина снижения
@@ -1756,6 +1775,7 @@ async function enterRoom(joinData, opts = {}) {
       if (!sender) continue
       const rep = await sender.getStats()
       if (rtt === null) rtt = pairRtt(rep)
+      if (!path) path = pairPath(rep)
       const kind = pub.source === LK.Track.Source.Camera ? 'camera' : pub.source === LK.Track.Source.ScreenShare ? 'screen' : ''
       if (!kind) continue
       rep.forEach((r) => {
@@ -1768,6 +1788,19 @@ async function enterRoom(joinData, opts = {}) {
           if (kind === 'camera') video = v; else shareVid = v
         }
       })
+    }
+    // Входящий звук собеседников: потерянные пакеты и «додуманные» браузером куски (хрип/рация)
+    for (const p of room.remoteParticipants.values()) {
+      for (const pub of p.trackPublications.values()) {
+        if (pub.kind !== 'audio' || !pub.track || !pub.track.receiver) continue
+        const rep = await pub.track.receiver.getStats()
+        if (!path) path = pairPath(rep)
+        rep.forEach((r) => {
+          if (r.type !== 'inbound-rtp' || r.kind !== 'audio') return
+          aLost += Math.max(0, r.packetsLost || 0); aRecv += r.packetsReceived || 0
+          aConc += r.concealedSamples || 0; aTot += r.totalSamplesReceived || 0
+        })
+      }
     }
     // Своих треков нет (всё выключено) — пинг по входящему соединению
     if (rtt === null) {
@@ -1792,6 +1825,18 @@ async function enterRoom(joinData, opts = {}) {
     }
     connPing.textContent = rtt === null ? '—' : `${Math.round(rtt * 1000)} мс`
     pingPill.textContent = rtt === null ? '— мс' : `${Math.round(rtt * 1000)} мс`
+    connPath.textContent = path || '—'
+    if (aRecv + aLost > 0) {
+      const pv = audioPrev && audioPrev.recv <= aRecv ? audioPrev : { lost: 0, recv: 0, conc: 0, tot: 0 }
+      const dl = aLost - pv.lost, dr = aRecv - pv.recv, dc = aConc - pv.conc, dt = aTot - pv.tot
+      if (dl + dr > 0) {
+        const loss = Math.max(0, dl) / (Math.max(0, dl) + dr) * 100
+        const conc = dt > 0 ? Math.max(0, dc) / dt * 100 : 0
+        connLoss.textContent = `${loss < 10 ? loss.toFixed(1) : Math.round(loss)}%` + (conc >= 1 ? ` · заглушено ${Math.round(conc)}%` : '')
+        connLoss.dataset.bad = loss >= 3 || conc >= 5 ? '1' : ''
+      }
+      audioPrev = { lost: aLost, recv: aRecv, conc: aConc, tot: aTot }
+    } else connLoss.textContent = '—'
     connVideoRow.hidden = !lp.isCameraEnabled
     if (lp.isCameraEnabled) connVideo.textContent = fmtVideo(video)
     connScreenRow.hidden = !lp.isScreenShareEnabled
