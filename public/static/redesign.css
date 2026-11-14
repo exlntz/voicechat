@@ -2057,3 +2057,6 @@ html[data-theme] .g-join .g-join__col > .g-join__msg .auth-msg { justify-content
   .g-join__who-n, html[data-theme] .g-join .g-join__who input.g-join__who-inp { font-size: 28px !important; }
   .g-join .g-join__login { top: calc(env(safe-area-inset-top) + 10px); right: 14px; }
 }
+
+/* Карточка связи: плохие потери звука — красным */
+.conn-card__val[data-bad="1"] { color: #ff453a; }
