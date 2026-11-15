@@ -92,6 +92,10 @@ jobs:
             echo "строк: $(wc -l < /tmp/lk2.log)"
             echo "--- типы сообщений"
             awk -F'\t' '{print $2" "$5}' /tmp/lk2.log | sort | uniq -c | sort -rn | head -40
+            echo "--- ice reconnected / switched pair (последние 12)"
+            grep -i 'switched pair\|ice reconnected' /tmp/lk2.log | tail -12 | cut -c1-1200 | maskip
+            echo "--- participant closing: причины"
+            grep -i 'participant closing' /tmp/lk2.log | grep -oE '"reason": "[^"]*"|"isExpectedToResume": [a-z]+' | sort | uniq -c
             echo "--- строки с loss/lost (последние 30, обрезаны)"
             grep -Ei 'packetsLost|lossRate|packetLoss|"lost"' /tmp/lk2.log | tail -30 | cut -c1-3000 | maskip
             echo "--- ICE: выбранные пары"

@@ -1659,7 +1659,11 @@ async function enterRoom(joinData, opts = {}) {
     // родная громкость <audio>/<video> ограничена диапазоном [0,1] и браузер бросает исключение
     // при попытке выставить больше 1 - из-за этого слайдер "залипал"/не реагировал на верхних значениях.
     // GainNode такого ограничения не имеет и позволяет усиливать сигнал выше 100% без ошибок.
-    webAudioMix: true,
+    // Звук собеседников играет обычными <audio>, как в Телемосте/Telegram/Discord. Через Web Audio
+    // (webAudioMix) Chrome хуже гасит эхо: эхоподавление «душит» голос и звук рвётся «как по рации»
+    // (сама LiveKit ссылается на этот баг Chromium). Усиление громче 100% включается точечно —
+    // только для того собеседника, кому его выкрутили (см. setPeerVolume).
+    webAudioMix: false,
     // Камера: просим до 1080p/30 (если вебка умеет меньше — браузер отдаст её максимум)
     videoCaptureDefaults: {
       resolution: LK.VideoPresets.h1080.resolution,
@@ -1679,9 +1683,10 @@ async function enterRoom(joinData, opts = {}) {
     // чтобы при потерях пакетов он не рвался «как по рации»; камере — обычный приоритет:
     // когда отдачи не хватает, браузер урезает сначала видео, а не голос
     publishDefaults: {
-      audioPreset: { maxBitrate: 48000, priority: 'high' },
+      // Голос как в Discord: Opus 64 кбит/с; без DTX — начало фраз не «съедается» на шуме
+      audioPreset: { maxBitrate: 64000, priority: 'high' },
       red: true,
-      dtx: true,
+      dtx: false,
       simulcast: true,
       videoEncoding: { maxBitrate: 3500000, maxFramerate: 30, priority: 'low' },
       videoSimulcastLayers: [LK.VideoPresets.h360, LK.VideoPresets.h720],
@@ -1939,6 +1944,7 @@ async function enterRoom(joinData, opts = {}) {
             const d = {}
             for (const k in c) d[k] = c[k] >= prev[k] ? c[k] - prev[k] : c[k]
             const pct = (a, b) => (b > 0 ? Math.round(a / b * 1000) / 10 : null)
+            const lp = room.localParticipant
             const mic = lp.isMicrophoneEnabled
             const body = {
               room: state.roomCode, sid, app: IS_ELECTRON ? 'exe' : 'web', ua: (navigator.userAgent.match(/(Edg|OPR|YaBrowser|Firefox|Chrome|Version)\/[\d]+/g) || []).slice(-2).join(' ') + (/Mobile|Android|iPhone/.test(navigator.userAgent) ? ' mob' : ''),
@@ -2411,7 +2417,7 @@ async function enterRoom(joinData, opts = {}) {
       // Громкость голоса конкретного собеседника (не влияет на других)
       volumeCtl = makeVolumeControl((v) => {
         const p = room.getParticipantByIdentity(identity)
-        if (p) p.setVolume(v, LK.Track.Source.Microphone)
+        if (p) setPeerVolume(p, v, LK.Track.Source.Microphone)
       })
       // Громкость — капсулой в правом нижнем углу плитки (как в канвасе)
       tile.appendChild(volumeCtl)
@@ -2602,7 +2608,7 @@ async function enterRoom(joinData, opts = {}) {
       // Громкость звука демонстрации (звук с устройства демонстрирующего)
       volumeCtl = makeVolumeControl((v) => {
         const p = room.getParticipantByIdentity(identity)
-        if (p) p.setVolume(v, LK.Track.Source.ScreenShareAudio)
+        if (p) setPeerVolume(p, v, LK.Track.Source.ScreenShareAudio)
       })
       tile.appendChild(volumeCtl)
     }
@@ -2795,7 +2801,7 @@ async function enterRoom(joinData, opts = {}) {
         icon: 'fas fa-desktop', label: 'Громкость стрима', initial: screenVolInitial,
         onChange: (v) => {
           const p = room.getParticipantByIdentity(identity)
-          if (p) p.setVolume(v, LK.Track.Source.ScreenShareAudio)
+          if (p) setPeerVolume(p, v, LK.Track.Source.ScreenShareAudio)
           if (screenTileRef && screenTileRef.volumeCtl) syncVolumeControlUI(screenTileRef.volumeCtl, v)
         }
       }))
@@ -2803,7 +2809,7 @@ async function enterRoom(joinData, opts = {}) {
         icon: 'fas fa-microphone', label: 'Громкость пользователя', initial: micVolInitial,
         onChange: (v) => {
           const p = room.getParticipantByIdentity(identity)
-          if (p) p.setVolume(v, LK.Track.Source.Microphone)
+          if (p) setPeerVolume(p, v, LK.Track.Source.Microphone)
           if (camTileRef && camTileRef.volumeCtl) syncVolumeControlUI(camTileRef.volumeCtl, v)
         }
       }))
@@ -2955,6 +2961,41 @@ async function enterRoom(joinData, opts = {}) {
   }
 
   // ---- Track handling ----
+  // ---- Громкость собеседника выше 100% ----
+  // <audio> умеет только 0…1, поэтому для усиления трек этого собеседника временно ведётся через
+  // общий AudioContext с GainNode; вернули ≤100% — снова обычный <audio> (лучшее эхоподавление).
+  const peerVol = new Map() // `${identity}:${source}` → громкость
+  let boostCtx = null
+  function getBoostCtx() {
+    if (!boostCtx) {
+      boostCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' })
+      if (state.selectedSpeakerId && typeof boostCtx.setSinkId === 'function') boostCtx.setSinkId(state.selectedSpeakerId).catch(() => {})
+    }
+    if (boostCtx.state !== 'running') boostCtx.resume().catch(() => {})
+    return boostCtx
+  }
+  function routeBoost(track, on) {
+    if (!track || typeof track.setAudioContext !== 'function') return
+    const has = !!track.audioContext
+    if (on && !has) {
+      track.setAudioContext(getBoostCtx())
+      track.attachedElements.forEach((e) => { e.volume = 0; e.muted = true })
+    } else if (!on && has) {
+      track.setAudioContext(undefined)
+      track.attachedElements.forEach((e) => { e.muted = false; e.volume = 1 })
+    }
+  }
+  function setPeerVolume(p, v, source) {
+    peerVol.set(p.identity + ':' + source, v)
+    const pub = p.getTrackPublication(source)
+    try { routeBoost(pub && pub.track, v > 1) } catch (e) { console.warn('boost', e) }
+    try { p.setVolume(v, source) } catch (e) { console.warn('setVolume', e) }
+  }
+  VL.setSpeakerForBoost = (id) => { if (boostCtx && typeof boostCtx.setSinkId === 'function') boostCtx.setSinkId(id || '').catch(() => {}) }
+  function prepBoost(track, participant, source) {
+    if ((peerVol.get(participant.identity + ':' + source) || 1) > 1 && typeof track.setAudioContext === 'function') track.setAudioContext(getBoostCtx())
+  }
+
   room.on(LK.RoomEvent.TrackSubscribed, (track, publication, participant) => {
     const name = participant.name || participant.identity
     if (track.source === LK.Track.Source.Camera) {
@@ -2963,6 +3004,7 @@ async function enterRoom(joinData, opts = {}) {
       t.placeholder.style.display = 'none'
       updateCamIndicator(participant.identity, false)
     } else if (track.source === LK.Track.Source.Microphone) {
+      prepBoost(track, participant, LK.Track.Source.Microphone)
       const audioEl = document.body.appendChild(el('audio', { autoplay: true, style: 'display:none' }))
       track.attach(audioEl)
       if (state.selectedSpeakerId && typeof audioEl.setSinkId === 'function') {
@@ -2981,6 +3023,7 @@ async function enterRoom(joinData, opts = {}) {
       forceHighRemoteScreenQuality(participant.identity)
       if (!alreadyExisted) showToast(`${name} начал демонстрацию экрана`)
     } else if (track.source === LK.Track.Source.ScreenShareAudio) {
+      prepBoost(track, participant, LK.Track.Source.ScreenShareAudio)
       const audioEl = document.body.appendChild(el('audio', { autoplay: true, style: 'display:none' }))
       track.attach(audioEl)
       if (state.selectedSpeakerId && typeof audioEl.setSinkId === 'function') {
@@ -3650,6 +3693,7 @@ async function enterRoom(joinData, opts = {}) {
 
   function applySpeakerDevice(deviceId, silent = false) {
     state.selectedSpeakerId = deviceId || null
+    try { VL.setSpeakerForBoost(deviceId) } catch {}
     try { if (deviceId) localStorage.setItem('speakerDeviceId', deviceId) } catch {}
     try { room.options.audioOutput = deviceId ? { deviceId } : undefined } catch {}
     if (!deviceId) return
